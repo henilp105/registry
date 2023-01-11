@@ -182,3 +182,69 @@ def transfer_account():
             ),
             200,
         )
+
+@app.route("/users/<username>/maintainer", methods=["GET", "POST"])
+def maintainer_requests(username):
+    uuid = request.cookies.get("uuid")
+    if not uuid:
+        return jsonify({"message": "Unauthorized", "code": 403})
+
+    # Get the user from the database using uuid.
+    user = db.users.find_one({"uuid": uuid})
+
+    # If the user is not found or user name does not match. Just return unauthorized.
+    if not user or user["name"] != username:
+        return jsonify({"message": "Unauthorized", "code": 403})
+
+    if request.method == "GET": 
+        # Extract the pending_requests list from the user document.
+        # pending_requests list contains the package_id's of the package's that
+        # author has received the request to join in as maintainer.
+        pending_requests = user.get("pending_requests")
+        pending_requests_response = []
+
+        for package_id in pending_requests:
+            # Get package using package_id from the database.
+            package = db.packages.find_one({"_id": package_id})
+
+            # Get the author using _id from the database.
+            author = db.users.find_one({"_id": package["author"]})
+
+            pending_requests_response.append({
+                "package_name": package["name"],
+                "author_name": author["name"],
+                "package_id": package["_id"]
+            })
+
+        return jsonify({"data": pending_requests_response, "code": 200}) 
+    
+    else:
+        # Extract whether the request is approve or decline from json payload.
+        data = request.get_json()
+
+        if 'status' in data and 'package_id' in data:
+            active_package_id = data['package_id']
+            status = data['status']
+            if status == 'approved':
+                
+                # Add user's _id to the package maintainer's field.
+                db.packages.update_one(
+                    {"_id": active_package_id}, 
+                    {"$push": {"maintainers": user["_id"]}}
+                )
+                # package_id gets added to the maintainerOf list in user document.
+                db.users.update_one(
+                    {"_id": user["_id"]}, 
+                    {"$push": {"maintainerOf": active_package_id}}
+                )
+                db.users.update_one(
+                    {"_id": user["_id"]}, 
+                    {"$pull": {"pending_requests": {"$eq": active_package_id}}}
+                )    
+            elif status == 'declined':
+                db.users.update_one(
+                    {"_id": user["_id"]}, 
+                    {"$pull": {"pending_requests": {"$eq": active_package_id}}}
+                )    
+        else:
+            return jsonify({"message": "Both fields status and package_id are required", "code": 400})
