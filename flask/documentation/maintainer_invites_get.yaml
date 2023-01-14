@@ -1,0 +1,23 @@
+description: Makes a GET request, verifies by uuid and username and returns the maintainer invites.
+parameters:
+  - name: username
+    description: Username of logged in user.
+    required: true
+    type: string
+responses:
+  200:
+    description: A list of packages.
+    schema: 
+      type: array
+      items:
+        type: object
+        properties:
+          package_id:
+            type: string
+            description: The id of the package
+          package_name:
+            type: string
+            description: The name of the package
+          author_name:
+            type: string
+            description: The name of package's author

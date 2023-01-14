@@ -184,6 +184,8 @@ def transfer_account():
         )
 
 @app.route("/users/<username>/maintainer", methods=["GET", "POST"])
+@swag_from('documentation/maintainer_invites_get.yaml', methods=["GET"])
+@swag_from('documentation/maintainer_invites_post.yaml', methods=["POST"])
 def maintainer_requests(username):
     uuid = request.cookies.get("uuid")
     if not uuid:
@@ -241,10 +243,13 @@ def maintainer_requests(username):
                     {"_id": user["_id"]}, 
                     {"$pull": {"pending_requests": {"$eq": active_package_id}}}
                 )    
+
+                return jsonify({"message": "Invite accepted", "code": 200})
             elif status == 'declined':
                 db.users.update_one(
                     {"_id": user["_id"]}, 
                     {"$pull": {"pending_requests": {"$eq": active_package_id}}}
-                )    
+                )
+                return jsonify({"message": "Invite declined", "code": 200})    
         else:
             return jsonify({"message": "Both fields status and package_id are required", "code": 400})

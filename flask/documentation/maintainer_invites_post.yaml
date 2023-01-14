@@ -1,0 +1,32 @@
+description: Makes a POST request and either accepts or declines the invite.
+parameters:
+  - name: payload
+    in: body
+    required: true
+    schema:
+      type: object
+      properties:
+        status:
+          type: boolean
+          description: Status of accept or decline invite
+        package_id:
+          type: string
+          description: Package id whose invite is accepted or rejected
+
+responses:
+  200:
+    description: Gives the status where invite was accepted or declined.
+    schema:
+      type: object
+      properties:
+        message:
+          type: string
+          description: The response message
+  400:
+    description: Gives the response when either or both of the fields (status & package_id) are missing
+    schema:
+      type: object
+      properties:
+        message:
+          type: string
+          description: The response message
