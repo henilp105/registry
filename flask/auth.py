@@ -28,19 +28,21 @@ def generate_uuid():
 @app.route("/auth/login", methods=["POST"])
 @swag_from("documentation/login.yaml", methods=["POST"])
 def login():
-    uuid = request.form.get("uuid")
-    if not uuid:
-        email = request.form.get("email")
-        password = request.form.get("password")
-        password += salt
-        hashed_password = hashlib.sha256(password.encode()).hexdigest()
-        user = db.users.find_one({"email": email, "password": hashed_password})
-        uuid = generate_uuid()
-    else:
-        user = db.users.find_one({"uuid": uuid})
+    email = request.form.get("email")
+    password = request.form.get("password")
+    password += salt
+    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    user = db.users.find_one({"email": email, "password": hashed_password})
 
     if not user:
         return jsonify({"message": "Invalid email or password", "code": 401}), 401
+
+    # If the loggedCount is 0. That means user has logged out from all sessions 
+    # and uuid is "" empty string now.
+    if user["loggedCount"] == 0:
+        uuid = generate_uuid()
+    else:
+        uuid = user["uuid"]
 
     user["loggedCount"] += 1
 
@@ -88,6 +90,10 @@ def signup():
 
     if not password:
         return jsonify({"message": "Password is required", "code": 400}), 400
+
+    # Check if email or username is already in use.
+    if db.users.find_one({"$or": [{"email": email}, {"username": username}]}):
+        return jsonify({"message": "Email or username already in use."}), 400
 
     password += salt
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
