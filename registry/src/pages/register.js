@@ -4,11 +4,12 @@ import { useCookies } from "react-cookie";
 import { useDispatch, useSelector } from "react-redux";
 import { signup, resetErrorMessage } from "../store/actions/authActions";
 import { Link } from "react-router-dom";
+import Container from "react-bootstrap/Container";
 
 const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
   const [cookies, setCookie] = useCookies(["uuid"]);
   const [fromValidationErrors, setFormValidationError] = useState({});
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      dispatch(signup(name, email, password));
+      dispatch(signup(username, email, password));
     }
   };
 
@@ -29,6 +30,7 @@ const Register = () => {
     if (isAuthenticated) {
       setCookie("uuid", uuid);
       navigate("/manage/projects");
+      window.location.reload();
     }
 
     if (errorMessage != null) {
@@ -39,8 +41,8 @@ const Register = () => {
   const validateForm = () => {
     let errors = {};
 
-    if (!name) {
-      errors.name = "Name is required";
+    if (!username) {
+      errors.username = "username is required";
     }
 
     if (!email) {
@@ -57,18 +59,19 @@ const Register = () => {
   };
 
   return (
+    <Container style={{ paddingTop: 25 }}>
     <form id="login-form" onSubmit={handleSubmit}>
       <h1>Welcome to fpm Registry!</h1>
       <p>Please enter your details to Sign up.</p>
       <input
         type="text"
-        name="name"
-        placeholder="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
+        name="username"
+        placeholder="username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
       />
       {fromValidationErrors.email && (
-        <p className="error">{fromValidationErrors.name}</p>
+        <p className="error">{fromValidationErrors.username}</p>
       )}
       <input
         type="email"
@@ -95,7 +98,7 @@ const Register = () => {
       <p>
         Already have an account?<Link to="/account/login"> Log in </Link>
       </p>
-    </form>
+    </form></Container>
   );
 };
 

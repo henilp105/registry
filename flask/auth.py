@@ -103,7 +103,8 @@ def signup():
         "username": username,
         "email": email,
         "password": hashed_password,
-        "lastLogin": datetime.utcnow(),
+        "lastLogout": None, 
+        "loginAt": datetime.utcnow(),
         "createdAt": datetime.utcnow(),
         "uuid": uuid,
         "loggedCount": 1,
@@ -124,7 +125,7 @@ def signup():
         )
     else:
         return (
-            jsonify({"message": "A user with this email already exists", "code": 400}),
+            jsonify({"message": "A user with this email or username already exists", "code": 400}),
             400,
         )
 
