@@ -24,4 +24,4 @@ jobs:
           if echo $line | grep -qi 'FAIL'; then
             exit 1
           fi
-        done || true
+        done
