@@ -21,7 +21,7 @@ jobs:
       run: |
         export CONTAINER_ID=$(docker ps -aqf "name=ci")
         docker logs -f $CONTAINER_ID | while read line ; do
-          echo $line
+          echo $line $line
           if echo $line | grep -qi 'FAILED'; then
             exit 1
           fi
