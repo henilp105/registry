@@ -69,7 +69,13 @@ const ShowUserListDialog = (props) => {
                         marginBottom: "0",
                       }}
                     >
-                      {user.username}
+                      
+                    <a
+                        href={`/users/${user.username}`}
+                        style={{ textDecoration: "none" }}
+                      >
+                        {user.username}
+                      </a>
                     </h6>
                   </Card.Body>
                 </Card>
