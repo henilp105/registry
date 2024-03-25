@@ -9,7 +9,7 @@ class Namespace:
         self.author = author
         self.maintainers = maintainers
         self.admins = admins
-        self.packages = []
+        self.packages = packages
 
     # Create a to_json method.
     def to_json(self):

@@ -171,7 +171,7 @@ def namespace_packages(namespace):
                 "name": 1,
                 "description": 1,
                 "author": 1,
-                "updatedAt": 1,
+                "updated_at": 1,
             },
         )
         
@@ -185,7 +185,7 @@ def namespace_packages(namespace):
             "name": package["name"],
             "description": package["description"],
             "author": author_obj.username,
-            "updatedAt": package["updatedAt"],
+            "updated_at": package["updated_at"],
         })
             
     return (
