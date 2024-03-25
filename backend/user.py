@@ -76,7 +76,7 @@ def profile(username):
                         "name": package_doc["name"],
                         "namespace": namespace["namespace"],
                         "description": package_doc["description"],
-                        "updatedAt": package_doc["updated_at"],
+                        "updated_at": package_doc["updated_at"],
                         "isNamespaceMaintainer": isNamespaceMaintainer,
                         "isNamespaceAdmin": isNamespaceAdmin,
                         "isPackageMaintainer": isPackageMaintainer,
@@ -119,7 +119,7 @@ def profile(username):
                         "name": package["name"],
                         "namespace": namespace["namespace"],
                         "description": package["description"],
-                        "updatedAt": package["updated_at"],
+                        "updated_at": package["updated_at"],
                         "isNamespaceMaintainer": isNamespaceMaintainer,
                         "isPackageMaintainer": isPackageMaintainer,
                     }
