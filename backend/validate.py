@@ -83,6 +83,10 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
     # run_command(cleanup_command)
     print(result)
 
+    if result[1]['description'] == "README.md":
+        with open(f'static/temp/{packagename}/README.md', 'r') as file:
+            parsed_toml['description'] = file.read()
+
     if result[0]==-1:
         # Package verification failed 
         return False, parsed_toml, "Digests do not match or file not found."
