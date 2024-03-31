@@ -1,6 +1,7 @@
 from app import app
 import subprocess
 import toml
+import html
 from mongo import db
 from mongo import file_storage
 from bson.objectid import ObjectId
@@ -85,7 +86,7 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
 
     if result[1]['description'] == "README.md":
         with open(f'static/temp/{packagename}/README.md', 'r') as file:
-            parsed_toml['description'] = file.read()
+            parsed_toml['description'] = html.escape(file.read())  # Sanitize HTML content
 
     if result[0]==-1:
         # Package verification failed 
