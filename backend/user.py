@@ -149,8 +149,9 @@ def profile(username):
 
 @app.route("/users/delete", methods=["POST"])
 @swag_from("documentation/delete_user.yaml", methods=["POST"])
+@jwt_required()
 def delete_user():
-    uuid = request.form.get("uuid")
+    uuid = get_jwt_identity()
     username = request.form.get("username")
 
     if not uuid:
@@ -173,8 +174,9 @@ def delete_user():
 
 @app.route("/users/account", methods=["POST"])
 @swag_from("documentation/get_user_account.yaml", methods=["POST"])
+@jwt_required()
 def account():
-    uuid = request.form.get("uuid")
+    uuid = get_jwt_identity()
     if not uuid:
         return jsonify({"message": "Unauthorized", "code": 401}), 401
     else:
@@ -263,8 +265,9 @@ def transfer_account():
 
 @app.route("/<username>/maintainer", methods=["POST"])
 @swag_from("documentation/add_package_maintainer.yaml", methods=["POST"])
+@jwt_required()
 def add_maintainers_to_package(username):
-    uuid = request.form.get("uuid")
+    uuid = get_jwt_identity()
     username_to_be_added = request.form.get("username")
     package = request.form.get("package")
     namespace = request.form.get("namespace")
@@ -344,8 +347,9 @@ def add_maintainers_to_package(username):
 
 @app.route("/<username>/maintainer/remove", methods=["POST"])
 @swag_from("documentation/remove_package_maintainer.yaml", methods=["POST"])
+@jwt_required()
 def remove_maintainers_from_package(username):
-    uuid = request.form.get("uuid")
+    uuid = get_jwt_identity()
     username_to_be_removed = request.form.get("username")
     package = request.form.get("package")
     namespace = request.form.get("namespace")
@@ -430,8 +434,9 @@ def remove_maintainers_from_package(username):
 
 @app.route("/<username>/namespace/maintainer", methods=["POST"])
 @swag_from("documentation/add_namespace_maintainer.yaml", methods=["POST"])
+@jwt_required()
 def add_maintainers_to_namespace(username):
-    uuid = request.form.get("uuid")
+    uuid = get_jwt_identity()
     username_to_be_added = request.form.get("username")
     namespace = request.form.get("namespace")
 
@@ -499,8 +504,9 @@ def add_maintainers_to_namespace(username):
 
 @app.route("/<username>/namespace/maintainer/remove", methods=["POST"])
 @swag_from("documentation/remove_namespace_maintainer.yaml", methods=["POST"])
+@jwt_required()
 def remove_maintainers_from_namespace(username):
-    uuid = request.form.get("uuid")
+    uuid = get_jwt_identity()
     username_to_be_removed = request.form.get("username")
     namespace = request.form.get("namespace")
 
@@ -575,8 +581,9 @@ def remove_maintainers_from_namespace(username):
     
 @app.route("/<username>/namespace/admin", methods=["POST"])
 @swag_from("documentation/add_namespace_admin.yaml", methods=["POST"])
+@jwt_required()
 def add_admins_to_namespace(username):
-    uuid = request.form.get("uuid")
+    uuid = get_jwt_identity()
     username_to_be_added = request.form.get("username")
     namespace = request.form.get("namespace")
 
@@ -639,8 +646,9 @@ def add_admins_to_namespace(username):
     
 @app.route("/<username>/namespace/admin/remove", methods=["POST"])
 @swag_from("documentation/remove_namespace_admin.yaml", methods=["POST"])
+@jwt_required()
 def remove_admins_from_namespace(username):
-    uuid = request.form.get("uuid")
+    uuid = get_jwt_identity()
     username_to_be_removed = request.form.get("username")
     namespace = request.form.get("namespace")
 
