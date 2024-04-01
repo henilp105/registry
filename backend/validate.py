@@ -83,10 +83,13 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
     cleanup_command = f'rm -rf static/temp/{packagename} static/temp/{packagename}.tar.gz'
     # run_command(cleanup_command)
     print(result)
-
-    if parsed_toml['description'] == "README.md":
-        with open(f'static/temp/{packagename}/README.md', 'r') as file:
-            parsed_toml['description'] = html.escape(file.read())  # Sanitize HTML content
+    
+    if 'description' in parsed_toml and parsed_toml['description'] == "README.md":
+        try:
+            with open(f'static/temp/{packagename}/README.md', 'r') as file:
+                parsed_toml['description'] = html.escape(file.read())  # Sanitize HTML content
+        except:
+            parsed_toml['description'] = "README.md not found."
 
     if result[0]==-1:
         # Package verification failed 
