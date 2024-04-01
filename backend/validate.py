@@ -84,7 +84,7 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
     # run_command(cleanup_command)
     print(result)
 
-    if result[1]['description'] == "README.md":
+    if parsed_toml['description'] == "README.md":
         with open(f'static/temp/{packagename}/README.md', 'r') as file:
             parsed_toml['description'] = html.escape(file.read())  # Sanitize HTML content
 
