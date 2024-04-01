@@ -9,6 +9,7 @@ from gridfs.errors import NoFile
 import toml
 from check_digests import check_digests
 from typing import Union,List, Tuple, Dict, Any
+import markdown
 
 
 def run_command(command: str) -> Union[str, None]:
@@ -87,7 +88,7 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
     if 'description' in parsed_toml and parsed_toml['description'] == "README.md":
         try:
             with open(f'static/temp/{packagename}/README.md', 'r') as file:
-                parsed_toml['description'] = html.escape(file.read())  # Sanitize HTML content
+                parsed_toml['description'] = markdown.markdown(file.read())  # Sanitize HTML content
         except:
             parsed_toml['description'] = "README.md not found."
 
