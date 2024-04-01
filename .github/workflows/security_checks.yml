@@ -19,7 +19,8 @@ jobs:
       - uses: fortran-lang/setup-fpm@v5
         with:
           fpm-version: 'v0.10.1'
-          github-token: ${{ secrets.GITHUB_TOKEN }}     
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fpm-repository: https://github.com/henilp105/fpm     
 
       - name: Setup Python
         uses: actions/setup-python@v5
