@@ -18,7 +18,7 @@ jobs:
       
       - uses: fortran-lang/setup-fpm@v5
         with:
-          fpm-version: 'v0.10.1'
+          fpm-version: 'v0.10.2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           fpm-repository: https://github.com/henilp105/fpm     
 
