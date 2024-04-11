@@ -1,7 +1,7 @@
 from app import app
 import subprocess
 import toml
-import html
+import os
 from mongo import db
 from mongo import file_storage
 from bson.objectid import ObjectId
@@ -9,7 +9,6 @@ from gridfs.errors import NoFile
 import toml
 from check_digests import check_digests
 from typing import Union,List, Tuple, Dict, Any
-import markdown
 
 
 def run_command(command: str) -> Union[str, None]:
@@ -29,23 +28,26 @@ def run_command(command: str) -> Union[str, None]:
         print(result.stderr)
     return result.stdout if result.stdout else result.stderr
 
-def collect_dependencies(section: str, parsed_toml: Dict[str, List[Dict[str, Any]]]) -> List[Tuple[str, str]]:
+def extract_dependencies(parsed_toml: Dict[str, List[Dict[str, Any]]]) -> List[Tuple[str, str, str]]:
     """
-    Collect dependencies from a section in a parsed TOML file.
-
+    Extracts dependencies from a parsed TOML file.
+    
     Args:
-        section (str): The section in the TOML file to collect dependencies from.
         parsed_toml (Dict[str, List[Dict[str, Any]]]): The parsed TOML file represented as a dictionary.
 
     Returns:
-        List[Tuple[str, str]]: A list of dependency tuples containing (namespace, dependency_name).
-
+        List[Tuple[str, str, str]]: A list of dependency tuples containing (namespace, package_name, version).
+    
     """
     dependencies = list()
-    for dependency_dict in parsed_toml.get(section, []):
-        for dependency_name, dependency_info in dependency_dict.get('dependencies', {}).items():
-            dependencies.append((dependency_info['namespace'],dependency_name))
+    for dependency_name, dependency_info in parsed_toml.get('dependencies', {}).items():
+        dependencies.append((dependency_info['namespace'], dependency_name, dependency_info.get('v', None)))
+    for section in ['test', 'example', 'executable']:
+        if section in parsed_toml and 'dependencies' in parsed_toml[section]:
+            for dependency_name, dependency_info in parsed_toml[section].get('dependencies', {}).items():
+                dependencies.append((dependency_info['namespace'], dependency_name, dependency_info.get('v', None)))
     return dependencies
+
 
 def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
     """
@@ -80,17 +82,14 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
     
     result = check_digests(f'static/temp/{packagename}/')
 
+    if os.path.exists(f'static/temp/{packagename}/README.md'):
+        with open(f'static/temp/{packagename}/README.md', 'r') as file:
+            parsed_toml['description'] = file.read()
+
     # Clean up
     cleanup_command = f'rm -rf static/temp/{packagename} static/temp/{packagename}.tar.gz'
-    # run_command(cleanup_command)
+    run_command(cleanup_command)
     print(result)
-    
-    if 'description' in parsed_toml and parsed_toml['description'] == "README.md":
-        try:
-            with open(f'static/temp/{packagename}/README.md', 'r') as file:
-                parsed_toml['description'] = markdown.markdown(file.read())  # Sanitize HTML content
-        except:
-            parsed_toml['description'] = "README.md not found."
 
     if result[0]==-1:
         # Package verification failed 
@@ -111,7 +110,6 @@ def validate() -> None:
     Returns:
         None
     """
-    # packages = db.packages.find({"versions": {"$elemMatch": {"isVerified": False}}}) # find packages with unverified versions
     packages = db.packages.find({"is_verified": False})
     packages = list(packages)
     for  package in packages:
@@ -128,13 +126,14 @@ def validate() -> None:
                 result = process_package(packagename)
                 update_data = {}
                 if result[0] == False:
-                    update_data['isVerified'] = False
-                    update_data['unabletoVerify'] = True
+                    update_data['is_verified'] = False
+                    update_data['unable_to_verify'] = True
                     print("Package tests failed for " + packagename)
                     print(result)
                 else:
                     print("Package tests success for " + packagename)
-                    update_data['isVerified'] = True
+                    update_data['is_verified'] = True
+                    update_data['unable_to_verify'] = False
 
                 if result[2] == "Error parsing toml file":
                     db.packages.update_one({"name": package['name'],"namespace":package['namespace']}, {"$set": update_data})
@@ -143,28 +142,18 @@ def validate() -> None:
                 for key in ['repository', 'copyright', 'description',"homepage", 'categories', 'keywords']:
                     if key in result[1] and package[key] != result[1][key]:
                         if key in ['categories', 'keywords']:
-                            update_data[key] = package[key] + result[1][key]
+                            update_data[key] = list(set(package[key] + list(map(str.strip, result[1][key]))))
                         else:
                             update_data[key] = result[1][key]
 
-                dependencies = list()
-                try:
-                    dependencies += [(dependency_info['namespace'],dependency_name) for dependency_name, dependency_info in result[1].get('dependencies', {}).items()]
-                except:
-                    pass
-                for section in ['test', 'example', 'executable']:
-                    try:
-                        dependencies += collect_dependencies(section, result[1])
-                    except:
-                        pass
-                
-                update_data['dependencies'] = list(set(dependencies))
+                dependencies = extract_dependencies(result[1])
 
                 for i in dependencies:
-                    dependency_package = db.packages.find_one({"name": i[1], "namespace": i[0]}) # TODO: enable version checking
+                    namespace = db.namespaces.find_one({"namespace": i[0]})
+                    dependency_package = db.packages.find_one({"name": i[1], "namespace": namespace['namespace'], "versions.version": i[2] if i[2] is not None else {"$exists": True} })
                     if dependency_package is None:
                         print(f"Dependency {i[0]}/{i[1]} not found in the database")
-                        update_data['isVerified'] = False                     # if any dependency is not found, the package is not verified      
+                        update_data['is_verified'] = False    
 
                 for k,v in package.items():
                     if v == "Package Under Verification" and k not in update_data.keys():
