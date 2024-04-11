@@ -171,7 +171,7 @@ def namespace_packages(namespace):
                 "name": 1,
                 "description": 1,
                 "author": 1,
-                "updatedAt": 1,
+                "updated_at": 1,
             },
         )
         
@@ -185,7 +185,7 @@ def namespace_packages(namespace):
             "name": package["name"],
             "description": package["description"],
             "author": author_obj.username,
-            "updatedAt": package["updatedAt"],
+            "updated_at": package["updated_at"],
         })
             
     return (
@@ -201,29 +201,13 @@ def namespace_packages(namespace):
 
 @app.route("/namespaces/<namespace>/admins", methods=["POST"])
 @swag_from("documentation/get_namespace_admins.yaml", methods=["POST"])
-@jwt_required()
 def namespace_admins(namespace):
-    uuid = get_jwt_identity()
-
-    if not uuid:
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401
-    
-    user = db.users.find_one({"uuid": uuid})
-
-    if not user:
-        return jsonify({"code": 404, "message": "User not found"}), 404
-    
-    user_obj = User.from_json(user)
-
     namespace_doc = db.namespaces.find_one({"namespace": namespace})
 
     if not namespace_doc:
         return jsonify({"code": 404, "message": "Namespace not found"}), 404  
 
     namespace_obj = Namespace.from_json(namespace_doc)
-    
-    if not user_obj.id in namespace_obj.admins and not user_obj.id in namespace_obj.maintainers:
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401
     
     admins = []
 
@@ -239,17 +223,7 @@ def namespace_admins(namespace):
 
 @app.route("/namespaces/<namespace>/maintainers", methods=["POST"])
 @swag_from("documentation/get_namespace_maintainers.yaml", methods=["POST"])
-@jwt_required()
 def namespace_maintainers(namespace):
-    uuid = get_jwt_identity()
-
-    if not uuid:
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401
-    
-    user = db.users.find_one({"uuid": uuid})
-
-    if not user:
-        return jsonify({"code": 404, "message": "User not found"}), 404
 
     namespace_doc = db.namespaces.find_one({"namespace": namespace})
 
@@ -257,10 +231,6 @@ def namespace_maintainers(namespace):
         return jsonify({"code": 404, "message": "Namespace not found"}), 404
     
     namespace_obj = Namespace.from_json(namespace_doc)
-    user_obj = User.from_json(user)
-    
-    if not user_obj.id in namespace_obj.admins and not user_obj.id in namespace_obj.maintainers:
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401    
     
     maintainers = []
 

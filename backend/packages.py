@@ -837,18 +837,9 @@ def create_token_upload_token_package(namespace_name, package_name):
     )
 
 
-@app.route("/packages/<namespace>/<package>/maintainers", methods=["GET"])
-@swag_from("documentation/package_maintainers.yaml", methods=["GET"])
-@jwt_required()
+@app.route("/packages/<namespace>/<package>/maintainers", methods=["GET","POST"])
+@swag_from("documentation/package_maintainers.yaml", methods=["GET","POST"])
 def package_maintainers(namespace, package):
-    uuid = get_jwt_identity()
-    
-    user = db.users.find_one({"uuid": uuid})
-
-    if not user:
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401
-    
-    user_obj = User.from_json(user)
 
     namespace_doc = db.namespaces.find_one({"namespace": namespace})
 

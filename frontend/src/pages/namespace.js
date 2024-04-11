@@ -51,9 +51,10 @@ const NamespacePage = () => {
           <Row
             style={{ marginLeft: "10px", marginTop: "10px", fontSize: "20px" }}
           >
-            <MDBIcon style={{ marginTop: "5px" }} fas icon="box">
+            <MDBIcon style={{ marginTop: "5px" }} far icon="box">
               {" Namespace: " + namespace}
             </MDBIcon>
+            <br></br>
             <MDBIcon style={{ marginTop: "5px" }} far icon="calendar-alt">
               {" Created " + dateJoined.slice(4, 16)}
             </MDBIcon>
@@ -68,7 +69,7 @@ const NamespacePage = () => {
           >
             <MDBIcon
               style={{ marginTop: "5px" }}
-              fas
+              far
               icon="user"
               onClick={() => {
                 setFindNamespaceMaintainers(false);
@@ -90,7 +91,7 @@ const NamespacePage = () => {
           >
             <MDBIcon
               style={{ marginTop: "5px" }}
-              fas
+              far
               icon="user"
               onClick={() => {
                 setFindNamespaceMaintainers(true);

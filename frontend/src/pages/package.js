@@ -61,7 +61,13 @@ const PackagePage = () => {
           justifyContent: "space-between",
         }}
       >
-        <p style={{ textAlign: "left", fontSize: 24 }}>{data.name}</p>
+        <p style={{ textAlign: "left", fontSize: 24 }}><a
+        href={`/namespaces/${data.namespace}`}
+          style={{ textDecoration: "none" }}
+        >
+        {data.namespace}
+        </a>
+        /{data.name}</p>
 
         <ViewPackageMaintainersButton
           namespace_name={namespace_name}
