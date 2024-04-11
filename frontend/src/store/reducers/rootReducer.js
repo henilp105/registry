@@ -19,6 +19,7 @@ import verifyEmailReducer from "./verifyEmailReducer";
 import userListReducer from "./userListReducer";
 import reportPackageReducer from "./reportPackageReducer";
 import viewMalicousReportsReducer from "./viewMalicousReportsReducer";
+import ratePackageReducer from "./ratePackageReducer";
 
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -41,6 +42,7 @@ const rootReducer = combineReducers({
   archives: archivesReducer,
   reportPackage: reportPackageReducer,
   malicousReport: viewMalicousReportsReducer,
+  ratePackage: ratePackageReducer,
 });
 
 export default rootReducer;
