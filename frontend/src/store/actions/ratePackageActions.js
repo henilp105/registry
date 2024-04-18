@@ -11,7 +11,6 @@ export const ratePackage = (data, access_token) => async (dispatch) => {
 
   let packageName = data.package;
   let namespaceName = data.namespace;
-  console.log("Rating package: ", access_token);
   if(access_token === null){
     // exit this function early if we don't have an access token
     dispatch({
