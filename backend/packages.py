@@ -583,7 +583,7 @@ def get_package_from_version(namespace_name, package_name, version):
     package = db.packages.find_one(
         {
             "name": package_name,
-            "namespace": namespace_name,
+            "namespace_name": namespace_name,
             "versions.version": version,
         }
     )

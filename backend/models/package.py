@@ -11,7 +11,7 @@ class Package:
         self.homepage = homepage
         self.repository = repository
         self.copyright = copyright
-        self.license = license,
+        self.license = license
         self.created_at = created_at
         self.updated_at = updated_at
         self.author = author
