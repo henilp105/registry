@@ -70,17 +70,23 @@ const PackageItem = ({ packageEntity }) => {
             to={`/packages/${packageEntity.namespace}/${packageEntity.name}`}
             style={{
               textDecoration: "none",
+              color: "black",
             }}
           >
-            <h5 id="list-item-package-name">{packageEntity.name}</h5>
+            <h5 id="list-item-package-name" style={{ color: "black" }}>
+              {packageEntity.name}
+            </h5>
           </Link>
-          <h6 className="mb-2 text-muted">
-            <a
-              href={`/namespaces/${packageEntity.namespace}`}
-              style={{ textDecoration: "none" }}
+          <h6 className="mb-4 text-muted">
+            <Link
+              to={`/namespaces/${packageEntity.namespace}`}
+              style={{
+                textDecoration: "none",
+                color: "grey",
+              }}
             >
               Namespace {packageEntity.namespace}
-            </a>
+            </Link>
           </h6>
           <label className="mb-4 text-muted" style={{ fontSize: "18px" }}>
             {packageEntity.description}
