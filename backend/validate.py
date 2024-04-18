@@ -139,7 +139,10 @@ def validate() -> None:
                 if result[2] == "Error parsing toml file":
                     db.packages.update_one({"name": package['name'],"namespace":package['namespace']}, {"$set": update_data})
                     pass
-                update_data['registry_description'] = open(f"static/temp/{packagename}/README.md", "r").read()          
+                try:
+                    update_data['registry_description'] = open(f"static/temp/{packagename}/README.md", "r").read()      
+                except:
+                    update_data['registry_description'] = result[1].get('description', "description not provided.")
                 
                 for key in ['repository', 'copyright', 'description',"homepage", 'categories', 'keywords']:
                     if key in result[1] and package[key] != result[1][key]:

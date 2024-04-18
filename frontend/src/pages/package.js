@@ -133,7 +133,6 @@ const PackagePage = () => {
           <MDBContainer>
             <MDBRow>
               <MDBCol size="9"><Markdown>{data.registry_description}</Markdown></MDBCol>
-
               {sideBar(data, setShowReportForm, setRateForm)}
             </MDBRow>
           </MDBContainer>

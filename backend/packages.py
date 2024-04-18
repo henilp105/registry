@@ -110,6 +110,7 @@ def search_packages():
                 "_id": 0,
                 "name": 1,
                 "namespace": 1,
+                "namespace_name": 1,
                 "author": 1,
                 "description": 1,
                 "keywords": 1,
@@ -136,8 +137,7 @@ def search_packages():
                 "name": package_obj.name,
                 "namespace": package_obj.namespace_name,
                 "description": package_obj.description,
-                "keywords": package_obj.keywords,
-                "categories": package_obj.categories,
+                "keywords": package_obj.keywords+package_obj.categories,
                 "updated_at": package_obj.updated_at,
             })
         return (
