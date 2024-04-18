@@ -30,7 +30,9 @@ def dilate(instr):
     return outstr
 
 def process(lines):
-    return re.sub(r'(?<=\S) +(?=\n)', '', ''.join(lines))
+    cleaned = re.sub(r'(?<=\S) +(?=\n)', '', ''.join(lines))
+    cleaned = re.sub(r'(?<=\n)\t+(?=\n)', '', cleaned)
+    return re.sub(r'\n\s+\n', '\n\n\n', cleaned)
 
 def check_digests(file_path: str) -> Tuple[int, bool]:
     """
@@ -69,7 +71,7 @@ def check_digests(file_path: str) -> Tuple[int, bool]:
         try:
             # Read the content of the file
             with open(f'{file_path}{file_name.replace("./", "")}', 'r',newline='') as file:
-                file_content: str = ''.join(process(file.readlines()))
+                file_content: str = process(file.readlines())
         except:
             print(f'Error reading file content: {file_path}{file_name}')
             return (-1, "Error reading file content.")

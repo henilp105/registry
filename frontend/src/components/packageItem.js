@@ -56,10 +56,10 @@ const PackageItem = ({ packageEntity }) => {
 
           <h6 className="mb-2 text-muted">
               <a
-                href={`/namespaces/${packageEntity.namespace}`}
+                href={`/namespaces/${packageEntity.namespace_name}`}
                   style={{ textDecoration: "none" }}
                 >
-                Namespace  {packageEntity.namespace}
+                Namespace  {packageEntity.namespace_name}
                 </a>
           </h6>
           <label className="mb-2 text-muted" style={{ fontSize: "18px" }}>

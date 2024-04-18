@@ -8,6 +8,7 @@ from bson.objectid import ObjectId
 from gridfs.errors import NoFile
 import toml
 from check_digests import check_digests
+from bson.objectid import ObjectId
 from typing import Union,List, Tuple, Dict, Any
 
 
@@ -139,7 +140,7 @@ def validate() -> None:
                     db.packages.update_one({"name": package['name'],"namespace":package['namespace']}, {"$set": update_data})
                     pass
                 
-                for key in ['repository', 'copyright', 'description',"homepage", 'categories', 'keywords']:
+                for key in ['repository', 'copyright', 'description',"homepage", 'categories', 'keywords','registry_description']:
                     if key in result[1] and package[key] != result[1][key]:
                         if key in ['categories', 'keywords']:
                             update_data[key] = list(set(package[key] + list(map(str.strip, result[1][key]))))
@@ -150,7 +151,10 @@ def validate() -> None:
 
                 for i in dependencies:
                     namespace = db.namespaces.find_one({"namespace": i[0]})
-                    dependency_package = db.packages.find_one({"name": i[1], "namespace": namespace['namespace'], "versions.version": i[2] if i[2] is not None else {"$exists": True} })
+                    query = {"name": i[1], "namespace": ObjectId(str(namespace['_id']))}
+                    if i[2] is not None:
+                        query['versions.version'] = i[2]
+                    dependency_package = db.packages.find_one(query)
                     if dependency_package is None:
                         print(f"Dependency {i[0]}/{i[1]} not found in the database")
                         update_data['is_verified'] = False    

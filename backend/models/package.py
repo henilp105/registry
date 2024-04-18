@@ -1,15 +1,17 @@
 class Package:
-    def __init__(self, name, namespace, description, homepage, repository, 
+    def __init__(self, name, namespace, namespace_name, description, homepage, repository, registry_description,
                     copyright, license, created_at, updated_at, author, maintainers, keywords, categories, is_deprecated, versions=[], id=None,unable_to_verify=False,
                         malicious_report={}, is_verified=False, is_malicious=False, security_status="No security issues found", ratings={"users": {}, "avg_ratings": 0}):
         self.id = id
         self.name = name
         self.namespace = namespace
+        self.namespace_name = namespace_name
+        self.registry_description = registry_description
         self.description = description
         self.homepage = homepage
         self.repository = repository
         self.copyright = copyright
-        self.license = license
+        self.license = license,
         self.created_at = created_at
         self.updated_at = updated_at
         self.author = author
@@ -44,6 +46,7 @@ class Package:
             "id": str(self.id),
             "name": self.name,
             "namespace": self.namespace,
+            "namespace_name": self.namespace_name,
             "description": self.description,
             "homepage": self.homepage,
             "repository": self.repository,
