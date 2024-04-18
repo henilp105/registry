@@ -1,7 +1,7 @@
 class Package:
-    def __init__(self, name, namespace, namespace_name, description, homepage, repository, registry_description,
+    def __init__(self, name, namespace, namespace_name, description, homepage, repository,
                     copyright, license, created_at, updated_at, author, maintainers, keywords, categories, is_deprecated, versions=[], id=None,unable_to_verify=False,
-                        malicious_report={}, is_verified=False, is_malicious=False, security_status="No security issues found", ratings={"users": {}, "avg_ratings": 0}):
+                        malicious_report={},  registry_description=None,is_verified=False, is_malicious=False, security_status="No security issues found", ratings={"users": {}, "avg_ratings": 0}):
         self.id = id
         self.name = name
         self.namespace = namespace
@@ -48,6 +48,7 @@ class Package:
             "namespace": self.namespace,
             "namespace_name": self.namespace_name,
             "description": self.description,
+            "registry_description": self.registry_description,
             "homepage": self.homepage,
             "repository": self.repository,
             "copyright": self.copyright,
@@ -81,7 +82,9 @@ class Package:
             id=str(json_data.get("_id")),
             name=json_data.get("name"),
             namespace=json_data.get("namespace"),
+            namespace_name=json_data.get("namespace_name"),
             description=json_data.get("description"),
+            registry_description=json_data.get("registry_description"),
             homepage=json_data.get("homepage"),
             repository=json_data.get("repository"),
             copyright=json_data.get("copyright"),
