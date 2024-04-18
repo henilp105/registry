@@ -90,7 +90,7 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
     # Clean up
     cleanup_command = f'rm -rf static/temp/{packagename} static/temp/{packagename}.tar.gz'
     run_command(cleanup_command)
-    print(result)
+    # print(result)
 
     if result[0]==-1:
         # Package verification failed 
@@ -139,8 +139,9 @@ def validate() -> None:
                 if result[2] == "Error parsing toml file":
                     db.packages.update_one({"name": package['name'],"namespace":package['namespace']}, {"$set": update_data})
                     pass
+                update_data['registry_description'] = open(f"static/temp/{packagename}/README.md", "r").read()          
                 
-                for key in ['repository', 'copyright', 'description',"homepage", 'categories', 'keywords','registry_description']:
+                for key in ['repository', 'copyright', 'description',"homepage", 'categories', 'keywords']:
                     if key in result[1] and package[key] != result[1][key]:
                         if key in ['categories', 'keywords']:
                             update_data[key] = list(set(package[key] + list(map(str.strip, result[1][key]))))
