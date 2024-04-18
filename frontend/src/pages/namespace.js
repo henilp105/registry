@@ -56,7 +56,7 @@ const NamespacePage = () => {
             </MDBIcon>
             <br></br>
             <MDBIcon style={{ marginTop: "5px" }} far icon="calendar-alt">
-              {" Created " + dateJoined.slice(4, 16)}
+              {" Created: " + dateJoined.slice(4, 16)}
             </MDBIcon>
           </Row>
           <Row
