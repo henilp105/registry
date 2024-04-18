@@ -83,10 +83,6 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
     
     result = check_digests(f'static/temp/{packagename}/')
 
-    if os.path.exists(f'static/temp/{packagename}/README.md'):
-        with open(f'static/temp/{packagename}/README.md', 'r') as file:
-            parsed_toml['description'] = file.read()
-
     # Clean up
     cleanup_command = f'rm -rf static/temp/{packagename} static/temp/{packagename}.tar.gz'
     run_command(cleanup_command)
