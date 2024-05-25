@@ -133,10 +133,8 @@ def validate() -> None:
                     pass
                 try:
                     update_data['registry_description'] = open(f"static/temp/{packagename}/README.md", "r").read()     
-                    print('README.md found') 
                 except:
                     update_data['registry_description'] = result[1].get('description', "description not provided.")
-                    print('README.md not found',f'static/temp/{packagename}/README.md')
                 
                 for key in ['repository', 'copyright', 'description',"homepage", 'categories', 'keywords']:
                     if key in result[1] and package[key] != result[1][key]:
