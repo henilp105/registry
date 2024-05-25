@@ -1,10 +1,12 @@
 class Package:
-    def __init__(self, name, namespace, description, homepage, repository, 
-                    copyright, license, created_at, updated_at, author, maintainers, keywords, categories, is_deprecated, versions=[], id=None,
-                        malicious_report={}, is_verified=False, is_malicious=False, security_status="No security issues found", ratings={"users": {}, "avg_ratings": 0}):
+    def __init__(self, name, namespace, namespace_name, description, homepage, repository,
+                    copyright, license, created_at, updated_at, author, maintainers, keywords, categories, is_deprecated, versions=[], id=None,unable_to_verify=False,
+                        malicious_report={},  registry_description=None,is_verified=False, is_malicious=False, security_status="No security issues found", ratings={"users": {}, "avg_ratings": 0}):
         self.id = id
         self.name = name
         self.namespace = namespace
+        self.namespace_name = namespace_name
+        self.registry_description = registry_description
         self.description = description
         self.homepage = homepage
         self.repository = repository
@@ -24,6 +26,7 @@ class Package:
         self.downloads_stats = {}
         self.ratings = ratings
         self.categories = categories
+        self.unable_to_verify = unable_to_verify
 
         # Ensure that versions list only contains instances of Version class
         for v in self.versions:
@@ -43,7 +46,9 @@ class Package:
             "id": str(self.id),
             "name": self.name,
             "namespace": self.namespace,
+            "namespace_name": self.namespace_name,
             "description": self.description,
+            "registry_description": self.registry_description,
             "homepage": self.homepage,
             "repository": self.repository,
             "copyright": self.copyright,
@@ -61,6 +66,7 @@ class Package:
             "is_malicious": self.is_malicious,
             "security_status": self.security_status,
             "ratings": self.ratings,
+            "unable_to_verify": self.unable_to_verify,
         }
     
     # Create a from_json method.
@@ -76,7 +82,9 @@ class Package:
             id=str(json_data.get("_id")),
             name=json_data.get("name"),
             namespace=json_data.get("namespace"),
+            namespace_name=json_data.get("namespace_name"),
             description=json_data.get("description"),
+            registry_description=json_data.get("registry_description"),
             homepage=json_data.get("homepage"),
             repository=json_data.get("repository"),
             copyright=json_data.get("copyright"),
@@ -94,6 +102,7 @@ class Package:
             is_malicious=json_data.get("is_malicious"),
             security_status=json_data.get("security_status"),
             ratings=json_data.get("ratings"),
+            unable_to_verify=json_data.get("unable_to_verify"),
         )
     
 class Version:

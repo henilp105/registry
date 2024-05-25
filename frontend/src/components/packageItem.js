@@ -1,8 +1,21 @@
 import { MDBListGroupItem } from "mdb-react-ui-kit";
 import { Row, Col, Image } from "react-bootstrap";
 import { Link } from "react-router-dom";
+import { searchPackage, setQuery } from "../store/actions/searchActions";
+import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 
 const PackageItem = ({ packageEntity }) => {
+  const dispatch = useDispatch();
+  const query = useSelector((state) => state.search.query);
+  const navigate = useNavigate();
+  const search = () => {
+    if (query.trim().length !== 0) {
+      dispatch(searchPackage(query, 0));
+      navigate("/search");
+    }
+  };
+
   function formatDate(timestamp) {
     const now = new Date();
     const date = new Date(timestamp);
@@ -32,10 +45,18 @@ const PackageItem = ({ packageEntity }) => {
       return `${monthName} ${day},  ${year}`;
     }
   }
+  const spanStyle = {
+    borderRadius: "5px",
+    backgroundColor: "lavender",
+    padding: "3px 8px",
+    margin: "2px",
+    textDecoration: "none",
+    color: "grey",
+  };
 
   return (
     <MDBListGroupItem id="list-item">
-      <Row style={{ padding: "5px" }}>
+      <Row style={{}}>
         <Col md={1}>
           <Image
             src="https://fortran-lang.org/en/_static/fortran-logo-256x256.png"
@@ -44,25 +65,30 @@ const PackageItem = ({ packageEntity }) => {
             height={60}
           />
         </Col>
-        <Col md={4} style={{ padding: "10px" }}>
+        <Col md={6} style={{ padding: "10px" }}>
           <Link
             to={`/packages/${packageEntity.namespace}/${packageEntity.name}`}
             style={{
               textDecoration: "none",
+              color: "black",
             }}
           >
-            <h5 id="list-item-package-name">{packageEntity.name}</h5>
+            <h5 id="list-item-package-name" style={{ color: "black" }}>
+              {packageEntity.name}
+            </h5>
           </Link>
-
-          <h6 className="mb-2 text-muted">
-              <a
-                href={`/namespaces/${packageEntity.namespace}`}
-                  style={{ textDecoration: "none" }}
-                >
-                Namespace  {packageEntity.namespace}
-                </a>
+          <h6 className="mb-4 text-muted">
+            <Link
+              to={`/namespaces/${packageEntity.namespace}`}
+              style={{
+                textDecoration: "none",
+                color: "grey",
+              }}
+            >
+              Namespace {packageEntity.namespace}
+            </Link>
           </h6>
-          <label className="mb-2 text-muted" style={{ fontSize: "18px" }}>
+          <label className="mb-4 text-muted" style={{ fontSize: "18px" }}>
             {packageEntity.description}
           </label>
         </Col>
@@ -72,6 +98,18 @@ const PackageItem = ({ packageEntity }) => {
           </label>
         </Col>
       </Row>
+      {packageEntity.keywords.map((keyword, index) => (
+        <a
+          key={index}
+          style={spanStyle}
+          onClick={() => {
+            dispatch(setQuery(keyword));
+            search();
+          }}
+        >
+          {keyword}
+        </a>
+      ))}
     </MDBListGroupItem>
   );
 };

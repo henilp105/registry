@@ -26,6 +26,7 @@ import ReportPackageForm from "./reportPackageForm";
 import RatePackageForm from "./ratePackageForm";
 import { Button } from "react-bootstrap";
 import PackageRatingGraph from "./packageRatingGraph";
+import Markdown from 'react-markdown';
 
 const PackagePage = () => {
   const [iconsActive, setIconsActive] = useState("readme");
@@ -131,8 +132,7 @@ const PackagePage = () => {
         <MDBTabsPane show={iconsActive === "readme"}>
           <MDBContainer>
             <MDBRow>
-              <MDBCol size="9">{data.description}</MDBCol>
-
+              <MDBCol size="9"><Markdown>{data.registry_description}</Markdown></MDBCol>
               {sideBar(data, setShowReportForm, setRateForm)}
             </MDBRow>
           </MDBContainer>

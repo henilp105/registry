@@ -110,6 +110,7 @@ def search_packages():
                 "_id": 0,
                 "name": 1,
                 "namespace": 1,
+                "namespace_name": 1,
                 "author": 1,
                 "description": 1,
                 "keywords": 1,
@@ -132,24 +133,13 @@ def search_packages():
         for i in packages:
             package_obj = Package.from_json(i)
 
-            namespace = db.namespaces.find_one({"_id": package_obj.namespace})
-            namespace_obj = Namespace.from_json(namespace)
-
-            author = db.users.find_one({"_id": package_obj.author})
-            author_obj = User.from_json(author)
-            
-            package_obj.namespace = namespace_obj.namespace
-            package_obj.author = author_obj.username
             search_packages.append({
                 "name": package_obj.name,
-                "namespace": package_obj.namespace,
-                "author": package_obj.author,
+                "namespace": package_obj.namespace_name,
                 "description": package_obj.description,
-                "keywords": package_obj.keywords,
-                "categories": package_obj.categories,
+                "keywords": package_obj.keywords+package_obj.categories,
                 "updated_at": package_obj.updated_at,
             })
-
         return (
             jsonify(
                 {"code": 200, "packages": search_packages, "total_pages": total_pages}
@@ -207,11 +197,8 @@ def upload():
     namespace_doc = db.namespaces.find_one(
         {"upload_tokens": {"$elemMatch": {"token": upload_token}}}
     )
-    package_doc = db.packages.find_one(
-        {"upload_tokens": {"$elemMatch": {"token": upload_token}}}
-    )
 
-    if not namespace_doc and not package_doc:
+    if not namespace_doc:
         return jsonify({"code": 401, "message": "Invalid upload token"}), 401
 
     if namespace_doc:
@@ -224,18 +211,6 @@ def upload():
         package_doc = db.packages.find_one(
             {"name": package_name, "namespace": namespace_obj.id}
         )
-
-    elif package_doc:
-        package_obj = Package.from_json(package_doc)
-        if package_obj.name != package_name:
-            return jsonify({"code": 401, "message": "Invalid upload token"}), 401
-
-        upload_token_doc = next(
-            item
-            for item in package_doc["upload_tokens"]
-            if item["token"] == upload_token
-        )
-        namespace_doc = db.namespaces.find_one({"_id": package_doc["namespace"]})    
 
     # Check if the token is expired.
     # Expire the token after one week of it's creation.
@@ -294,6 +269,7 @@ def upload():
         "description": "Package Under Verification",
         "copyright": "Package Under Verification",
         "homepage": "Package Under Verification",
+        "registry_description": "Package Under Verification",
     }
 
     file_object_id = file_storage.put(
@@ -306,6 +282,7 @@ def upload():
             package_obj = Package(
                 name=package_name,
                 namespace=namespace_obj.id,
+                namespace_name=namespace_obj.namespace,
                 description=package_data["description"],
                 homepage=package_data["homepage"],
                 repository=package_data["repository"],
@@ -478,20 +455,9 @@ def check_version(current_version, new_version):
 @app.route("/packages/<namespace_name>/<package_name>", methods=["GET"])
 @swag_from("documentation/get_package.yaml", methods=["GET"])
 def get_package(namespace_name, package_name):
-    # Get namespace from namespace name.
-    namespace = db.namespaces.find_one({"namespace": namespace_name})
-
-    # Check if namespace exists.
-    if not namespace:
-        return (
-            jsonify({"status": "error", "message": "Namespace not found", "code": 404}),
-            404,
-        )
-
-    namespace_obj = Namespace.from_json(namespace)
-    # Get package from a package_name and namespace's id.
+    # Get package from a package_name and namespace's name.
     package = db.packages.find_one(
-        {"name": package_name, "namespace": namespace_obj.id}
+        {"name": package_name, "namespace_name": namespace_name}
     )
 
     # Check if package is not found.
@@ -549,7 +515,7 @@ def get_package(namespace_name, package_name):
     # Only latest version of the package will be sent as a response.
     package_response_data = {
         "name": package_obj.name,
-        "namespace": namespace_obj.namespace,
+        "namespace": package_obj.namespace_name,
         "latest_version_data": latest_version_data,
         "author": package_author_obj.username,
         "keywords": package_obj.keywords if package_obj.keywords else [],
@@ -559,6 +525,7 @@ def get_package(namespace_name, package_name):
         "version_history": version_history,
         "updated_at": package_obj.updated_at,
         "description": package_obj.description,
+        "registry_description": package_obj.registry_description,
         "ratings": ratings,
         "downloads": downloads_stats,
         "ratings_count": rating_count
@@ -586,7 +553,7 @@ def verify_user_role(namespace_name, package_name):
         )
 
     package = db.packages.find_one(
-        {"name": package_name, "namespace": namespace["_id"]}
+        {"name": package_name, "namespace": namespace_name}
     )
 
     if not package:
@@ -612,20 +579,11 @@ def verify_user_role(namespace_name, package_name):
 @app.route("/packages/<namespace_name>/<package_name>/<version>", methods=["GET"])
 @swag_from("documentation/get_version.yaml", methods=["GET"])
 def get_package_from_version(namespace_name, package_name, version):
-    # Get namespace from namespace name.
-    namespace = db.namespaces.find_one({"namespace": namespace_name})
-
-    # Check if namespace does not exists.
-    if not namespace:
-        return jsonify({"message": "Namespace not found", "code": 404}), 404
-    
-    namespace_obj = Namespace.from_json(namespace)
-
-    # Get package from a package_name, namespace's id and version.
+    # Get package from a package_name, namespace_name and version.
     package = db.packages.find_one(
         {
             "name": package_name,
-            "namespace": namespace["_id"],
+            "namespace_name": namespace_name,
             "versions.version": version,
         }
     )
@@ -652,7 +610,7 @@ def get_package_from_version(namespace_name, package_name, version):
         # Only queried version should be sent as response.
         package_response_data = {
             "name": package_obj.name,
-            "namespace": namespace_obj.namespace,
+            "namespace": package_obj.namespace_name,
             "author": package_author_obj.username,
             "keywords": package_obj.keywords,
             "categories": package_obj.categories,
