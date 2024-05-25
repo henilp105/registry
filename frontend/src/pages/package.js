@@ -23,6 +23,7 @@ import {
 } from "../store/actions/packageActions";
 import ShowUserListDialog from "./showUserListDialog";
 import ReportPackageForm from "./reportPackageForm";
+import RatePackageForm from "./ratePackageForm";
 import { Button } from "react-bootstrap";
 import PackageRatingGraph from "./packageRatingGraph";
 
@@ -37,6 +38,7 @@ const PackagePage = () => {
   const [togglePackageMaintainersDialog, settogglePackageMaintainersDialog] =
     useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
+  const [showRateForm, setRateForm] = useState(false);
 
   const handleIconsClick = (value) => {
     if (value === iconsActive) {
@@ -131,7 +133,7 @@ const PackagePage = () => {
             <MDBRow>
               <MDBCol size="9">{data.description}</MDBCol>
 
-              {sideBar(data, setShowReportForm)}
+              {sideBar(data, setShowReportForm, setRateForm)}
             </MDBRow>
           </MDBContainer>
         </MDBTabsPane>
@@ -202,6 +204,12 @@ const PackagePage = () => {
           </MDBContainer>
         </MDBTabsPane>
       </MDBTabsContent>
+      <RatePackageForm
+        namespace={namespace_name}
+        package={package_name}
+        show={showRateForm}
+        onHide={() => setRateForm(false)}
+      ></RatePackageForm>
       <ReportPackageForm
         namespace={namespace_name}
         package={package_name}
@@ -257,7 +265,7 @@ const ViewPackageMaintainersButton = ({
   );
 };
 
-const sideBar = (data, setShowReportForm) => {
+const sideBar = (data, setShowReportForm, setRateForm) => {
   return (
     <MDBCol size="3">
       <p style={{ fontSize: 16, textAlign: "left" }}>Install (add to fpm.toml)</p>
@@ -278,13 +286,22 @@ const sideBar = (data, setShowReportForm) => {
       <p style={{ fontSize: 16, textAlign: "left" }}>Last publish</p>
       {updatedDays(data.updated_at)} days ago
       <hr></hr>
-      <Button
-        variant="danger"
-        style={{ margin: 0 }}
-        onClick={() => setShowReportForm(true)}
-      >
-        Report
-      </Button>
+      <div>
+        <Button
+          variant="success"
+          style={{ margin: 0 }}
+          onClick={() => setRateForm(true)}
+        >
+          Rate
+        </Button>
+        <Button
+          variant="danger"
+          style={{ marginLeft: "4px" }}
+          onClick={() => setShowReportForm(true)}
+        >
+          Report
+        </Button>
+      </div>
     </MDBCol>
   );
 };
