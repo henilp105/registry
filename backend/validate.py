@@ -82,10 +82,6 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
         return False, None,"Error parsing toml file"
     
     result = check_digests(f'static/temp/{packagename}/')
-
-    # Clean up
-    cleanup_command = f'rm -rf static/temp/{packagename} static/temp/{packagename}.tar.gz'
-    run_command(cleanup_command)
     # print(result)
 
     if result[0]==-1:
@@ -136,9 +132,11 @@ def validate() -> None:
                     db.packages.update_one({"name": package['name'],"namespace":package['namespace']}, {"$set": update_data})
                     pass
                 try:
-                    update_data['registry_description'] = open(f"static/temp/{packagename}/README.md", "r").read()      
+                    update_data['registry_description'] = open(f"static/temp/{packagename}/README.md", "r").read()     
+                    print('README.md found') 
                 except:
                     update_data['registry_description'] = result[1].get('description', "description not provided.")
+                    print('README.md not found',f'static/temp/{packagename}/README.md')
                 
                 for key in ['repository', 'copyright', 'description',"homepage", 'categories', 'keywords']:
                     if key in result[1] and package[key] != result[1][key]:
@@ -165,6 +163,9 @@ def validate() -> None:
 
                 db.packages.update_one({"name": package['name'],"namespace":package['namespace']}, {"$set": update_data})
                 print(f"Package {packagename} verified successfully.")
+                # Clean up
+                cleanup_command = f'rm -rf static/temp/{packagename} static/temp/{packagename}.tar.gz'
+                run_command(cleanup_command)
 
 
 validate()
