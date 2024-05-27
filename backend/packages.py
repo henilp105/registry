@@ -182,17 +182,17 @@ def search_packages_cli():
     packages_per_page = int_validation(packages_per_page,10)
 
     conditions = [
-    {"namespace_name": {"$regex": namespace}} if namespace else None,
-    {"license": {"$regex": license}} if license else None,
-    {"name": {"$regex": package}} if package else None,
+    {"namespace_name": {"$regex": namespace, "$options": "i"}} if namespace else None,
+    {"license": {"$regex": license, "$options": "i"}} if license else None,
+    {"name": {"$regex": package, "$options": "i"}} if package else None,
     ]
 
     mongo_db_query = {
         "$and": [
           {
             "$or": [
-                    {"registry_description": {"$regex": query}},
-                    {"description": {"$regex": query}},
+                    {"registry_description": {"$regex": query, "$options": "i"}},
+                    {"description": {"$regex": query, "$options": "i"}},
                    ]
             },
             {"is_deprecated": False},
