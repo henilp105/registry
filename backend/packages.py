@@ -85,7 +85,7 @@ def search_packages():
         if sorted_by.lower() in parameters.keys()
         else "name"
     )
-    page = int(page) if page else 0
+    page = int_validation(page,0)
     query = unquote(query.strip().lower())
     packages_per_page = 10
 
@@ -118,7 +118,7 @@ def search_packages():
                 "updated_at": 1,
             },
         )
-        .sort(sorted_by, -1)
+        .sort(sorted_by, sort)
         .limit(packages_per_page)
         .skip(page * packages_per_page)
     )
@@ -139,6 +139,88 @@ def search_packages():
                 "description": package_obj.description,
                 "keywords": package_obj.keywords+package_obj.categories,
                 "updated_at": package_obj.updated_at,
+            })
+        return (
+            jsonify(
+                {"code": 200, "packages": search_packages, "total_pages": total_pages}
+            ),
+            200,
+        )
+    else:
+        return (
+            jsonify({"status": "error", "message": "packages not found", "code": 404}),
+            404,
+        )
+
+def int_validation(param,default_value):
+    try:
+        return int(param)
+    except:
+        return default_value
+
+@app.route("/packages_cli", methods=["GET"])
+@swag_from("documentation/search_packages_cli.yaml", methods=["GET"])
+def search_packages_cli():
+    query = request.args.get("query")
+    page = request.args.get("page")
+    license = request.args.get("license")
+    namespace = request.args.get("namespace")
+    package = request.args.get("package")
+    packages_per_page = request.args.get("limit")
+    sorted_by = request.args.get("sorted_by")
+    sort = request.args.get("sort")
+    sorted_by = sorted_by.lower() if sorted_by else "name"
+    query = query if query else "fortran"
+    sort = -1 if sort == "desc" else 1 
+    sorted_by = (
+        parameters[sorted_by.lower()]
+        if sorted_by.lower() in parameters.keys()
+        else "name"
+    )
+    query = unquote(query.strip().lower())
+    page = int_validation(page,0)-1
+    packages_per_page = int_validation(packages_per_page,10)
+
+    conditions = [
+    {"namespace_name": {"$regex": namespace}} if namespace else None,
+    {"license": {"$regex": license}} if license else None,
+    {"name": {"$regex": package}} if package else None,
+    ]
+
+    mongo_db_query = {
+        "$and": [
+          {
+            "$or": [
+                    {"registry_description": {"$regex": query}},
+                    {"description": {"$regex": query}},
+                   ]
+            },
+            {"is_deprecated": False},
+        ]
+    }
+    mongo_db_query["$and"].extend(cond for cond in conditions if cond)
+    total_documents = db.packages.count_documents(mongo_db_query)
+
+    packages_per_page = total_documents if packages_per_page > total_documents else packages_per_page
+
+    packages = (
+        db.packages.find(mongo_db_query)
+        .sort(sorted_by, sort)
+        .limit(packages_per_page)
+        .skip(page * packages_per_page)
+    )
+
+    if packages:
+        total_pages = math.ceil(total_documents / packages_per_page)
+
+        search_packages = []
+        for i in packages:
+            package_obj = Package.from_json(i)
+
+            search_packages.append({
+                "name": package_obj.name,
+                "namespace": package_obj.namespace_name,
+                "description": package_obj.description,
             })
         return (
             jsonify(
