@@ -221,6 +221,7 @@ def search_packages_cli():
                 "name": package_obj.name,
                 "namespace": package_obj.namespace_name,
                 "description": package_obj.description,
+                "version": package_obj.versions[-1].version,
             })
         return (
             jsonify(
