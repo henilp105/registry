@@ -2,7 +2,7 @@ from app import app
 from mongo import db
 from mongo import file_storage
 from bson.objectid import ObjectId
-from flask import request, jsonify, abort, send_file
+from flask import request, jsonify, abort, send_from_directory
 from gridfs.errors import NoFile
 from datetime import datetime, timedelta
 from auth import generate_uuid, IS_VERCEL
@@ -355,9 +355,25 @@ def upload():
         "registry_description": "Package Under Verification",
     }
 
+    file_url = f"{package_name}_{package_version}_{tarball_name}"
     file_object_id = file_storage.put(
-        tarball, content_type=tarball.content_type, filename=tarball_name
+        data=file_url, content_type="application/text", filename=tarball_name, encoding="utf-8", metadata={'url':file_url}
     )
+
+    static_dir = os.path.join("static", "packages")
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir)
+    file_path = os.path.join(static_dir, file_url)
+    tarball.save(file_path)
+
+    try:
+        # Save the tarball to the directory
+
+        # Optionally verify the tarball (e.g., check if it's a valid tar.gz file)
+        with tarfile.open(file_path, "r:gz") as tar:
+            tar.getnames()
+    except Exception as e:
+        return jsonify({"code": 400, "message": f"Invalid tarball file. {e}"}), 400
 
     # No previous recorded versions of the package found.
     if not package_doc:
@@ -504,8 +520,9 @@ def check_token_expiry(upload_token_created_at):
 @swag_from("documentation/get_tarball.yaml", methods=["GET"])
 def serve_gridfs_file(oid):
     try:
-        file = file_storage.get(ObjectId(oid))
-
+        file = list(db.tarballs.files.find({'_id':ObjectId(oid)}))[0]
+        
+        file_path = os.path.join("static/packages/", file['metadata']['url'])
         package_version_doc = db.tarballs.files.update_one(
             {"_id": ObjectId(oid)},
             {
@@ -516,13 +533,15 @@ def serve_gridfs_file(oid):
             },
         )
         if package_version_doc.modified_count > 0:
+            if os.path.exists(file_path):
+                return send_from_directory("static/packages/", file['metadata']['url'], as_attachment=True)
             # Return the file data as a Flask response object
-            return send_file(
-                file,
-                download_name=file.filename,
-                as_attachment=True,
-                mimetype=file.content_type,
-            )
+            # return send_file(
+            #     file,
+            #     download_name=file.filename,
+            #     as_attachment=True,
+            #     mimetype=file.content_type,
+            # )
         return jsonify({"message": "Package version not found", "code": 404}), 404
 
     except NoFile:

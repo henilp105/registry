@@ -28,9 +28,11 @@ try:
     env_var["salt"] = salt
     env_var["sudo_password"] = sudo_password
     if is_ci!="true":
-        smtp = smtplib.SMTP("smtp.gmail.com", 587)
-        smtp.starttls()
-        smtp.login(fortran_email, fortran_password)
+        host = "smtp.gmail.com"
+        port = 587  # TLS replaced SSL in 1999
+        # smtp = smtplib.SMTP("smtp.gmail.com", 587)
+        # smtp.starttls()
+        # smtp.login(fortran_email, fortran_password)
 
 except KeyError as err:
     print("Add SALT to .env file")

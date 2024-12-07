@@ -23,5 +23,11 @@ def internal_server_error(e):
 
 debug = True if is_ci != "true" else False
 
+def list_routes(app):
+    for rule in app.url_map.iter_rules():
+        methods = ', '.join(rule.methods)
+        print(f"{rule.endpoint}: {rule.rule} [{methods}]")
+
 if __name__ == "__main__":
+    list_routes(app)
     app.run(host="0.0.0.0", port=os.environ.get("FLASK_SERVER_PORT", 9090), debug=debug)
