@@ -3,6 +3,9 @@
 /.vscode/
 /.vercel/
 /.docker/
+/backend/_*
+*_pycache_*
+/backend/static/*.tar.gz
 
 # backend
 /backend/.env

@@ -7,7 +7,7 @@ from app import app
 from mongo import db
 import hashlib
 from app import swagger
-import smtplib
+from smtplib import SMTP
 from flasgger.utils import swag_from
 from flask_jwt_extended import jwt_required, create_access_token, create_refresh_token, get_jwt_identity
 from models.user import User
@@ -30,9 +30,12 @@ try:
     if is_ci!="true":
         host = "smtp.gmail.com"
         port = 587  # TLS replaced SSL in 1999
-        # smtp = smtplib.SMTP("smtp.gmail.com", 587)
-        # smtp.starttls()
-        # smtp.login(fortran_email, fortran_password)
+        server = SMTP(host=host, port=port)
+        server.connect(host=host, port=port)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(user=fortran_email, password=sudo_password)
 
 except KeyError as err:
     print("Add SALT to .env file")
