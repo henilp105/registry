@@ -1,99 +1,117 @@
 import re
+from datetime import datetime
+from flask import request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from flasgger.utils import swag_from
+
 from app import app
 from mongo import db
-from flask import request, jsonify
-from app import swagger
-from flasgger.utils import swag_from
+from auth import generate_uuid
 from packages import checkUserUnauthorizedForNamespaceTokenCreation
-from flask_jwt_extended import jwt_required, get_jwt_identity
 from models.namespace import Namespace
 from models.user import User
 
-from datetime import datetime
-from auth import generate_uuid
-
-# Regular expression pattern for namespace name validation.
+# Constants
 NAMESPACE_NAME_PATTERN = r'^[a-zA-Z0-9_-]+$'
+HTTP_200_OK = 200
+HTTP_400_BAD_REQUEST = 400
+HTTP_401_UNAUTHORIZED = 401
+HTTP_404_NOT_FOUND = 404
+HTTP_500_INTERNAL_SERVER_ERROR = 500
+
+def get_request_data():
+    """Get data from request with support for both JSON and form data."""
+    if request.is_json:
+        return request.get_json()
+    return request.form
+
+def fetch_user(uuid):
+    """Fetch user by UUID or return None if not found."""
+    return db.users.find_one({"uuid": uuid})
+
+def fetch_namespace(namespace_name):
+    """Fetch namespace by name or return None if not found."""
+    return db.namespaces.find_one({"namespace": namespace_name})
+
+def validate_namespace_name(namespace_name):
+    """Validate namespace name format."""
+    if not re.match(NAMESPACE_NAME_PATTERN, namespace_name):
+        return jsonify({
+            "code": HTTP_400_BAD_REQUEST,
+            "message": "Namespace name can only include letters, numbers, hyphens and underscores"
+        }), HTTP_400_BAD_REQUEST
+    return None
+
+def build_package_response(package, namespace_name, author_map):
+    """Build package response object."""
+    return {
+        "namespace": namespace_name,
+        "name": package["name"],
+        "description": package["description"],
+        "author": author_map.get(package["author"], "Unknown"),
+        "updated_at": package["updated_at"],
+    }
 
 @app.route("/namespaces", methods=["POST"])
 @swag_from("documentation/create_namespace.yaml", methods=["POST"])
 @jwt_required()
 def create_namespace():
     uuid = get_jwt_identity()
-    
-    # Get the user document from the uuid.
-    user_doc = db.users.find_one({"uuid": uuid})
-
+    user_doc = fetch_user(uuid)
     if not user_doc:
-        return jsonify({"code":  401, "message": "Unauthorized"}), 401
+        return jsonify({"code": HTTP_401_UNAUTHORIZED, "message": "Unauthorized"}), HTTP_401_UNAUTHORIZED
     
-    user_obj = User.from_json(user_doc)
-    
-    namespace_name = request.form.get("namespace")
-    namespace_description = request.form.get("namespace_description")
+    data = get_request_data()
+    namespace_name = data.get("namespace")
+    namespace_description = data.get("namespace_description")
 
     if not namespace_name:
-        return jsonify({"code": 400, "message": "Please enter namespace name"}), 400
-    
+        return jsonify({"code": HTTP_400_BAD_REQUEST, "message": "Namespace name is required"}), HTTP_400_BAD_REQUEST
     if not namespace_description:
-        return jsonify({"code": 400, "message": "Please enter namespace description"}), 400
+        return jsonify({"code": HTTP_400_BAD_REQUEST, "message": "Namespace description is required"}), HTTP_400_BAD_REQUEST
 
-    # Make sure namespace name only contains [a-z], [A-Z], [0-9], - and _ characters.
-    if not re.match(NAMESPACE_NAME_PATTERN, namespace_name):
-        return jsonify({"code": 400, "message": "Namespace name can only include (a-z), (A-Z), (0-9), - and _"}), 400
+    if error := validate_namespace_name(namespace_name):
+        return error
 
-    # Get the namespace document from the namespace name.
-    # To check if already a namespace exists by this name.
-    namespace_doc = db.namespaces.find_one({"namespace": namespace_name})
+    if fetch_namespace(namespace_name):
+        return jsonify({"code": HTTP_400_BAD_REQUEST, "message": "Namespace already exists"}), HTTP_400_BAD_REQUEST
 
-    # Check if namespace already exists.
-    if namespace_doc:
-        return jsonify({"code": 400, "message": "Namespace already exists"}), 400
-    
-    namespace_obj = Namespace(
+    user_obj = User.from_json(user_doc)
+    namespace = Namespace(
         namespace=namespace_name,
         description=namespace_description,
         author=user_obj.id,
         maintainers=[user_obj.id],
         admins=[user_obj.id],
         packages=[],
-    ).to_json()
+    )
 
-    db.namespaces.insert_one(namespace_obj)
-
-    return jsonify({"code": 200, "message": "Namespace created successfully"}), 200
+    db.namespaces.insert_one(namespace.to_json())
+    return jsonify({
+        "code": HTTP_200_OK,
+        "message": "Namespace created successfully"
+    }), HTTP_200_OK
 
 @app.route("/namespaces/<namespace_name>/uploadToken", methods=["POST"])
 @swag_from("documentation/create_namespace_upload_token.yaml", methods=["POST"])
 @jwt_required()
 def create_upload_token(namespace_name):
     uuid = get_jwt_identity()
-
-    if not uuid:
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401
-    
-    user_doc = db.users.find_one({"uuid": uuid})
-
+    user_doc = fetch_user(uuid)
     if not user_doc:
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401
+        return jsonify({"code": HTTP_401_UNAUTHORIZED, "message": "Unauthorized"}), HTTP_401_UNAUTHORIZED
     
-    user_obj = User.from_json(user_doc)
-    
-    # Get the namespace from namespace_name.
-    namespace_doc = db.namespaces.find_one({"namespace": namespace_name})
-
+    namespace_doc = fetch_namespace(namespace_name)
     if not namespace_doc:
-        return jsonify({"code": 404, "message": "Namespace not found"}), 404
-    
+        return jsonify({"code": HTTP_404_NOT_FOUND, "message": "Namespace not found"}), HTTP_404_NOT_FOUND
+
+    user_obj = User.from_json(user_doc)
     namespace_obj = Namespace.from_json(namespace_doc)
-    
-    # Only namespace maintainers or admins can generate an upload token for now.
+
     if checkUserUnauthorizedForNamespaceTokenCreation(user_id=user_obj.id, namespace_obj=namespace_obj):
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401
-    
-    # Generate an upload token for upload packages to the namespace.
+        return jsonify({"code": HTTP_401_UNAUTHORIZED, "message": "Unauthorized"}), HTTP_401_UNAUTHORIZED
+
     upload_token = generate_uuid()
-    
     upload_token_obj = {
         "token": upload_token,
         "createdAt": datetime.utcnow(),
@@ -105,141 +123,124 @@ def create_upload_token(namespace_name):
         {"$addToSet": {"upload_tokens": upload_token_obj}}
     )
 
-    return jsonify({"code": 200, "message": "Upload token created", "uploadToken": upload_token})
+    return jsonify({
+        "code": HTTP_200_OK,
+        "message": "Upload token created",
+        "uploadToken": upload_token
+    }), HTTP_200_OK
 
 @app.route("/namespace/<namespace_name>/delete", methods=["POST"])
 @swag_from("documentation/delete_namespace.yaml", methods=["POST"])
 @jwt_required()
 def delete_namespace(namespace_name):
     uuid = get_jwt_identity()
-
     if not uuid:
-        return jsonify({"code": 401, "message": "Unauthorized"}), 401
+        return jsonify({"code": HTTP_401_UNAUTHORIZED, "message": "Unauthorized"}), HTTP_401_UNAUTHORIZED
 
-    user = db.users.find_one({"uuid": uuid})
-
-    if not user:
-        return jsonify({"code": 404, "message": "User not found"}), 404
+    user_doc = fetch_user(uuid)
+    if not user_doc:
+        return jsonify({"code": HTTP_404_NOT_FOUND, "message": "User not found"}), HTTP_404_NOT_FOUND
     
-    user_obj = User.from_json(user)
+    user_obj = User.from_json(user_doc)
+    if "admin" not in user_obj.roles:
+        return jsonify({
+            "code": HTTP_401_UNAUTHORIZED,
+            "message": "User is not authorized to delete the namespace"
+        }), HTTP_401_UNAUTHORIZED
 
-    # Check if the user is authorized to delete the package.
-    if not "admin" in user_obj.roles:
-        return (
-            jsonify(
-                {
-                    "code": 401,
-                    "message": "User is not authorized to delete the namespace",
-                }
-            ),
-            401,
-        )
+    namespace_doc = fetch_namespace(namespace_name)
+    if not namespace_doc:
+        return jsonify({"code": HTTP_404_NOT_FOUND, "message": "Namespace not found"}), HTTP_404_NOT_FOUND
 
-    # Get the namespace from the namespace_name.
-    namespace = db.namespaces.find_one({"namespace": namespace_name})
+    result = db.namespaces.delete_one({"namespace": namespace_name})
+    if result.deleted_count == 0:
+        return jsonify({
+            "code": HTTP_500_INTERNAL_SERVER_ERROR,
+            "message": "Failed to delete namespace"
+        }), HTTP_500_INTERNAL_SERVER_ERROR
 
-    # If namespace is not found. Return 404.
-    if not namespace:
-        return jsonify({"message": "Namespace not found", "code": 404})
-    
-    namespace_obj = Namespace.from_json(namespace)
-
-    namespace_deleted = db.namespaces.delete_one({"namespace": namespace_obj.id})
-
-    if namespace_deleted.deleted_count > 0:
-        return jsonify({"message": "Namespace deleted successfully","code":200}), 200
-    else:
-        return jsonify({"message": "Internal Server Error", "code": 500}),200
-    
+    return jsonify({
+        "code": HTTP_200_OK,
+        "message": "Namespace deleted successfully"
+    }), HTTP_200_OK
 
 @app.route("/namespace/<namespace>", methods=["GET"])
 @swag_from("documentation/get_namespace_packages.yaml", methods=["GET"])
 def namespace_packages(namespace):
-    namespace_document = db.namespaces.find_one({"namespace": namespace})
+    namespace_doc = fetch_namespace(namespace)
+    if not namespace_doc:
+        return jsonify({"code": HTTP_404_NOT_FOUND, "message": "Namespace not found"}), HTTP_404_NOT_FOUND
 
-    if not namespace_document:
-        return jsonify({"code": 404, "message": "Namespace not found"}), 404
+    namespace_obj = Namespace.from_json(namespace_doc)
+    package_ids = namespace_obj.packages
+    
+    if not package_ids:
+        return jsonify({
+            "code": HTTP_200_OK,
+            "packages": [],
+            "createdAt": namespace_obj.createdAt
+        }), HTTP_200_OK
 
-    namespace_obj = Namespace.from_json(namespace_document)
-
-    packages = []
-    for i in namespace_obj.packages:
-        package = db.packages.find_one(
-            {"_id": i},
-            {
-                "_id": 0,
-                "name": 1,
-                "description": 1,
-                "author": 1,
-                "updated_at": 1,
-            },
-        )
-        
-        # Get the package author name.
-        author = db.users.find_one({"_id": package["author"]})
-
-        author_obj = User.from_json(author)
-        
-        packages.append({
-            "namespace" : namespace,
-            "name": package["name"],
-            "description": package["description"],
-            "author": author_obj.username,
-            "updated_at": package["updated_at"],
-        })
-            
-    return (
-        jsonify(
-            {
-                "code": 200,
-                "packages": packages,
-                "createdAt": namespace_obj.createdAt,
-            }
-        ),
-        200,
+    # Fetch all packages in single query
+    packages_cursor = db.packages.find(
+        {"_id": {"$in": package_ids}},
+        {"_id": 0, "name": 1, "description": 1, "author": 1, "updated_at": 1}
     )
+    packages_list = list(packages_cursor)
+
+    # Fetch all authors in single query
+    author_ids = {pkg["author"] for pkg in packages_list}
+    authors_cursor = db.users.find(
+        {"_id": {"$in": list(author_ids)}},
+        {"_id": 1, "username": 1}
+    )
+    author_map = {author["_id"]: User.from_json(author).username for author in authors_cursor}
+
+    packages = [
+        build_package_response(pkg, namespace, author_map)
+        for pkg in packages_list
+    ]
+
+    return jsonify({
+        "code": HTTP_200_OK,
+        "packages": packages,
+        "createdAt": namespace_obj.createdAt
+    }), HTTP_200_OK
 
 @app.route("/namespaces/<namespace>/admins", methods=["POST"])
 @swag_from("documentation/get_namespace_admins.yaml", methods=["POST"])
 def namespace_admins(namespace):
-    namespace_doc = db.namespaces.find_one({"namespace": namespace})
-
-    if not namespace_doc:
-        return jsonify({"code": 404, "message": "Namespace not found"}), 404  
-
-    namespace_obj = Namespace.from_json(namespace_doc)
-    
-    admins = []
-
-    for i in namespace_obj.admins:
-        admin = db.users.find_one({"_id": i}, {"_id": 1, "username": 1})
-        admin_obj = User.from_json(admin)
-        admins.append({
-            "id": str(admin_obj.id),
-            "username": admin_obj.username
-        })
-    
-    return jsonify({"code": 200, "users": admins}), 200
+    return fetch_namespace_users(namespace, "admins")
 
 @app.route("/namespaces/<namespace>/maintainers", methods=["POST"])
 @swag_from("documentation/get_namespace_maintainers.yaml", methods=["POST"])
 def namespace_maintainers(namespace):
+    return fetch_namespace_users(namespace, "maintainers")
 
-    namespace_doc = db.namespaces.find_one({"namespace": namespace})
-
+def fetch_namespace_users(namespace, role_field):
+    namespace_doc = fetch_namespace(namespace)
     if not namespace_doc:
-        return jsonify({"code": 404, "message": "Namespace not found"}), 404
-    
+        return jsonify({"code": HTTP_404_NOT_FOUND, "message": "Namespace not found"}), HTTP_404_NOT_FOUND
+
     namespace_obj = Namespace.from_json(namespace_doc)
+    user_ids = getattr(namespace_obj, role_field, [])
     
-    maintainers = []
+    if not user_ids:
+        return jsonify({"code": HTTP_200_OK, "users": []}), HTTP_200_OK
 
-    for i in namespace_obj.maintainers:
-        maintainer = db.users.find_one({"_id": i}, {"_id": 1, "username": 1})
-        maintainer_obj = User.from_json(maintainer)
-        maintainers.append({
-            "id": str(maintainer_obj.id),
-            "username": maintainer_obj.username
-        })
+    users_cursor = db.users.find(
+        {"_id": {"$in": user_ids}},
+        {"_id": 1, "username": 1}
+    )
+    users = [
+        {
+            "id": str(user["_id"]),
+            "username": User.from_json(user).username
+        }
+        for user in users_cursor
+    ]
 
-    return jsonify({"code": 200, "users": maintainers}), 200
+    return jsonify({
+        "code": HTTP_200_OK,
+        "users": users
+    }), HTTP_200_OK
