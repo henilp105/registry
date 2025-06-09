@@ -177,7 +177,7 @@ const AuthForm = ({ isLogin }) => {
                     value={formData.username}
                     onChange={handleChange}
                     isInvalid={!!errors.username}
-                    className={errors.username ? "border-danger" : "border-primary"}
+                    className={`${errors.username ? "border-danger" : "border-primary"} w-100 fw-medium py-2`}
                   />
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
                     <i className="bi bi-exclamation-circle me-1"></i>
@@ -197,7 +197,7 @@ const AuthForm = ({ isLogin }) => {
                     value={formData.user_identifier}
                     onChange={handleChange}
                     isInvalid={!!errors.user_identifier}
-                    className={errors.user_identifier ? "border-danger" : "border-primary"}
+                    className={`${errors.user_identifier ? "border-danger" : "border-primary"} w-100 fw-medium py-2`}
                   />
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
                     <i className="bi bi-exclamation-circle me-1"></i>
