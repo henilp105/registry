@@ -50,6 +50,7 @@ def build_package_response(package, namespace_name, author_map):
         "description": package["description"],
         "author": author_map.get(package["author"], "Unknown"),
         "updated_at": package["updated_at"],
+        "keywords": list(set(package.get("keywords", []) + package.get("categories", []))),
     }
 
 @app.route("/namespaces", methods=["POST"])
@@ -184,7 +185,7 @@ def namespace_packages(namespace):
     # Fetch all packages in single query
     packages_cursor = db.packages.find(
         {"_id": {"$in": package_ids}},
-        {"_id": 0, "name": 1, "description": 1, "author": 1, "updated_at": 1}
+        {"_id": 0, "name": 1, "description": 1, "author": 1, "updated_at": 1,"keywords":1, "categories": 1}
     )
     packages_list = list(packages_cursor)
 

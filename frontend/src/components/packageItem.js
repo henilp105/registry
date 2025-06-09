@@ -16,35 +16,39 @@ const PackageItem = ({ packageEntity }) => {
     }
   };
 
-  function formatDate(timestamp) {
-    const now = new Date();
-    const date = new Date(timestamp);
+function formatDate(timestamp) {
+  const now = new Date();
+  const date = new Date(timestamp);
 
-    // Check if the date is less than 12 hours ago
-    const diff = (now.getTime() - date.getTime()) / 1000;
-    if (diff < 43200) {
-      // 12 hours = 43,200 seconds
-      // Calculate minutes or hours ago
-      const minutes = Math.floor(diff / 60);
-      if (minutes < 60) {
-        return `${minutes} minutes ago`;
-      } else {
-        const hours = Math.floor(minutes / 60);
-        return `${hours} hours ago`;
-      }
-    } else {
-      // Format date in "YYYY-MM-DD" format
-      const year = date.getUTCFullYear();
-      const month = String(date.getUTCMonth()).padStart(2, "0");
-      const monthName = new Date(Date.UTC(year, month, 1)).toLocaleString(
-        "en-US",
-        { month: "long" }
-      );
-      const day = String(date.getUTCDate()).padStart(2, "0");
-
-      return `${monthName} ${day},  ${year}`;
-    }
+  if (isNaN(date.getTime())) {
+    return "Invalid date";
   }
+
+  const diffSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  // Less than 12 hours (43,200 seconds)
+  if (diffSeconds < 43200) {
+    const minutes = Math.floor(diffSeconds / 60);
+    if (minutes < 1) {
+      return "Just now";
+    } else if (minutes < 60) {
+      return `${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      return `${hours} hour${hours !== 1 ? "s" : ""} ago`;
+    }
+  } else {
+    // Format as: "March 30, 2024"
+    const options = {
+      year: "numeric",
+      month: "long",
+      day: "2-digit",
+      timeZone: "UTC"
+    };
+    return new Intl.DateTimeFormat("en-US", options).format(date);
+  }
+}
+
   const spanStyle = {
     borderRadius: "5px",
     backgroundColor: "lavender",
@@ -59,7 +63,7 @@ const PackageItem = ({ packageEntity }) => {
       <Row style={{}}>
         <Col md={1}>
           <Image
-            src="https://fortran-lang.org/en/_static/fortran-logo-256x256.png"
+            src="https://fortran-lang.org/_static/fortran-logo-256x256.png"
             fluid
             width={60}
             height={60}

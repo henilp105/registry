@@ -15,10 +15,7 @@ import ShowUserListDialog from "./showUserListDialog";
 const NamespacePage = () => {
   const { namespace } = useParams();
   const navigate = useNavigate();
-  const dateJoined = useSelector((state) => state.namespace.dateJoined);
-  const projects = useSelector((state) => state.namespace.projects);
-  const notFound = useSelector((state) => state.namespace.notFound);
-  const isLoading = useSelector((state) => state.namespace.isLoading);
+  const {dateJoined, projects, notFound, isLoading} = useSelector((state) => state.namespace);
   const dispatch = useDispatch();
 
   const [isListDialogOpen, setListDialogOpen] = useState(false);
@@ -27,6 +24,7 @@ const NamespacePage = () => {
     useState(false);
 
   useEffect(() => {
+    console.log("Fetching namespace data for:", namespace);
     dispatch(fetchNamespaceData(namespace));
   }, [namespace, notFound]);
 
@@ -41,8 +39,8 @@ const NamespacePage = () => {
           <Row style={{ marginLeft: "10px", marginTop: "20px" }}>
             <Figure>
               <Figure.Image
-                width={171}
-                height={180}
+                width={100}
+                height={100}
                 alt={`Avatar for ${namespace} from gravatar.com`}
                 src={`https://www.gravatar.com/avatar/${namespace}`} // render image from Storage Service
               />
@@ -120,10 +118,12 @@ const NamespacePage = () => {
               : projects.length + " Packages"}
           </Row>
           {projects.map((packageEntity) => (
-            <PackageItem
-              key={packageEntity.name + packageEntity.namespace}
-              packageEntity={packageEntity}
-            />
+            <Row style={{ marginTop: "20px" }}>
+              <PackageItem
+                key={packageEntity.name + packageEntity.namespace}
+                packageEntity={packageEntity}
+              />
+            </Row>
           ))}
         </Col>
       </Row>

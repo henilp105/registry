@@ -17,6 +17,7 @@ import { FETCH_NAMESPACE_DATA, FETCH_NAMESPACE_DATA_SUCCESS, FETCH_NAMESPACE_DAT
         };
       case FETCH_NAMESPACE_DATA_SUCCESS:
         return {
+          ...state,
           dateJoined: action.payload.dateJoined,
           projects: action.payload.projects,
           isLoading: false,

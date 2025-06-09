@@ -19,8 +19,8 @@ import Archives from "./pages/archives";
 import ForgotPassword from "./pages/forgotpassword";
 import ResetPassword from "./pages/resetpassword";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import 'bootstrap/dist/css/bootstrap.min.css';
 
-import "bootstrap/dist/css/bootstrap.css";
 
 function App() {
   return (

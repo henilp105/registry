@@ -1,15 +1,48 @@
-from app import app
 import subprocess
 import toml
 import os
-from mongo import db
-from mongo import file_storage
+from mongo import db, file_storage
 from bson.objectid import ObjectId
 from gridfs.errors import NoFile
-import toml
-from check_digests import check_digests
-from bson.objectid import ObjectId
 from typing import Union,List, Tuple, Dict, Any
+import numpy as np
+import json
+
+def hash(lines):
+    hash_val = np.int64(2166136261)
+    FNV_PRIME = np.int64(16777619)
+    for line in lines:
+        for char in line:
+            hash_val = (hash_val ^ np.int64(ord(char))) * FNV_PRIME
+    return hash_val
+
+def check_digests(file_path: str) -> Tuple[int, bool]:
+    try:
+        with open(f'{file_path}fpm_model.json', 'r') as file:
+            model = json.load(file)
+    except:
+        return (-1, False)
+
+    src_data: dict = model['packages'][model['package-name']] 
+    error_count: int = 0
+
+    for _, source_info in src_data['sources'].items():
+        expected_digest: int = source_info['digest']
+        file_name: str = source_info['file-name']
+        
+        try:
+            with open(f'{file_path}{file_name.replace("./", "")}', 'r') as file:
+                lines = file.read().splitlines()
+        except:
+            print(f'Error reading file content: {file_path}{file_name}')
+            return (-1, False)
+
+        computed_digest: int = hash(lines)
+
+        if computed_digest != expected_digest:
+            error_count += 1
+            
+    return (error_count, error_count == 0)
 
 
 def run_command(command: str) -> Union[str, None]:

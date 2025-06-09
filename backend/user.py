@@ -20,131 +20,126 @@ except KeyError as err:
 @app.route("/users/<username>", methods=["GET"])
 @swag_from("documentation/get_user_profile.yaml", methods=["GET"])
 def profile(username):
+    # Find user document
     user_doc = db.users.find_one({"username": username})
-    if user_doc:
-        # Get all the packages user is maintainer of.
-        packages = db.packages.find(
-            {"$or": [{"author": user_doc["_id"]}, {"maintainers": user_doc["_id"]}]},
-        )
+    if not user_doc:
+        return jsonify({"message": "User not found", "code": 404}), 404
 
-        # Get all the namespaces user is maintainer/admin of.
-        # A namespace maintainer / admin will be maintainer of all the packages under that namespace.
-        namespaces = db.namespaces.find(
-            {"$or": [{"author": user_doc["_id"]}, {"maintainers": user_doc["_id"]}, {"admins": user_doc["_id"]}]},
-        )
+    user_id = user_doc["_id"]
+    response_packages = []
+    response_namespaces = []
+    processed_package_ids = set()
 
-        response_packages = []
-        response_namespaces = []
+    # Fetch namespaces where user has roles
+    namespaces = list(db.namespaces.find({
+        "$or": [
+            {"author": user_id},
+            {"maintainers": user_id},
+            {"admins": user_id}
+        ]
+    }))
+
+    # Precompute namespace roles and package IDs
+    namespace_roles = {}
+    all_namespace_package_ids = set()
+    
+    for ns in namespaces:
+        ns_id = ns["_id"]
+        namespace_roles[ns_id] = {
+            "isAdmin": user_id in ns.get("admins", []),
+            "isMaintainer": user_id in ns.get("maintainers", [])
+        }
+        all_namespace_package_ids.update(ns.get("packages", []))
+
+    # Bulk fetch all packages from namespaces
+    if all_namespace_package_ids:
+        namespace_packages = list(db.packages.find({
+            "_id": {"$in": list(all_namespace_package_ids)}
+        }))
+        # Map package ID to package document
+        package_map = {p["_id"]: p for p in namespace_packages}
+    else:
+        namespace_packages = []
+        package_map = {}
+
+    # Process namespaces and their packages
+    for ns in namespaces:
+        ns_id = ns["_id"]
+        roles = namespace_roles[ns_id]
         
-        # Check if there are any namespaces user is maintainer of.
-        if namespaces:
-            # Iterate over all the namespaces and add it to the response_namespace.
-            for namespace in namespaces:
-                isNamespaceAdmin = False
-                isNamespaceMaintainer = False
+        response_namespaces.append({
+            "id": str(ns_id),
+            "name": ns["namespace"],
+            "description": ns["description"],
+            "isNamespaceAdmin": roles["isAdmin"],
+            "isNamespaceMaintainer": roles["isMaintainer"]
+        })
 
-                # Check if the user is admin of the namespace.
-                if user_doc["_id"] in namespace["admins"]:
-                    isNamespaceAdmin = True
-
-                # Check if the user is maintainer of the namespace.
-                if user_doc["_id"] in namespace["maintainers"]:
-                    isNamespaceMaintainer = True
-
-                response_namespaces.append({
-                    "id": str(namespace["_id"]),
-                    "name": namespace["namespace"],
-                    "description": namespace["description"],
-                    "isNamespaceAdmin": isNamespaceAdmin,
-                    "isNamespaceMaintainer": isNamespaceMaintainer,
-                })
-
-                # Iterate over all the packages in the namespace.
-                # User is maintainer of all these packages.
-                # Add these packages to the response_packages.
-                for package_id in namespace["packages"]:
-                    package_doc = db.packages.find_one({"_id": package_id})
-
-                    isPackageMaintainer = False
-
-                    # Check if the user is maintainer of the package.
-                    if user_doc["_id"] in package_doc["maintainers"]:
-                        isPackageMaintainer = True
-
-                    response_packages.append({
-                        "id": str(package_doc["_id"]),
-                        "name": package_doc["name"],
-                        "namespace": namespace["namespace"],
-                        "description": package_doc["description"],
-                        "updated_at": package_doc["updated_at"],
-                        "isNamespaceMaintainer": isNamespaceMaintainer,
-                        "isNamespaceAdmin": isNamespaceAdmin,
-                        "isPackageMaintainer": isPackageMaintainer,
-                    })
-
-        # Check for the packages that user is maintainer of individually but not as namespace maintainer.
-        # If these packages are already not in the response then add it to the response_packages else skip the 
-        # duplicates.
-        if packages:
-            for package in packages:
-                isDuplicate = False
-
-                # Check if that package is already under a namespace.
-                # response_packages will contain a list of packages that user is maintainer of under a namespace.
-                for pkg in response_packages:
-                    
-                    if pkg["id"] == str(package["_id"]):
-                        isDuplicate = True
-                        break
+        # Process packages in this namespace
+        for pkg_id in ns.get("packages", []):
+            if pkg_id not in package_map:
+                continue
                 
-                # Skip the duplicates.
-                if isDuplicate:
-                    continue
-                
-                # Get namespace from namespace id.
-                namespace = db.namespaces.find_one({"_id": package["namespace"]})
-                
-                isNamespaceMaintainer = False
-                isPackageMaintainer = False
+            package = package_map[pkg_id]
+            package_id_str = str(package["_id"])
+            processed_package_ids.add(package_id_str)
+            
+            response_packages.append({
+                "id": package_id_str,
+                "name": package["name"],
+                "namespace": ns["namespace"],
+                "description": package["description"],
+                "updated_at": package["updated_at"],
+                "isNamespaceMaintainer": roles["isMaintainer"],
+                "isNamespaceAdmin": roles["isAdmin"],
+                "isPackageMaintainer": user_id in package.get("maintainers", []),
+                "keywords": list(set(package.get("keywords", []) + package.get("categories", [])))
+            })
 
-                if user_doc["_id"] in namespace["maintainers"]:
-                    isNamespaceMaintainer = True
+    # Fetch individual packages not processed via namespaces
+    individual_packages = db.packages.find({
+        "$or": [
+            {"author": user_id},
+            {"maintainers": user_id}
+        ],
+        "_id": {"$nin": list(processed_package_ids)} if processed_package_ids else {}
+    })
+    
+    # Bulk fetch namespaces for individual packages
+    namespace_ids = {pkg["namespace"] for pkg in individual_packages}
+    namespace_map = {}
+    if namespace_ids:
+        for ns in db.namespaces.find({"_id": {"$in": list(namespace_ids)}}):
+            namespace_map[ns["_id"]] = ns
 
-                if user_doc["_id"] in package["maintainers"]:
-                    isPackageMaintainer = True
+    # Process individual packages
+    for package in individual_packages:
+        ns = namespace_map.get(package["namespace"])
+        if not ns:
+            continue
+            
+        response_packages.append({
+            "id": str(package["_id"]),
+            "name": package["name"],
+            "namespace": ns["namespace"],
+            "description": package["description"],
+            "updated_at": package["updated_at"],
+            "isNamespaceMaintainer": user_id in ns.get("maintainers", []),
+            "isPackageMaintainer": user_id in package.get("maintainers", []),
+            "keywords": list(set(package.get("keywords", []) + package.get("categories", [])))
+        })
 
-                response_packages.append(
-                    {   
-                        "id": str(package["_id"]),
-                        "name": package["name"],
-                        "namespace": namespace["namespace"],
-                        "description": package["description"],
-                        "updated_at": package["updated_at"],
-                        "isNamespaceMaintainer": isNamespaceMaintainer,
-                        "isPackageMaintainer": isPackageMaintainer,
-                    }
-                )
-                
-        
-        user_account = {
+    return jsonify({
+        "message": "User found",
+        "user": {
             "username": user_doc["username"],
             "email": user_doc["email"],
-            "createdAt": user_doc["createdAt"],
-        }
-        return (
-            jsonify(
-                {
-                    "message": "User found",
-                    "user": user_account,
-                    "packages": response_packages,
-                    "namespaces": response_namespaces,
-                    "code": 200,
-                }
-            ),
-            200,
-        )
-    else:
-        return jsonify({"message": "User not found", "code": 404}), 404
+            "createdAt": user_doc["createdAt"]
+        },
+        "packages": response_packages,
+        "namespaces": response_namespaces,
+        "code": 200
+    }), 200
 
 
 @app.route("/users/delete", methods=["POST"])

@@ -29,7 +29,7 @@ const UserPage = () => {
   }
 
   return !isLoading ? (
-    <Container style={{fontSize: 24}}>
+    <Container>
       <Row>
         <Col sm={4}>
           <Row style={{ marginLeft: "10px", marginTop: "20px" }}>

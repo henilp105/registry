@@ -38,7 +38,7 @@ const NavbarComponent = () => {
           }}
         >
           <Image
-            src="https://fortran-lang.org/en/_static/fortran-logo-256x256.png"
+            src="https://fortran-lang.org/_static/fortran-logo-256x256.png"
             fluid
             width={60}
             height={60}
