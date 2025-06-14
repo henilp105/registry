@@ -14,9 +14,9 @@ export const RESET_PASSWORD_SUCCESS = "RESET_PASSWORD_SUCCESS";
 export const RESET_PASSWORD_ERROR = "RESET_PASSWORD_ERROR";
 export const RESET_MESSAGES = "RESET_MESSAGES";
 
-export const getUserAccount = (uuid) => async (dispatch) => {
+export const getUserAccount = (accessToken) => async (dispatch) => {
   const formData = new FormData();
-  formData.append("uuid", uuid);
+  formData.append("accessToken", accessToken);
 
   axios({
     method: "post",
@@ -24,6 +24,7 @@ export const getUserAccount = (uuid) => async (dispatch) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
+      Authorization: `Bearer ${accessToken}`,
     },
   })
     .then((result) => {
@@ -43,12 +44,12 @@ export const getUserAccount = (uuid) => async (dispatch) => {
     });
 };
 
-export const reset = (oldpassword, password, uuid) => async (dispatch) => {
+export const reset = (oldpassword, password, accessToken) => async (dispatch) => {
   let formData = new FormData();
   dispatch({ type: RESET_PASSWORD });
   formData.append("oldpassword", oldpassword);
   formData.append("password", password);
-  formData.append("uuid", uuid);
+  formData.append("uuid", accessToken);
 
   try {
     const result = await axios({
@@ -57,6 +58,7 @@ export const reset = (oldpassword, password, uuid) => async (dispatch) => {
       data: formData,
       headers: {
         "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${accessToken}`,
       },
     });
     console.log(result);
@@ -70,10 +72,10 @@ export const reset = (oldpassword, password, uuid) => async (dispatch) => {
   }
 };
 
-export const change = (newemail, uuid) => async (dispatch) => {
+export const change = (newemail, accessToken) => async (dispatch) => {
   let formData = new FormData();
-  formData.append("newemail", newemail);
-  formData.append("uuid", uuid);
+  formData.append("new_email", newemail);
+  formData.append("accessToken", accessToken);
   dispatch({ type: CHANGE_EMAIL });
 
   try {
@@ -83,6 +85,7 @@ export const change = (newemail, uuid) => async (dispatch) => {
       data: formData,
       headers: {
         "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${accessToken}`,
       },
     });
     console.log(result.data.message);

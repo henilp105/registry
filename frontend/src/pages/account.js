@@ -25,6 +25,7 @@ import "mdbreact/dist/css/mdb.css";
 const Account = () => {
   const email = useSelector((state) => state.account.email);
   const error = useSelector((state) => state.account.error);
+  const accessToken = useSelector((state) => state.auth.accessToken);
   const message = useSelector((state) => state.account.message);
   const successMsg = useSelector(
     (state) => state.account.resetPasswordSuccessMsg
@@ -50,7 +51,7 @@ const Account = () => {
     if (username === null) {
       navigate("/");
     } else {
-      dispatch(getUserAccount(uuid));
+      dispatch(getUserAccount(accessToken));
     }
   });
 
@@ -83,7 +84,7 @@ const Account = () => {
 
     if (validateForm()) {
       dispatch(resetMessages());
-      dispatch(reset(oldPassword, newPassword, uuid));
+      dispatch(reset(oldPassword, newPassword, accessToken));
       setnewPassword("");
       setoldPassword("");
     }
@@ -94,7 +95,7 @@ const Account = () => {
     e.preventDefault();
 
     if (validateFormEmail()) {
-      dispatch(change(newEmail, uuid));
+      dispatch(change(newEmail, accessToken));
       setNewEmail("");
     }
     setShow(true);
