@@ -189,7 +189,6 @@ def reset_password():
 
 @app.route("/auth/forgot-password", methods=["POST"])
 @swag_from("documentation/forgot_password.yaml", methods=["POST"])
-@jwt_required()
 def forgot_password(*email):
     try:
         email = request.form.get("email") if request.form.get("email") else email[0]

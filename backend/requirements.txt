@@ -1,5 +1,5 @@
 pymongo
-flask==2.2.4
+flask
 python-dateutil
 python-dotenv
 bcrypt

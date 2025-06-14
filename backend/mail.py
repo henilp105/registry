@@ -8,7 +8,7 @@ class MailService:
     def __init__(self):
         self.is_ci = os.getenv("IS_CI", "false").lower()
         self.sender_email = os.getenv("RESET_EMAIL")
-        self.sender_password = os.getenv("RESET_PASSWORD")
+        self.sender_password = os.getenv("SUDO_PASSWORD")
         self.host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.port = int(os.getenv("SMTP_PORT", 587))
         self.base_url = os.getenv("HOST")
@@ -24,10 +24,9 @@ class MailService:
 
         try:
             with SMTP(host=self.host, port=self.port) as server:
-                # server.ehlo()
-                # server.starttls()
+                server.starttls()
                 server.ehlo()
-                server.login(self.sender_email, self.sender_password)
+                server.login(user=self.sender_email, password=self.sender_password)
                 message = f"Subject: {subject}\nTo: {to}\n{body}"
                 server.sendmail(self.sender_email, to, message)
             return True
