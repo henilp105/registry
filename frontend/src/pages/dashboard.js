@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchPackages } from "../store/actions/dashboardActions";
 import { useNavigate } from "react-router-dom";
 import Card from "react-bootstrap/Card";
 import Col from "react-bootstrap/Col";
 import Row from "react-bootstrap/Row";
-import Spinner from "react-bootstrap/Spinner";
 import Container from "react-bootstrap/Container";
 import { Link } from "react-router-dom";
+import { SkeletonDashboardCard } from "../components/SkeletonLoader";
 import AddMaintainerFormDialog from "./addMaintainerDialogForm";
 import RemoveMaintainerFormDialog from "./removeMaintainerDialogForm";
 import GenerateNamespaceTokenDialogForm from "./generateNamespaceTokenDialogForm";
@@ -34,62 +34,98 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (username === null) {
+      navigate("/");
+      return;
+    }
+    
     if (!packages) {
       dispatch(fetchPackages(username));
     }
+  }, [packages, username, dispatch, navigate]);
 
-    if (username === null) {
-      navigate("/");
-    }
-  }, [packages, username]);
-
-  const handleAddMaintainerDialog = (itemId, value) => {
+  const handleAddMaintainerDialog = useCallback((itemId, value) => {
     setAddMaintainerDialogState((prevState) => ({
       ...prevState,
       [itemId]: value,
     }));
-  };
+  }, []);
 
-  const handleRemoveMaintainerDialog = (itemId, value) => {
+  const handleRemoveMaintainerDialog = useCallback((itemId, value) => {
     setRemoveMaintainerDialogState((prevState) => ({
       ...prevState,
       [itemId]: value,
     }));
-  };
+  }, []);
 
-  const handleGenerateTokenDialog = (itemId, value) => {
+  const handleGenerateTokenDialog = useCallback((itemId, value) => {
     setshowGenerateTokenDialog((prevState) => ({
       ...prevState,
       [itemId]: value,
     }));
-  };
+  }, []);
 
-  const handleAddNamespaceAdminDialog = (itemId, value) => {
+  const handleAddNamespaceAdminDialog = useCallback((itemId, value) => {
     setAddNamespaceAdminDialogState((prevState) => ({
       ...prevState,
       [itemId]: value,
     }));
-  };
+  }, []);
 
-  const handleRemoveNamespaceAdminDialog = (itemId, value) => {
+  const handleRemoveNamespaceAdminDialog = useCallback((itemId, value) => {
     setRemoveNamespaceAdminDialogState((prevState) => ({
       ...prevState,
       [itemId]: value,
     }));
-  };
+  }, []);
 
-  return isLoading ? (
-    <div className="d-flex justify-content-center">
-      <Spinner className="spinner-border m-5" animation="border" role="status">
-        <span className="visually-hidden">Loading...</span>
-      </Spinner>
-    </div>
-  ) : (
+  // Skeleton loader for loading state
+  const DashboardSkeleton = useMemo(() => (
     <Container style={{ paddingTop: 25 }}>
-      <p style={{ textAlign: "left", fontSize: 24, padding: 5 }}>Namespaces</p>
-      {Namespaces()}
-      <p style={{ textAlign: "left", fontSize: 24, padding: 5 }}>Packages</p>
-      {Packages()}
+      <h5 className="mb-3 text-muted">Loading your dashboard...</h5>
+      <p className="text-start mb-2" style={{ fontSize: 18 }}>Namespaces</p>
+      <Row>
+        {[1, 2, 3].map((i) => (
+          <Col key={i} xs={12} md={4}>
+            <SkeletonDashboardCard />
+          </Col>
+        ))}
+      </Row>
+      <p className="text-start mb-2 mt-4" style={{ fontSize: 18 }}>Packages</p>
+      <Row>
+        {[1, 2, 3].map((i) => (
+          <Col key={i} xs={12} md={4}>
+            <SkeletonDashboardCard />
+          </Col>
+        ))}
+      </Row>
+    </Container>
+  ), []);
+
+  if (isLoading) {
+    return DashboardSkeleton;
+  }
+
+  return (
+    <Container style={{ paddingTop: 25 }}>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h4 className="mb-0">Welcome back, {username}!</h4>
+      </div>
+      
+      <section className="mb-4">
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <h5 className="mb-0">Namespaces</h5>
+          <Link to="/namespace/create" className="btn btn-sm btn-outline-primary">
+            <i className="fas fa-plus me-1" /> Create Namespace
+          </Link>
+        </div>
+        {Namespaces()}
+      </section>
+      
+      <section>
+        <h5 className="mb-2">Packages</h5>
+        {Packages()}
+      </section>
     </Container>
   );
 
@@ -181,76 +217,88 @@ const Dashboard = () => {
   }
 
   function Namespaces() {
-    return namespaces.length === 0 ? (
-      <div className="alert alert-secondary" role="alert">
-        You are not a maintainer of any namespace yet. Add a namespace <Link to="/namespace/create">here</Link>
-      </div>
-    ) : (
+    if (!namespaces || namespaces.length === 0) {
+      return (
+        <div className="alert alert-light border text-center py-4" role="alert">
+          <i className="fas fa-folder-open fa-2x text-muted mb-2" />
+          <p className="mb-2">You haven't created any namespaces yet.</p>
+          <Link to="/namespace/create" className="btn btn-primary btn-sm">
+            Create your first namespace
+          </Link>
+        </div>
+      );
+    }
+
+    return (
       <Row>
-        {namespaces.map((element, index) => (
-          <Col key={element.name} xs={12} md={4}>
-            <Card id="dashboard-card">
-              <Card.Body>
-                <div className="d-flex justify-content-between">
-                  <Card.Title>
-                    <a
-                      href={`/namespaces/${element.name}`}
-                      className="dashboard-title"
+        {namespaces.map((element) => (
+          <Col key={element.name} xs={12} md={4} className="mb-3">
+            <Card id="dashboard-card" className="h-100">
+              <Card.Body className="d-flex flex-column">
+                <div className="d-flex justify-content-between align-items-start mb-2">
+                  <Card.Title className="mb-0">
+                    <Link
+                      to={`/namespaces/${element.name}`}
+                      className="dashboard-title fw-semibold"
                     >
+                      <i className="fas fa-folder me-2 text-primary" />
                       {element.name}
-                    </a>
+                    </Link>
                   </Card.Title>
                   {element.isNamespaceAdmin ? (
-                    <label className="chip">Namespace Admin</label>
+                    <span className="chip bg-primary text-white">Admin</span>
                   ) : element.isNamespaceMaintainer ? (
-                    <label className="chip">Namespace Maintainer</label>
+                    <span className="chip">Maintainer</span>
                   ) : null}
                 </div>
-                <Card.Text id="card-text">{element.description}</Card.Text>
-                <div className="chip-container">
-                  <div
-                    className="border border-success rounded-pill chip-action"
+                <Card.Text id="card-text" className="text-muted small flex-grow-1">
+                  {element.description || "No description"}
+                </Card.Text>
+                <div className="chip-container mt-auto pt-2">
+                  <button
+                    className="border border-success rounded-pill chip-action text-success"
                     onClick={() => handleGenerateTokenDialog(element.id, true)}
+                    type="button"
                   >
-                    Generate Token
-                  </div>
-                  {element.isNamespaceAdmin ? (
-                    <div
-                      className="border border-success rounded-pill chip-action"
-                      onClick={() =>
-                        handleAddNamespaceAdminDialog(element.id, true)
-                      }
-                    >
-                      Add admins
-                    </div>
-                  ) : null}
-                  {element.isNamespaceAdmin ? (
-                    <div
-                      className="border border-danger rounded-pill chip-action"
-                      onClick={() =>
-                        handleRemoveNamespaceAdminDialog(element.id, true)
-                      }
-                    >
-                      Remove admins
-                    </div>
-                  ) : null}
-                  <div
-                    className="border border-success rounded-pill chip-action"
+                    <i className="fas fa-key me-1" /> Token
+                  </button>
+                  {element.isNamespaceAdmin && (
+                    <>
+                      <button
+                        className="border border-success rounded-pill chip-action text-success"
+                        onClick={() => handleAddNamespaceAdminDialog(element.id, true)}
+                        type="button"
+                      >
+                        <i className="fas fa-user-plus me-1" /> Admin
+                      </button>
+                      <button
+                        className="border border-danger rounded-pill chip-action text-danger"
+                        onClick={() => handleRemoveNamespaceAdminDialog(element.id, true)}
+                        type="button"
+                      >
+                        <i className="fas fa-user-minus me-1" /> Admin
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className="border border-success rounded-pill chip-action text-success"
                     onClick={() => handleAddMaintainerDialog(element.id, true)}
+                    type="button"
                   >
-                    Add maintainers
-                  </div>
-                  {element.isNamespaceAdmin ? (
-                    <div
-                      className="border border-danger rounded-pill chip-action"
-                      onClick={() =>
-                        handleRemoveMaintainerDialog(element.id, true)
-                      }
+                    <i className="fas fa-user-plus me-1" /> Maintainer
+                  </button>
+                  {element.isNamespaceAdmin && (
+                    <button
+                      className="border border-danger rounded-pill chip-action text-danger"
+                      onClick={() => handleRemoveMaintainerDialog(element.id, true)}
+                      type="button"
                     >
-                      Remove maintainers
-                    </div>
-                  ) : null}
+                      <i className="fas fa-user-minus me-1" /> Maintainer
+                    </button>
+                  )}
                 </div>
+                
+                {/* Dialogs */}
                 <GenerateNamespaceTokenDialogForm
                   namespace={element.name}
                   show={showGenerateTokenDialog[element.id]}
@@ -259,16 +307,12 @@ const Dashboard = () => {
                 <AddNamespaceAdminFormDialog
                   namespace={element.name}
                   show={addNamespaceAdminDialogState[element.id]}
-                  onHide={() =>
-                    handleAddNamespaceAdminDialog(element.id, false)
-                  }
+                  onHide={() => handleAddNamespaceAdminDialog(element.id, false)}
                 />
                 <RemoveNamespaceAdminFormDialog
                   namespace={element.name}
                   show={removeNamespaceAdminDialogState[element.id]}
-                  onHide={() =>
-                    handleRemoveNamespaceAdminDialog(element.id, false)
-                  }
+                  onHide={() => handleRemoveNamespaceAdminDialog(element.id, false)}
                 />
                 <AddNamespaceMaintainerFormDialog
                   namespace={element.name}
