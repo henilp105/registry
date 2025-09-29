@@ -1,9 +1,9 @@
 import {
+  SEARCH_REQUEST,
   SEARCH_SUCCESS,
   SEARCH_FAILURE,
   SET_QUERY,
   SET_ORDER_BY,
-  SEARCH_LOADING,
 } from "../actions/searchActions";
 
 const initialState = {
@@ -13,17 +13,18 @@ const initialState = {
   currentPage: 0,
   query: "",
   orderBy: "None",
-  isLoading: true,
+  isLoading: false,
 };
 
 const searchReducer = (state = initialState, action) => {
   switch (action.type) {
-    case SEARCH_LOADING:
+    case SEARCH_REQUEST:
       return {
         ...state,
         isLoading: true,
-        packages: null,
+        error: null,
       };
+
     case SEARCH_SUCCESS:
       return {
         ...state,
@@ -31,6 +32,7 @@ const searchReducer = (state = initialState, action) => {
         packages: action.payload.packages,
         totalPages: action.payload.totalPages,
         currentPage: action.payload.currentPage,
+        error: null,
       };
 
     case SEARCH_FAILURE:
@@ -38,7 +40,6 @@ const searchReducer = (state = initialState, action) => {
         ...state,
         isLoading: false,
         packages: null,
-        totalPages: action.payload.totalPages,
         error: action.payload.error,
       };
 
@@ -59,4 +60,5 @@ const searchReducer = (state = initialState, action) => {
   }
 };
 
+export default searchReducer;
 export default searchReducer;
