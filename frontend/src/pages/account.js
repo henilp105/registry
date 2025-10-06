@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,136 +17,150 @@ import Spinner from "react-bootstrap/Spinner";
 import Container from "react-bootstrap/Container";
 import Form from "react-bootstrap/Form";
 import Button from "react-bootstrap/Button";
+import Alert from "react-bootstrap/Alert";
 
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import "bootstrap-css-only/css/bootstrap.min.css";
 import "mdbreact/dist/css/mdb.css";
 
 const Account = () => {
-  const email = useSelector((state) => state.account.email);
-  const error = useSelector((state) => state.account.error);
-  const accessToken = useSelector((state) => state.auth.accessToken);
-  const message = useSelector((state) => state.account.message);
-  const successMsg = useSelector(
-    (state) => state.account.resetPasswordSuccessMsg
-  );
-  const [oldPassword, setoldPassword] = useState("");
-  const [newPassword, setnewPassword] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [fromValidationErrors, setFormValidationError] = useState({});
-  const [show, setShow] = useState(false);
-  const dateJoined = useSelector((state) => state.account.dateJoined);
-  const username = useSelector((state) => state.auth.username);
-  const uuid = useSelector((state) => state.auth.uuid);
-  const isLoading = useSelector((state) => state.account.isLoading);
-  const isLoadingEmail = useSelector((state) => state.account.isLoadingEmail);
-  const messageEmail = useSelector((state) => state.account.message);
-  const isLoadingPassword = useSelector(
-    (state) => state.account.isLoadingPassword
-  );
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
+  // Auth state
+  const accessToken = useSelector((state) => state.auth.accessToken);
+  const username = useSelector((state) => state.auth.username);
+
+  // Account state
+  const email = useSelector((state) => state.account.email);
+  const dateJoined = useSelector((state) => state.account.dateJoined);
+  const error = useSelector((state) => state.account.error);
+  const message = useSelector((state) => state.account.message);
+  const isLoading = useSelector((state) => state.account.isLoading);
+  const isLoadingEmail = useSelector((state) => state.account.isLoadingEmail);
+  const isLoadingPassword = useSelector((state) => state.account.isLoadingPassword);
+
+  // Form state
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [formErrors, setFormErrors] = useState({});
+
+  // Modal state
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+
+  // Redirect if not logged in, fetch account data on mount
   useEffect(() => {
-    if (username === null) {
+    if (!username) {
       navigate("/");
     } else {
       dispatch(getUserAccount(accessToken));
     }
-  });
+  }, [username, accessToken, dispatch, navigate]);
 
-  const validateForm = () => {
-    let errors = {};
+  // Clear form and messages
+  const clearForm = useCallback(() => {
+    setFormErrors({});
+    setNewEmail("");
+    setNewPassword("");
+    setOldPassword("");
+    dispatch(resetMessages());
+  }, [dispatch]);
 
+  // Password validation
+  const validatePasswordForm = () => {
+    const errors = {};
     if (!oldPassword) {
-      errors.password = "Old Password is required";
+      errors.oldPassword = "Old password is required";
     }
     if (!newPassword) {
-      errors.password = "Enter New password";
+      errors.newPassword = "New password is required";
+    } else if (newPassword.length < 8) {
+      errors.newPassword = "Password must be at least 8 characters";
     }
-
-    setFormValidationError(errors);
+    setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const validateFormEmail = () => {
-    let errors = {};
-    setFormValidationError(errors);
+  // Email validation
+  const validateEmailForm = () => {
+    const errors = {};
     if (!newEmail) {
-      errors.email = "New Email is required";
+      errors.email = "New email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      errors.email = "Please enter a valid email address";
     }
-    setFormValidationError(errors);
+    setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  // Handle password reset
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-
-    if (validateForm()) {
+    if (validatePasswordForm()) {
       dispatch(resetMessages());
       dispatch(reset(oldPassword, newPassword, accessToken));
-      setnewPassword("");
-      setoldPassword("");
+      setNewPassword("");
+      setOldPassword("");
     }
-    setShow(true);
   };
 
-  const handleSubmitEmail = async (e) => {
+  // Handle email change
+  const handleEmailSubmit = async (e) => {
     e.preventDefault();
-
-    if (validateFormEmail()) {
+    if (validateEmailForm()) {
+      dispatch(resetMessages());
       dispatch(change(newEmail, accessToken));
       setNewEmail("");
     }
-    setShow(true);
   };
 
-  const clearForm = () => {
-    setFormValidationError({});
-    setNewEmail("");
-    setnewPassword("");
-    setoldPassword("");
-    dispatch(resetMessages());
-  };
-
-  const handleCloseModal = () => {
+  // Modal handlers
+  const handleOpenPasswordModal = () => {
     clearForm();
-    setShowModal(false);
+    setShowPasswordModal(true);
+  };
+
+  const handleClosePasswordModal = () => {
+    clearForm();
+    setShowPasswordModal(false);
+  };
+
+  const handleOpenEmailModal = () => {
+    clearForm();
+    setShowEmailModal(true);
   };
 
   const handleCloseEmailModal = () => {
     clearForm();
-    setshowemailModal(false);
-  };
-  const handleOpenModal = () => {
-    setShowModal(true);
+    setShowEmailModal(false);
   };
 
-  const handleOpenEmailModal = () => {
-    setshowemailModal(true);
-  };
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="d-flex justify-content-center">
+        <Spinner className="spinner-border m-5" animation="border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </div>
+    );
+  }
 
-  const [showModal, setShowModal] = useState(false);
-  const [showemailModal, setshowemailModal] = useState(false);
-
-  return isLoading ? (
-    <div className="d-flex justify-content-center">
-      <Spinner className="spinner-border m-5" animation="border" role="status">
-        <span className="visually-hidden">Loading...</span>
-      </Spinner>
-    </div>
-  ) : (
+  return (
     <Container fluid="md" style={{ paddingTop: 25 }}>
-      <Table>
-        <thead>
-          <h3>Account Settings</h3>
-        </thead>
+      <h3 className="mb-4">Account Settings</h3>
+      
+      <Table responsive>
         <tbody>
           <tr>
-            <h5>Profile picture</h5>
+            <td colSpan="2">
+              <h5 className="mb-3">Profile picture</h5>
+            </td>
           </tr>
           <tr>
-            <td>
+            <td style={{ width: "200px" }}>
               <Image
                 src={`https://www.gravatar.com/avatar/${username}`}
                 alt={`Avatar for ${username} from gravatar.com`}
@@ -163,12 +177,20 @@ const Account = () => {
               your profile picture based on your primary email address —
               <code className="break"> {email} </code>.<br />
               <br />
-              <Button onClick={handleOpenModal}>Change Password</Button>
-              <Button onClick={handleOpenEmailModal}>Change Email</Button>
+              <div className="d-flex gap-2">
+                <Button variant="outline-primary" onClick={handleOpenPasswordModal}>
+                  Change Password
+                </Button>
+                <Button variant="outline-secondary" onClick={handleOpenEmailModal}>
+                  Change Email
+                </Button>
+              </div>
             </td>
           </tr>
           <tr>
-            <h5>Account details</h5>
+            <td colSpan="2">
+              <h5 className="mb-3 mt-3">Account details</h5>
+            </td>
           </tr>
           <tr>
             <td>
@@ -182,7 +204,6 @@ const Account = () => {
             </td>
             <td>{dateJoined}</td>
           </tr>
-
           <tr>
             <td>
               <h6>Primary Email</h6>
@@ -191,90 +212,139 @@ const Account = () => {
           </tr>
         </tbody>
       </Table>
-      <Modal show={showModal} onHide={handleCloseModal}>
+
+      {/* Password Reset Modal */}
+      <Modal show={showPasswordModal} onHide={handleClosePasswordModal}>
         <Modal.Header closeButton>
-          <Modal.Title>Reset Password</Modal.Title>
+          <Modal.Title>Change Password</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form onSubmit={handleSubmit}>
-            <Form.Group as={Row} className="mb-4">
+          <Form onSubmit={handlePasswordSubmit}>
+            <Form.Group as={Row} className="mb-3">
               <Form.Label column sm="4">
-                Old Password
+                Current Password
               </Form.Label>
               <Col sm="8">
                 <Form.Control
                   type="password"
-                  placeholder="Enter Old Password"
+                  placeholder="Enter current password"
                   name="oldPassword"
                   value={oldPassword}
-                  onChange={(e) => setoldPassword(e.target.value)}
+                  onChange={(e) => setOldPassword(e.target.value)}
+                  isInvalid={!!formErrors.oldPassword}
                 />
+                <Form.Control.Feedback type="invalid">
+                  {formErrors.oldPassword}
+                </Form.Control.Feedback>
               </Col>
             </Form.Group>
-            <Form.Group as={Row} className="mb-4">
+            <Form.Group as={Row} className="mb-3">
               <Form.Label column sm="4">
                 New Password
               </Form.Label>
               <Col sm="8">
                 <Form.Control
                   type="password"
-                  placeholder="Enter New Password"
+                  placeholder="Enter new password"
                   name="password"
                   value={newPassword}
-                  onChange={(e) => setnewPassword(e.target.value)}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  isInvalid={!!formErrors.newPassword}
                 />
+                <Form.Control.Feedback type="invalid">
+                  {formErrors.newPassword}
+                </Form.Control.Feedback>
               </Col>
             </Form.Group>
 
-            {fromValidationErrors.password && (
-              <p className="error">{fromValidationErrors.password}</p>
+            {error && (
+              <Alert variant="danger" className="mt-3">
+                {error}
+              </Alert>
             )}
-            <p className="error">{error}</p>
-            <p className="success">{messageEmail}</p>
+            {message && (
+              <Alert variant="success" className="mt-3">
+                {message}
+              </Alert>
+            )}
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseModal}>
-            Close
+          <Button variant="secondary" onClick={handleClosePasswordModal}>
+            Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit}>
-            {isLoadingPassword ? "Loading..." : "Submit"}
+          <Button 
+            variant="primary" 
+            onClick={handlePasswordSubmit}
+            disabled={isLoadingPassword}
+          >
+            {isLoadingPassword ? (
+              <>
+                <Spinner size="sm" animation="border" className="me-2" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </Button>
         </Modal.Footer>
       </Modal>
-      <Modal show={showemailModal} onHide={handleCloseEmailModal}>
+
+      {/* Change Email Modal */}
+      <Modal show={showEmailModal} onHide={handleCloseEmailModal}>
         <Modal.Header closeButton>
           <Modal.Title>Change Email</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form onSubmit={handleSubmitEmail}>
-            <Form.Group as={Row} className="mb-4">
+          <Form onSubmit={handleEmailSubmit}>
+            <Form.Group as={Row} className="mb-3">
               <Form.Label column sm="4">
                 New Email
               </Form.Label>
               <Col sm="8">
                 <Form.Control
                   type="email"
-                  placeholder="Enter New Email"
+                  placeholder="Enter new email address"
                   name="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
+                  isInvalid={!!formErrors.email}
                 />
+                <Form.Control.Feedback type="invalid">
+                  {formErrors.email}
+                </Form.Control.Feedback>
               </Col>
             </Form.Group>
 
-            {fromValidationErrors.email && (
-              <p className="error">{fromValidationErrors.email}</p>
+            {error && (
+              <Alert variant="danger" className="mt-3">
+                {error}
+              </Alert>
             )}
-            <p className={`success ${message ? "error" : ""}`}>{message}</p>
+            {message && (
+              <Alert variant="success" className="mt-3">
+                {message}
+              </Alert>
+            )}
           </Form>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCloseEmailModal}>
-            Close
+            Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmitEmail}>
-            {isLoadingEmail ? "Loading..." : "Submit"}
+          <Button 
+            variant="primary" 
+            onClick={handleEmailSubmit}
+            disabled={isLoadingEmail}
+          >
+            {isLoadingEmail ? (
+              <>
+                <Spinner size="sm" animation="border" className="me-2" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </Button>
         </Modal.Footer>
       </Modal>
