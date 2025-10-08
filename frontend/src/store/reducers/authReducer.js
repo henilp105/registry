@@ -1,45 +1,36 @@
 import {
+  LOGIN_REQUEST,
   LOGIN_SUCCESS,
   LOGIN_FAILURE,
-  SIGNUP_SUCCESS,
-  SIGNUP_FAILURE,
+  LOGOUT_REQUEST,
   LOGOUT_SUCCESS,
   LOGOUT_FAILURE,
-  RESET_ERROR_MESSAGE,
-  LOGIN_REQUEST,
   SIGNUP_REQUEST,
-  LOGOUT_REQUEST,
+  SIGNUP_SUCCESS,
+  SIGNUP_FAILURE,
+  RESET_ERROR_MESSAGE,
 } from "../actions/authActions";
 
 const initialState = {
   isAuthenticated: false,
   accessToken: null,
   refreshToken: null,
-  error: null,
   username: null,
   isLoading: false,
+  error: null,
   message: null,
 };
 
 const authReducer = (state = initialState, action) => {
   switch (action.type) {
+    // Login
     case LOGIN_REQUEST:
       return {
         ...state,
         isLoading: true,
-        error: "",
+        error: null,
       };
-    case LOGOUT_REQUEST:
-      return {
-        ...state,
-        isLoading: true,
-      };
-    case SIGNUP_REQUEST:
-      return {
-        ...state,
-        isLoading: true,
-        error: "",
-      };
+
     case LOGIN_SUCCESS:
       return {
         ...state,
@@ -48,55 +39,75 @@ const authReducer = (state = initialState, action) => {
         refreshToken: action.payload.refreshToken,
         username: action.payload.username,
         isLoading: false,
+        error: null,
       };
 
     case LOGIN_FAILURE:
       return {
         ...state,
         isAuthenticated: false,
-        error: action.payload.error,
         isLoading: false,
+        error: action.payload.error,
+      };
+
+    // Logout
+    case LOGOUT_REQUEST:
+      return {
+        ...state,
+        isLoading: true,
       };
 
     case LOGOUT_SUCCESS:
       return {
-        ...state,
-        isAuthenticated: false,
-        uuid: null,
-        username: null,
-        error: null,
-        isLoading: false,
+        ...initialState,
       };
 
     case LOGOUT_FAILURE:
       return {
         ...state,
-        error: action.payload.error,
         isLoading: false,
+        error: action.payload.error,
+      };
+
+    // Signup
+    case SIGNUP_REQUEST:
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+        message: null,
       };
 
     case SIGNUP_SUCCESS:
       return {
         ...state,
-        message: action.payload.message,
         isLoading: false,
+        message: action.payload.message,
+        error: null,
       };
 
     case SIGNUP_FAILURE:
       return {
         ...state,
         isAuthenticated: false,
-        error: action.payload.error,
         isLoading: false,
+        error: action.payload.error,
+        message: null,
       };
+
+    // Reset error
     case RESET_ERROR_MESSAGE:
       return {
         ...state,
         error: null,
+        message: null,
       };
+
     default:
       return state;
   }
 };
+
+export default authReducer;
 
 export default authReducer;
