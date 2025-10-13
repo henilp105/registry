@@ -1,55 +1,71 @@
 import {
-  FETCH_PACKAGE_DATA,
+  FETCH_PACKAGE_DATA_REQUEST,
   FETCH_PACKAGE_DATA_SUCCESS,
-  FETCH_PACKAGE_DATA_ERROR,
+  FETCH_PACKAGE_DATA_FAILURE,
+  VERIFY_USER_ROLE_REQUEST,
   VERIFY_USER_ROLE_SUCCESS,
-  VERIFY_USER_ROLE_ERROR,
-  VERIFY_USER_ROLE,
+  VERIFY_USER_ROLE_FAILURE,
 } from "../actions/packageActions";
 
 const initialState = {
-  statuscode: 0,
-  data: [],
-  isLoading: true,
+  data: null,
+  statuscode: null,
+  isLoading: false,
+  error: null,
   isVerified: null,
+  isVerifying: false,
 };
 
 const packageReducer = (state = initialState, action) => {
   switch (action.type) {
-    case FETCH_PACKAGE_DATA:
+    // Fetch package data
+    case FETCH_PACKAGE_DATA_REQUEST:
       return {
         ...state,
         isLoading: true,
+        error: null,
       };
+
     case FETCH_PACKAGE_DATA_SUCCESS:
       return {
         ...state,
         isLoading: false,
         statuscode: action.payload.statuscode,
         data: action.payload.data,
+        error: null,
       };
-    case FETCH_PACKAGE_DATA_ERROR:
+
+    case FETCH_PACKAGE_DATA_FAILURE:
       return {
         ...state,
         isLoading: false,
         statuscode: action.payload.statuscode,
-        data: action.payload.data,
+        data: null,
+        error: action.payload.message,
       };
+
+    // Verify user role
+    case VERIFY_USER_ROLE_REQUEST:
+      return {
+        ...state,
+        isVerified: null,
+        isVerifying: true,
+      };
+
     case VERIFY_USER_ROLE_SUCCESS:
       return {
         ...state,
         isVerified: action.payload.data.isVerified,
+        isVerifying: false,
       };
-    case VERIFY_USER_ROLE_ERROR:
+
+    case VERIFY_USER_ROLE_FAILURE:
       return {
         ...state,
         isVerified: false,
+        isVerifying: false,
       };
-    case VERIFY_USER_ROLE:
-      return {
-        ...state,
-        isVerified: null,
-      };
+
     default:
       return state;
   }

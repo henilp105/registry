@@ -1,70 +1,81 @@
-import axios from "axios";
-export const FETCH_PACKAGE_DATA = "FETCH_PACKAGE_DATA";
+import { get, post, getErrorMessage, isSuccessResponse } from "../utils";
+
+// Action types - using consistent _REQUEST/_SUCCESS/_FAILURE naming
+export const FETCH_PACKAGE_DATA_REQUEST = "FETCH_PACKAGE_DATA_REQUEST";
 export const FETCH_PACKAGE_DATA_SUCCESS = "FETCH_PACKAGE_DATA_SUCCESS";
-export const FETCH_PACKAGE_DATA_ERROR = "FETCH_PACKAGE_DATA_ERROR";
-export const VERIFY_USER_ROLE = "VERIFY_USER_ROLE";
+export const FETCH_PACKAGE_DATA_FAILURE = "FETCH_PACKAGE_DATA_FAILURE";
+
+export const VERIFY_USER_ROLE_REQUEST = "VERIFY_USER_ROLE_REQUEST";
 export const VERIFY_USER_ROLE_SUCCESS = "VERIFY_USER_ROLE_SUCCESS";
-export const VERIFY_USER_ROLE_ERROR = "VERIFY_USER_ROLE_ERROR";
+export const VERIFY_USER_ROLE_FAILURE = "VERIFY_USER_ROLE_FAILURE";
 
-export const fetchPackageData =
-  (namespace_name, package_name) => async (dispatch) => {
-    dispatch({
-      type: FETCH_PACKAGE_DATA,
-    });
-    try {
-      let result = await axios({
-        method: "get",
-        url: `${process.env.REACT_APP_REGISTRY_API_URL}/packages/${namespace_name}/${package_name}`,
-      });
+// Legacy aliases for backward compatibility
+export const FETCH_PACKAGE_DATA = FETCH_PACKAGE_DATA_REQUEST;
+export const FETCH_PACKAGE_DATA_ERROR = FETCH_PACKAGE_DATA_FAILURE;
+export const VERIFY_USER_ROLE = VERIFY_USER_ROLE_REQUEST;
+export const VERIFY_USER_ROLE_ERROR = VERIFY_USER_ROLE_FAILURE;
 
-      if (result.data.code === 200) {
-        dispatch({
-          type: FETCH_PACKAGE_DATA_SUCCESS,
-          payload: {
-            statuscode: result.data.code,
-            data: result.data.data,
-          },
-        });
-      }
-    } catch (error) {
+/**
+ * Fetch package data by namespace and package name
+ * @param {string} namespaceName - Namespace name
+ * @param {string} packageName - Package name
+ */
+export const fetchPackageData = (namespaceName, packageName) => async (dispatch) => {
+  dispatch({ type: FETCH_PACKAGE_DATA_REQUEST });
+
+  try {
+    const result = await get(`/packages/${namespaceName}/${packageName}`);
+
+    if (isSuccessResponse(result)) {
       dispatch({
-        type: FETCH_PACKAGE_DATA_ERROR,
+        type: FETCH_PACKAGE_DATA_SUCCESS,
         payload: {
-          statuscode: error.data.code,
-          data: error.data.data,
+          statuscode: result.data.code,
+          data: result.data.data,
+        },
+      });
+    } else {
+      dispatch({
+        type: FETCH_PACKAGE_DATA_FAILURE,
+        payload: {
+          statuscode: result.data.code,
+          message: result.data.message,
         },
       });
     }
-  };
+  } catch (error) {
+    dispatch({
+      type: FETCH_PACKAGE_DATA_FAILURE,
+      payload: {
+        statuscode: error.response?.data?.code || 500,
+        message: getErrorMessage(error),
+      },
+    });
+  }
+};
 
-export const verifyUserRole =
-  (namespace_name, package_name, uuid) => async (dispatch) => {
-    const formData = new FormData();
-    formData.append("uuid", uuid);
+/**
+ * Verify user role for a package
+ * @param {string} namespaceName - Namespace name
+ * @param {string} packageName - Package name
+ * @param {string} uuid - User UUID
+ */
+export const verifyUserRole = (namespaceName, packageName, uuid) => async (dispatch) => {
+  dispatch({ type: VERIFY_USER_ROLE_REQUEST });
+
+  try {
+    const result = await post(`/packages/${namespaceName}/${packageName}/verify`, { uuid });
 
     dispatch({
-      type: VERIFY_USER_ROLE,
+      type: VERIFY_USER_ROLE_SUCCESS,
+      payload: { data: result.data },
     });
-
-    try {
-      let result = await axios({
-        method: "post",
-        url: `${process.env.REACT_APP_REGISTRY_API_URL}/packages/${namespace_name}/${package_name}/verify`,
-        data: formData,
-      });
-
-      dispatch({
-        type: VERIFY_USER_ROLE_SUCCESS,
-        payload: {
-          data: result.data,
-        },
-      });
-    } catch (error) {
-      dispatch({
-        type: VERIFY_USER_ROLE_ERROR,
-        payload: {
-          data: error.data,
-        },
-      });
-    }
-  };
+  } catch (error) {
+    dispatch({
+      type: VERIFY_USER_ROLE_FAILURE,
+      payload: {
+        message: getErrorMessage(error),
+      },
+    });
+  }
+};
