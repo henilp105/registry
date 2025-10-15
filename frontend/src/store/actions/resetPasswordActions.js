@@ -1,32 +1,35 @@
-import axios from "axios";
+import { post, getErrorMessage, isSuccessResponse } from "../utils";
 
-export const RESET_REQUEST = "RESET_REQUEST";
-export const RESET_PASSWORD = "RESET_PASSWORD";
+// Action types
+export const FORGOT_PASSWORD_REQUEST = "FORGOT_PASSWORD_REQUEST";
+export const FORGOT_PASSWORD_SUCCESS = "FORGOT_PASSWORD_SUCCESS";
+export const FORGOT_PASSWORD_FAILURE = "FORGOT_PASSWORD_FAILURE";
 
-export const RESET_REQUEST_SUCCESS = "RESET_REQUEST_SUCCESS";
-export const RESET_REQUEST_FAILURE = "RESET_REQUEST_FAILURE";
-export const RESET_SUCCESS = "RESET_SUCCESS";
-export const RESET_FAILURE = "RESET_FAILURE";
+export const RESET_PASSWORD_REQUEST = "RESET_PASSWORD_REQUEST";
+export const RESET_PASSWORD_SUCCESS = "RESET_PASSWORD_SUCCESS";
+export const RESET_PASSWORD_FAILURE = "RESET_PASSWORD_FAILURE";
 
+// Legacy aliases for backward compatibility
+export const RESET_REQUEST = FORGOT_PASSWORD_REQUEST;
+export const RESET_REQUEST_SUCCESS = FORGOT_PASSWORD_SUCCESS;
+export const RESET_REQUEST_FAILURE = FORGOT_PASSWORD_FAILURE;
+export const RESET_PASSWORD = RESET_PASSWORD_REQUEST;
+export const RESET_SUCCESS = RESET_PASSWORD_SUCCESS;
+export const RESET_FAILURE = RESET_PASSWORD_FAILURE;
+
+/**
+ * Request password reset email
+ * @param {string} email - User email address
+ */
 export const forgot = (email) => async (dispatch) => {
-  // Make an api call to request reset password
-  let formData = new FormData();
-
-  formData.append("email", email);
+  dispatch({ type: FORGOT_PASSWORD_REQUEST });
 
   try {
-    let result = await axios({
-      method: "post",
-      url: `${process.env.REACT_APP_REGISTRY_API_URL}/auth/forgot-password`,
-      data: formData,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const result = await post("/auth/forgot-password", { email });
 
-    if (result.data.code === 200) {
+    if (isSuccessResponse(result)) {
       dispatch({
-        type: RESET_REQUEST_SUCCESS,
+        type: FORGOT_PASSWORD_SUCCESS,
         payload: {
           statuscode: result.data.code,
           message: result.data.message,
@@ -34,68 +37,59 @@ export const forgot = (email) => async (dispatch) => {
       });
     } else {
       dispatch({
-        type: RESET_REQUEST_FAILURE,
+        type: FORGOT_PASSWORD_FAILURE,
         payload: {
-            statuscode: result.data.code,
-            message: result.data.message,
+          statuscode: result.data.code,
+          message: result.data.message,
         },
       });
     }
   } catch (error) {
-    //on failure
-    console.log(error);
     dispatch({
-        type: RESET_REQUEST_FAILURE,
-        payload: {
-            statuscode: error.response.data.code,
-            message: error.response.data.message,
-        },
+      type: FORGOT_PASSWORD_FAILURE,
+      payload: {
+        statuscode: error.response?.data?.code || 500,
+        message: getErrorMessage(error),
+      },
     });
   }
 };
 
-export const reset = (password,uuid) => async (dispatch) => {
-    // Make an api call to reset password
-    let formData = new FormData();
-  
-    formData.append("password", password);
-    formData.append("uuid", uuid);
-  
-    try {
-      let result = await axios({
-        method: "post",
-        url: `${process.env.REACT_APP_REGISTRY_API_URL}/auth/reset-password`,
-        data: formData,
-        headers: {
-          "Content-Type": "multipart/form-data",
+/**
+ * Reset password with token
+ * @param {string} password - New password
+ * @param {string} uuid - Reset token UUID
+ */
+export const reset = (password, uuid) => async (dispatch) => {
+  dispatch({ type: RESET_PASSWORD_REQUEST });
+
+  try {
+    const result = await post("/auth/reset-password", { password, uuid });
+
+    if (isSuccessResponse(result)) {
+      dispatch({
+        type: RESET_PASSWORD_SUCCESS,
+        payload: {
+          statuscode: result.data.code,
+          message: result.data.message,
         },
       });
-  
-      if (result.data.code === 200) {
-        dispatch({
-          type: RESET_SUCCESS,
-          payload: {
-            statuscode: result.data.code,
-            message: result.data.message,
-          },
-        });
-      } else {
-        dispatch({
-          type: RESET_FAILURE,
-          payload: {
-              statuscode: result.data.code,
-              message: result.data.message,
-          },
-        });
-      }
-    } catch (error) {
-      //on failure
+    } else {
       dispatch({
-          type: RESET_REQUEST_FAILURE,
-          payload: {
-            statuscode: error.response.data.code,
-            message: error.response.data.message,
-          },
+        type: RESET_PASSWORD_FAILURE,
+        payload: {
+          statuscode: result.data.code,
+          message: result.data.message,
+        },
       });
     }
-  };
+  } catch (error) {
+    dispatch({
+      type: RESET_PASSWORD_FAILURE,
+      payload: {
+        statuscode: error.response?.data?.code || 500,
+        message: getErrorMessage(error),
+      },
+    });
+  }
+};

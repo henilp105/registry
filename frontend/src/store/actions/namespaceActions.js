@@ -1,29 +1,35 @@
-import axios from "axios";
+import { get, getErrorMessage } from "../utils";
 
-export const FETCH_NAMESPACE_DATA = "FETCH_NAMESPACE_DATA";
+// Action types - using consistent _REQUEST/_SUCCESS/_FAILURE naming
+export const FETCH_NAMESPACE_DATA_REQUEST = "FETCH_NAMESPACE_DATA_REQUEST";
 export const FETCH_NAMESPACE_DATA_SUCCESS = "FETCH_NAMESPACE_DATA_SUCCESS";
-export const FETCH_NAMESPACE_DATA_ERROR = "FETCH_NAMESPACE_DATA_ERROR";
+export const FETCH_NAMESPACE_DATA_FAILURE = "FETCH_NAMESPACE_DATA_FAILURE";
 
-export const fetchNamespaceData = (namespace) => {
-  return async (dispatch) => {
-    dispatch({ type: FETCH_NAMESPACE_DATA });
-    const url = `${process.env.REACT_APP_REGISTRY_API_URL}/namespace/${namespace}`;
+// Legacy aliases for backward compatibility
+export const FETCH_NAMESPACE_DATA = FETCH_NAMESPACE_DATA_REQUEST;
+export const FETCH_NAMESPACE_DATA_ERROR = FETCH_NAMESPACE_DATA_FAILURE;
 
-    try {
-      const result = await axios({
-        method: "get",
-        url: url,
-      });
+/**
+ * Fetch namespace data by namespace name
+ * @param {string} namespace - Namespace name
+ */
+export const fetchNamespaceData = (namespace) => async (dispatch) => {
+  dispatch({ type: FETCH_NAMESPACE_DATA_REQUEST });
 
-      dispatch({
-        type: FETCH_NAMESPACE_DATA_SUCCESS,
-        payload: {
-          projects: result.data["packages"],
-          dateJoined: result.data["createdAt"],
-        },
-      });
-    } catch (error) {
-      dispatch({ type: FETCH_NAMESPACE_DATA_ERROR });
-    }
-  };
+  try {
+    const result = await get(`/namespace/${namespace}`);
+
+    dispatch({
+      type: FETCH_NAMESPACE_DATA_SUCCESS,
+      payload: {
+        projects: result.data.packages,
+        dateJoined: result.data.createdAt,
+      },
+    });
+  } catch (error) {
+    dispatch({
+      type: FETCH_NAMESPACE_DATA_FAILURE,
+      payload: { message: getErrorMessage(error) },
+    });
+  }
 };
