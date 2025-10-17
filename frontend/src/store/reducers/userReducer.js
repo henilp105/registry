@@ -1,39 +1,43 @@
 import {
-  FETCH_USER_DATA,
+  FETCH_USER_DATA_REQUEST,
   FETCH_USER_DATA_SUCCESS,
-  FETCH_USER_DATA_ERROR,
+  FETCH_USER_DATA_FAILURE,
 } from "../actions/userActions";
+import { handleRequest, handleSuccess, handleFailure } from "../utils";
 
 const initialState = {
   email: "",
   dateJoined: "",
   projects: [],
-  isLoading: true,
+  error: null,
+  isLoading: false,
   notFound: false,
 };
 
+/**
+ * Reducer for user profile data
+ * @param {Object} state - Current state
+ * @param {Object} action - Redux action
+ * @returns {Object} New state
+ */
 const userReducer = (state = initialState, action) => {
   switch (action.type) {
-    case FETCH_USER_DATA:
-      return {
-        ...state,
-        isLoading: true,
-        notFound: false,
-      };
+    case FETCH_USER_DATA_REQUEST:
+      return handleRequest(state, { notFound: false });
+
     case FETCH_USER_DATA_SUCCESS:
-      return {
+      return handleSuccess(state, {
         email: action.payload.email,
         dateJoined: action.payload.dateJoined,
         projects: action.payload.projects,
-        isLoading: false,
         notFound: false,
-      };
-    case FETCH_USER_DATA_ERROR:
-      return {
-        ...state,
-        isLoading: false,
+      });
+
+    case FETCH_USER_DATA_FAILURE:
+      return handleFailure(state, action.payload?.message, {
         notFound: true,
-      };
+      });
+
     default:
       return state;
   }
