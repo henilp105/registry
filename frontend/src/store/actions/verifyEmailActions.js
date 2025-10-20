@@ -1,32 +1,29 @@
-import axios from "axios";
+import { post, getErrorMessage, isSuccessResponse } from "../utils";
 
-export const VERIFY_REQUEST = "VERIFY_REQUEST";
+// Action types with consistent naming
+export const VERIFY_EMAIL_REQUEST = "VERIFY_EMAIL_REQUEST";
+export const VERIFY_EMAIL_SUCCESS = "VERIFY_EMAIL_SUCCESS";
+export const VERIFY_EMAIL_FAILURE = "VERIFY_EMAIL_FAILURE";
 
-export const VERIFY_REQUEST_SUCCESS = "VERIFY_REQUEST_SUCCESS";
-export const VERIFY_REQUEST_FAILURE = "VERIFY_REQUEST_FAILURE";
+// Legacy aliases for backward compatibility
+export const VERIFY_REQUEST = VERIFY_EMAIL_REQUEST;
+export const VERIFY_REQUEST_SUCCESS = VERIFY_EMAIL_SUCCESS;
+export const VERIFY_REQUEST_FAILURE = VERIFY_EMAIL_FAILURE;
 
+/**
+ * Verify user email
+ * @param {string} uuid - User UUID
+ * @returns {Function} Redux thunk action
+ */
 export const verify = (uuid) => async (dispatch) => {
-  // Make an api call to request to verify email
-  dispatch({
-    type: VERIFY_REQUEST,
-  });
-  let formData = new FormData();
-
-  formData.append("uuid", uuid);
+  dispatch({ type: VERIFY_EMAIL_REQUEST });
 
   try {
-    let result = await axios({
-      method: "post",
-      url: `${process.env.REACT_APP_REGISTRY_API_URL}/auth/verify-email`,
-      data: formData,
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    const result = await post("/auth/verify-email", { uuid });
 
-    if (result.data.code === 200) {
+    if (isSuccessResponse(result)) {
       dispatch({
-        type: VERIFY_REQUEST_SUCCESS,
+        type: VERIFY_EMAIL_SUCCESS,
         payload: {
           statuscode: result.data.code,
           message: result.data.message,
@@ -34,7 +31,7 @@ export const verify = (uuid) => async (dispatch) => {
       });
     } else {
       dispatch({
-        type: VERIFY_REQUEST_FAILURE,
+        type: VERIFY_EMAIL_FAILURE,
         payload: {
           statuscode: result.data.code,
           message: result.data.message,
@@ -42,13 +39,11 @@ export const verify = (uuid) => async (dispatch) => {
       });
     }
   } catch (error) {
-    //on failure
-    // console.log(error);
     dispatch({
-      type: VERIFY_REQUEST_FAILURE,
+      type: VERIFY_EMAIL_FAILURE,
       payload: {
-        statuscode: error.response.data.code,
-        message: error.response.data.message,
+        statuscode: error.response?.data?.code,
+        message: getErrorMessage(error),
       },
     });
   }

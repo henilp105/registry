@@ -1,18 +1,26 @@
-import axios from "axios";
+import { authenticatedPost, getErrorMessage } from "../utils";
 
+// Action types with consistent naming
 export const RATE_PACKAGE_REQUEST = "RATE_PACKAGE_REQUEST";
 export const RATE_PACKAGE_SUCCESS = "RATE_PACKAGE_SUCCESS";
 export const RATE_PACKAGE_FAILURE = "RATE_PACKAGE_FAILURE";
-export const RESET_ERROR_MESSAGE = "RESET_ERROR_MESSAGE";
+export const RESET_RATE_PACKAGE_MESSAGES = "RESET_RATE_PACKAGE_MESSAGES";
 
-export const ratePackage = (data, access_token) => async (dispatch) => {
-  let formData = new FormData();
-  formData.append("rating", data.rating);
+// Legacy alias for backward compatibility
+export const RESET_ERROR_MESSAGE = RESET_RATE_PACKAGE_MESSAGES;
 
-  let packageName = data.package;
-  let namespaceName = data.namespace;
-  if(access_token === null){
-    // exit this function early if we don't have an access token
+/**
+ * Rate a package
+ * @param {Object} data - Rating data
+ * @param {number} data.rating - Rating value
+ * @param {string} data.package - Package name
+ * @param {string} data.namespace - Namespace name
+ * @param {string|null} accessToken - User access token
+ * @returns {Function} Redux thunk action
+ */
+export const ratePackage = (data, accessToken) => async (dispatch) => {
+  // Exit early if no access token
+  if (accessToken === null) {
     dispatch({
       type: RATE_PACKAGE_FAILURE,
       payload: {
@@ -22,21 +30,15 @@ export const ratePackage = (data, access_token) => async (dispatch) => {
     });
     return;
   }
-  
+
+  dispatch({ type: RATE_PACKAGE_REQUEST });
 
   try {
-    dispatch({
-      type: RATE_PACKAGE_REQUEST,
-    });
-
-    const result = await axios({
-      method: "post",
-      url: `${process.env.REACT_APP_REGISTRY_API_URL}/ratings/${namespaceName}/${packageName}`,
-      data: formData,
-      headers: {
-        Authorization: `Bearer ${access_token}`,
-      },
-    });
+    const result = await authenticatedPost(
+      `/ratings/${data.namespace}/${data.package}`,
+      { rating: data.rating },
+      accessToken
+    );
 
     dispatch({
       type: RATE_PACKAGE_SUCCESS,
@@ -49,15 +51,17 @@ export const ratePackage = (data, access_token) => async (dispatch) => {
     dispatch({
       type: RATE_PACKAGE_FAILURE,
       payload: {
-        message: error.response.data.message,
-        statuscode: error.response.data.code,
+        message: getErrorMessage(error),
+        statuscode: error.response?.data?.code,
       },
     });
   }
 };
 
+/**
+ * Reset rate package messages
+ * @returns {Function} Redux thunk action
+ */
 export const resetErrorMessage = () => (dispatch) => {
-  dispatch({
-    type: RESET_ERROR_MESSAGE,
-  });
+  dispatch({ type: RESET_RATE_PACKAGE_MESSAGES });
 };

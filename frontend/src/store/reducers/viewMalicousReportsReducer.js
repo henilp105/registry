@@ -1,9 +1,10 @@
 import {
-  FETCH_MALICIOUS_REPORTS,
+  FETCH_MALICIOUS_REPORTS_REQUEST,
   FETCH_MALICIOUS_REPORTS_SUCCESS,
-  FETCH_MALICIOUS_REPORTS_ERROR,
-  RESET_DATA,
+  FETCH_MALICIOUS_REPORTS_FAILURE,
+  RESET_MALICIOUS_REPORTS_DATA,
 } from "../actions/viewMalicousReportActions";
+import { handleRequest, handleSuccess, handleFailure } from "../utils";
 
 const initialState = {
   reports: [],
@@ -11,33 +12,30 @@ const initialState = {
   error: null,
 };
 
+/**
+ * Reducer for malicious package reports
+ * @param {Object} state - Current state
+ * @param {Object} action - Redux action
+ * @returns {Object} New state
+ */
 const viewMalicousReportsReducer = (state = initialState, action) => {
   switch (action.type) {
-    case FETCH_MALICIOUS_REPORTS:
-      return {
-        ...state,
-        isLoading: true,
-        error: null,
-      };
+    case FETCH_MALICIOUS_REPORTS_REQUEST:
+      return handleRequest(state);
+
     case FETCH_MALICIOUS_REPORTS_SUCCESS:
-      return {
-        ...state,
+      return handleSuccess(state, {
         reports: action.payload.reports,
-        isLoading: false,
-        error: null,
-      };
-    case FETCH_MALICIOUS_REPORTS_ERROR:
+      });
+
+    case FETCH_MALICIOUS_REPORTS_FAILURE:
+      return handleFailure(state, action.payload?.message);
+
+    case RESET_MALICIOUS_REPORTS_DATA:
       return {
-        ...state,
-        isLoading: false,
-        error: action.payload.message,
+        ...initialState,
       };
-    case RESET_DATA:
-      return {
-        reports: [],
-        isLoading: false,
-        error: null,
-      };
+
     default:
       return state;
   }

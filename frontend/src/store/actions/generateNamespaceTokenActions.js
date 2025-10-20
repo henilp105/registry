@@ -1,33 +1,37 @@
-import axios from "axios";
+import { authenticatedPost, getErrorMessage, isSuccessResponse } from "../utils";
 
-export const GENERATE_TOKEN_REQUEST = "GENERATE_TOKEN_REQUEST";
-export const GENERATE_TOKEN_SUCCESS = "GENERATE_TOKEN_SUCCESS";
-export const GENERATE_TOKEN_FAILURE = "GENERATE_TOKEN_FAILURE";
+// Action types with consistent naming
+export const GENERATE_NAMESPACE_TOKEN_REQUEST = "GENERATE_NAMESPACE_TOKEN_REQUEST";
+export const GENERATE_NAMESPACE_TOKEN_SUCCESS = "GENERATE_NAMESPACE_TOKEN_SUCCESS";
+export const GENERATE_NAMESPACE_TOKEN_FAILURE = "GENERATE_NAMESPACE_TOKEN_FAILURE";
+export const RESET_NAMESPACE_TOKEN_MESSAGES = "RESET_NAMESPACE_TOKEN_MESSAGES";
 
-export const RESET_MESSAGE = "RESET_ERROR_MESSAGE";
+// Legacy aliases for backward compatibility
+export const GENERATE_TOKEN_REQUEST = GENERATE_NAMESPACE_TOKEN_REQUEST;
+export const GENERATE_TOKEN_SUCCESS = GENERATE_NAMESPACE_TOKEN_SUCCESS;
+export const GENERATE_TOKEN_FAILURE = GENERATE_NAMESPACE_TOKEN_FAILURE;
+export const RESET_MESSAGE = RESET_NAMESPACE_TOKEN_MESSAGES;
 
+/**
+ * Generate an upload token for a namespace
+ * @param {Object} data - Token generation data
+ * @param {string} data.namespace - Namespace name
+ * @param {string} data.accessToken - User access token
+ * @returns {Function} Redux thunk action
+ */
 export const generateToken = (data) => async (dispatch) => {
-  let formData = new FormData();
-
-  formData.append("namespace", data.namespace);
+  dispatch({ type: GENERATE_NAMESPACE_TOKEN_REQUEST });
 
   try {
-    dispatch({
-      type: GENERATE_TOKEN_REQUEST,
-    });
+    const result = await authenticatedPost(
+      `/namespaces/${data.namespace}/uploadToken`,
+      { namespace: data.namespace },
+      data.accessToken
+    );
 
-    const result = await axios({
-      method: "post",
-      url: `${process.env.REACT_APP_REGISTRY_API_URL}/namespaces/${data.namespace}/uploadToken`,
-      data: formData,
-      headers: {
-        Authorization: `Bearer ${data.accessToken}`,
-      },
-    });
-
-    if (result.data.code === 200) {
+    if (isSuccessResponse(result)) {
       dispatch({
-        type: GENERATE_TOKEN_SUCCESS,
+        type: GENERATE_NAMESPACE_TOKEN_SUCCESS,
         payload: {
           message: result.data.message,
           uploadToken: result.data.uploadToken,
@@ -35,7 +39,7 @@ export const generateToken = (data) => async (dispatch) => {
       });
     } else {
       dispatch({
-        type: GENERATE_TOKEN_FAILURE,
+        type: GENERATE_NAMESPACE_TOKEN_FAILURE,
         payload: {
           message: result.data.message,
         },
@@ -43,16 +47,18 @@ export const generateToken = (data) => async (dispatch) => {
     }
   } catch (error) {
     dispatch({
-      type: GENERATE_TOKEN_FAILURE,
+      type: GENERATE_NAMESPACE_TOKEN_FAILURE,
       payload: {
-        message: error.response.data.message,
+        message: getErrorMessage(error),
       },
     });
   }
 };
 
+/**
+ * Reset namespace token generation messages
+ * @returns {Function} Redux thunk action
+ */
 export const resetMessages = () => (dispatch) => {
-  dispatch({
-    type: RESET_MESSAGE,
-  });
+  dispatch({ type: RESET_NAMESPACE_TOKEN_MESSAGES });
 };

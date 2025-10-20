@@ -1,36 +1,35 @@
 import {
-  FETCH_USERS_LIST,
+  FETCH_USERS_LIST_REQUEST,
   FETCH_USERS_LIST_SUCCESS,
-  FETCH_USERS_LIST_ERROR,
+  FETCH_USERS_LIST_FAILURE,
 } from "../actions/userListActions";
+import { handleRequest, handleSuccess, handleFailure } from "../utils";
 
 const initialState = {
   users: null,
-  isLoading: true,
+  isLoading: false,
   error: null,
 };
 
+/**
+ * Reducer for user list (admins/maintainers)
+ * @param {Object} state - Current state
+ * @param {Object} action - Redux action
+ * @returns {Object} New state
+ */
 const userListReducer = (state = initialState, action) => {
   switch (action.type) {
-    case FETCH_USERS_LIST:
-      return {
-        ...state,
-        isLoading: true,
-        error: null,
-      };
+    case FETCH_USERS_LIST_REQUEST:
+      return handleRequest(state);
+
     case FETCH_USERS_LIST_SUCCESS:
-      return {
-        ...state,
+      return handleSuccess(state, {
         users: action.payload.users,
-        isLoading: false,
-        error: null,
-      };
-    case FETCH_USERS_LIST_ERROR:
-      return {
-        ...state,
-        isLoading: false,
-        error: action.payload.message,
-      };
+      });
+
+    case FETCH_USERS_LIST_FAILURE:
+      return handleFailure(state, action.payload?.message);
+
     default:
       return state;
   }
