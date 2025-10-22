@@ -1,58 +1,123 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { forgot } from "../store/actions/resetPasswordActions";
 import { Link } from "react-router-dom";
 import Container from "react-bootstrap/Container";
+import Form from "react-bootstrap/Form";
+import Button from "react-bootstrap/Button";
+import Alert from "react-bootstrap/Alert";
+import Spinner from "react-bootstrap/Spinner";
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
-  const [fromValidationErrors, setFormValidationError] = useState({});
+  const [formErrors, setFormErrors] = useState({});
+  const [touched, setTouched] = useState(false);
+  
   const dispatch = useDispatch();
-  const message = useSelector((state) => state.resetpassword.message);
-  const statuscode = useSelector((state) => state.resetpassword.statuscode);
+  const { message, statuscode, isLoading } = useSelector(
+    (state) => state.resetpassword
+  );
 
-  const validateForm = () => {
-    let errors = {};
-
-    if (!email) {
-      errors.email = "Email is required";
+  const validateEmail = useCallback((value) => {
+    if (!value.trim()) {
+      return "Email is required";
     }
-    setFormValidationError(errors);
-    return Object.keys(errors).length === 0;
-  };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      return "Please enter a valid email address";
+    }
+    return null;
+  }, []);
 
-  const handleSubmit = async (e) => {
+  const validateForm = useCallback(() => {
+    const emailError = validateEmail(email);
+    if (emailError) {
+      setFormErrors({ email: emailError });
+      return false;
+    }
+    setFormErrors({});
+    return true;
+  }, [email, validateEmail]);
+
+  const handleBlur = useCallback(() => {
+    setTouched(true);
+    const error = validateEmail(email);
+    setFormErrors(error ? { email: error } : {});
+  }, [email, validateEmail]);
+
+  const handleSubmit = useCallback((e) => {
     e.preventDefault();
+    setTouched(true);
     if (validateForm()) {
       dispatch(forgot(email));
     }
-  };
+  }, [dispatch, email, validateForm]);
+
+  const isSuccess = statuscode === 200;
 
   return (
-    <Container style={{ paddingTop: 25 }}>
-      <form id="login-form" onSubmit={handleSubmit}>
-        <h1>Welcome to fpm Registry!</h1>
-        <p>Please enter your email to Reset Password</p>
-        <input
-          type="email"
-          name="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        {fromValidationErrors.email && (
-          <p className="error">{fromValidationErrors.email}</p>
-        )}
-       {message && (statuscode !== 200 ? (
-          <p className="error">{message}</p>
-        ) : (
-          <p className="success">{message}</p>
-        ))}
-        <input type="submit" value="Forgot Password" />
-        <p>
-          Already have an account?<Link to="/account/login"> Login </Link>
+    <Container 
+      className="d-flex justify-content-center" 
+      style={{ paddingTop: 50 }}
+    >
+      <div style={{ width: "100%", maxWidth: "400px" }}>
+        <h1 className="mb-2">Forgot Password?</h1>
+        <p className="text-muted mb-4">
+          Enter your email address and we'll send you a link to reset your password.
         </p>
-      </form>
+
+        {message && (
+          <Alert variant={isSuccess ? "success" : "danger"} className="mb-3">
+            {isSuccess && <i className="fas fa-check-circle me-2" />}
+            {!isSuccess && <i className="fas fa-exclamation-circle me-2" />}
+            {message}
+          </Alert>
+        )}
+
+        <Form onSubmit={handleSubmit}>
+          <Form.Group className="mb-3">
+            <Form.Label>Email address</Form.Label>
+            <Form.Control
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onBlur={handleBlur}
+              isInvalid={touched && !!formErrors.email}
+              disabled={isLoading}
+            />
+            <Form.Control.Feedback type="invalid">
+              {formErrors.email}
+            </Form.Control.Feedback>
+          </Form.Group>
+
+          <Button
+            type="submit"
+            variant="primary"
+            className="w-100 mb-3"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Spinner
+                  as="span"
+                  animation="border"
+                  size="sm"
+                  role="status"
+                  aria-hidden="true"
+                  className="me-2"
+                />
+                Sending...
+              </>
+            ) : (
+              "Send Reset Link"
+            )}
+          </Button>
+        </Form>
+
+        <p className="text-center text-muted">
+          Remember your password? <Link to="/account/login">Login</Link>
+        </p>
+      </div>
     </Container>
   );
 };

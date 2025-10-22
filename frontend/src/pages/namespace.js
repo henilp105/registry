@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchNamespaceData } from "../store/actions/namespaceActions";
 import { MDBIcon } from "mdbreact";
@@ -15,24 +15,54 @@ import ShowUserListDialog from "./showUserListDialog";
 const NamespacePage = () => {
   const { namespace } = useParams();
   const navigate = useNavigate();
-  const {dateJoined, projects, notFound, isLoading} = useSelector((state) => state.namespace);
   const dispatch = useDispatch();
+  
+  const { dateJoined, projects, notFound, isLoading } = useSelector(
+    (state) => state.namespace
+  );
 
   const [isListDialogOpen, setListDialogOpen] = useState(false);
-  const [findNamespaceAdmins, setFindNamespaceAdmins] = useState(false);
-  const [findNamespaceMaintainers, setFindNamespaceMaintainers] =
-    useState(false);
+  const [dialogType, setDialogType] = useState(null); // 'admins' | 'maintainers'
 
+  // Fetch namespace data on mount or namespace change
   useEffect(() => {
-    console.log("Fetching namespace data for:", namespace);
     dispatch(fetchNamespaceData(namespace));
-  }, [namespace, notFound]);
+  }, [dispatch, namespace]);
 
-  if (notFound) {
-    navigate("/404");
+  // Handle 404 redirect
+  useEffect(() => {
+    if (notFound) {
+      navigate("/404");
+    }
+  }, [notFound, navigate]);
+
+  const openDialog = useCallback((type) => {
+    setDialogType(type);
+    setListDialogOpen(true);
+  }, []);
+
+  const closeDialog = useCallback(() => {
+    setListDialogOpen(false);
+    setDialogType(null);
+  }, []);
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    if (!dateString) return "";
+    return dateString.slice(4, 16);
+  };
+
+  if (isLoading) {
+    return (
+      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: "400px" }}>
+        <Spinner animation="border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </Container>
+    );
   }
 
-  return !isLoading ? (
+  return (
     <Container>
       <Row>
         <Col sm={4}>
@@ -42,7 +72,7 @@ const NamespacePage = () => {
                 width={100}
                 height={100}
                 alt={`Avatar for ${namespace} from gravatar.com`}
-                src={`https://www.gravatar.com/avatar/${namespace}`} // render image from Storage Service
+                src={`https://www.gravatar.com/avatar/${namespace}`}
               />
             </Figure>
           </Row>
@@ -50,11 +80,11 @@ const NamespacePage = () => {
             style={{ marginLeft: "10px", marginTop: "10px", fontSize: "20px" }}
           >
             <MDBIcon style={{ marginTop: "5px" }} far icon="box">
-              {" Namespace: " + namespace}
+              {` Namespace: ${namespace}`}
             </MDBIcon>
-            <br></br>
+            <br />
             <MDBIcon style={{ marginTop: "5px" }} far icon="calendar-alt">
-              {" Created: " + dateJoined.slice(4, 16)}
+              {` Created: ${formatDate(dateJoined)}`}
             </MDBIcon>
           </Row>
           <Row
@@ -69,11 +99,7 @@ const NamespacePage = () => {
               style={{ marginTop: "5px" }}
               far
               icon="user"
-              onClick={() => {
-                setFindNamespaceMaintainers(false);
-                setFindNamespaceAdmins(true);
-                setListDialogOpen(true);
-              }}
+              onClick={() => openDialog('admins')}
             >
               {" "}
               Admins
@@ -91,48 +117,36 @@ const NamespacePage = () => {
               style={{ marginTop: "5px" }}
               far
               icon="user"
-              onClick={() => {
-                setFindNamespaceMaintainers(true);
-                setFindNamespaceAdmins(false);
-                setListDialogOpen(true);
-              }}
+              onClick={() => openDialog('maintainers')}
             >
               {" "}
               Namespace Maintainers
             </MDBIcon>
           </Row>
-          {findNamespaceAdmins || findNamespaceMaintainers ? (
+          
+          {dialogType && (
             <ShowUserListDialog
-              maintainers={findNamespaceMaintainers}
-              admins={findNamespaceAdmins}
-              onHide={() => setListDialogOpen(false)}
+              maintainers={dialogType === 'maintainers'}
+              admins={dialogType === 'admins'}
+              onHide={closeDialog}
               namespace={namespace}
               show={isListDialogOpen}
             />
-          ) : null}
+          )}
         </Col>
         <Col sm={8}>
           <Row style={{ fontSize: 24, marginTop: "20px" }}>
             {projects.length === 0
               ? "0 projects"
-              : projects.length + " Packages"}
+              : `${projects.length} Packages`}
           </Row>
           {projects.map((packageEntity) => (
-            <Row style={{ marginTop: "20px" }}>
-              <PackageItem
-                key={packageEntity.name + packageEntity.namespace}
-                packageEntity={packageEntity}
-              />
+            <Row key={`${packageEntity.namespace}-${packageEntity.name}`} style={{ marginTop: "20px" }}>
+              <PackageItem packageEntity={packageEntity} />
             </Row>
           ))}
         </Col>
       </Row>
-    </Container>
-  ) : (
-    <Container style={{ margin: "200px" }}>
-      <Spinner animation="border" role="status">
-        <span className="visually-hidden">Loading...</span>
-      </Spinner>
     </Container>
   );
 };

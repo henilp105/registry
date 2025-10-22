@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserData } from "../store/actions/userActions";
 import { MDBIcon } from "mdbreact";
@@ -13,22 +13,45 @@ import PackageItem from "../components/packageItem";
 const UserPage = () => {
   const { user } = useParams();
   const navigate = useNavigate();
-  const email = useSelector((state) => state.user.email);
-  const dateJoined = useSelector((state) => state.user.dateJoined);
-  const projects = useSelector((state) => state.user.projects);
-  const notFound = useSelector((state) => state.user.notFound);
-  const isLoading = useSelector((state) => state.user.isLoading);
   const dispatch = useDispatch();
+  
+  const { email, dateJoined, projects, notFound, isLoading } = useSelector(
+    (state) => state.user
+  );
 
+  // Fetch user data on mount or user change
   useEffect(() => {
     dispatch(fetchUserData(user));
-  }, [user, notFound]);
+  }, [dispatch, user]);
 
-  if (notFound) {
-    navigate("/404");
+  // Handle 404 redirect
+  useEffect(() => {
+    if (notFound) {
+      navigate("/404");
+    }
+  }, [notFound, navigate]);
+
+  // Format date for display
+  const formattedDate = useMemo(() => {
+    if (!dateJoined) return "";
+    return new Date(dateJoined).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }, [dateJoined]);
+
+  if (isLoading) {
+    return (
+      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: "400px" }}>
+        <Spinner animation="border" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </Spinner>
+      </Container>
+    );
   }
 
-  return !isLoading ? (
+  return (
     <Container>
       <Row>
         <Col sm={4}>
@@ -46,37 +69,30 @@ const UserPage = () => {
             style={{ marginLeft: "10px", marginTop: "10px", fontSize: "20px" }}
           >
             <MDBIcon style={{ marginTop: "5px" }} far icon="user-circle">
-              {" " + user}
+              {` ${user}`}
             </MDBIcon>
             <MDBIcon style={{ marginTop: "5px" }} far icon="calendar-alt">
-              {" Joined " + Date(dateJoined).slice(4, 15)}
+              {` Joined ${formattedDate}`}
             </MDBIcon>
-
             <MDBIcon style={{ marginTop: "5px" }} far icon="envelope">
-              {" " + email}
+              {` ${email}`}
             </MDBIcon>
           </Row>
         </Col>
         <Col sm={8}>
-          <Row style={{ fontSize: "20px", marginTop: "20px" , padding:"5px"}}>
+          <Row style={{ fontSize: "20px", marginTop: "20px", padding: "5px" }}>
             {projects.length === 0
               ? "0 projects"
-              : projects.length + " projects"} 
+              : `${projects.length} projects`}
           </Row>
-           {projects.map((packageEntity) => (
-        <PackageItem
-          key={packageEntity.name + packageEntity.namespace}
-          packageEntity={packageEntity}
-        />
-      ))}
+          {projects.map((packageEntity) => (
+            <PackageItem
+              key={`${packageEntity.namespace}-${packageEntity.name}`}
+              packageEntity={packageEntity}
+            />
+          ))}
         </Col>
       </Row>
-    </Container>
-  ) : (
-    <Container style={{ margin: "200px" }}>
-      <Spinner animation="border" role="status">
-        <span className="visually-hidden">Loading...</span>
-      </Spinner>
     </Container>
   );
 };
