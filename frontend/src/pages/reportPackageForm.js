@@ -1,97 +1,147 @@
-import React, { useEffect, useState } from "react";
-import { Form, Button, Modal, Spinner } from "react-bootstrap";
+import React, { useEffect, useState, useCallback } from "react";
+import { Form, Button, Modal, Spinner, Alert } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
 import {
   reportPackage,
   resetErrorMessage,
 } from "../store/actions/reportPackageActions";
-import { toast, ToastContainer } from "react-toastify";
-import { reset } from "../store/actions/accountActions";
 
-const ReportPackageForm = (props) => {
+const ReportPackageForm = ({ namespace, package: packageName, show, onHide }) => {
   const dispatch = useDispatch();
   const [reason, setReason] = useState("");
+  const [validationError, setValidationError] = useState("");
+  const [touched, setTouched] = useState(false);
+  
   const accessToken = useSelector((state) => state.auth.accessToken);
-  const isLoading = useSelector((state) => state.reportPackage.isLoading);
-  const statusCode = useSelector((state) => state.reportPackage.statuscode);
-  const message = useSelector((state) => state.reportPackage.message);
+  const { isLoading, statuscode, message } = useSelector(
+    (state) => state.reportPackage
+  );
 
-  const handleSubmit = async (e) => {
+  const isSuccess = statuscode === 200;
+
+  const validateReason = useCallback((value) => {
+    if (!value.trim()) return "Please provide a reason for reporting";
+    if (value.length < 20) return "Reason must be at least 20 characters";
+    return null;
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setTouched(true);
+    setValidationError(validateReason(reason));
+  }, [reason, validateReason]);
+
+  const handleSubmit = useCallback((e) => {
     e.preventDefault();
+    setTouched(true);
+    
+    const error = validateReason(reason);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+    
     dispatch(
       reportPackage(
-        { reason: reason, namespace: props.namespace, package: props.package },
+        { reason, namespace, package: packageName },
         accessToken
       )
     );
-  };
+  }, [dispatch, reason, namespace, packageName, accessToken, validateReason]);
 
-  useEffect(() => {
-    if (statusCode === 200) {
-      toast.success(message);
-    } else {
-      toast.error(message);
-    }
-
+  const resetData = useCallback(() => {
+    setReason("");
+    setValidationError("");
+    setTouched(false);
     dispatch(resetErrorMessage());
-  }, [statusCode]);
+  }, [dispatch]);
+
+  // Auto-close on success after delay
+  useEffect(() => {
+    if (isSuccess && show) {
+      const timer = setTimeout(() => {
+        onHide();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSuccess, show, onHide]);
 
   return (
-    <Form onSubmit={handleSubmit}>
-      <Modal {...props} size="lg">
+    <Modal
+      show={show}
+      onHide={onHide}
+      size="lg"
+      aria-labelledby="report-package-modal"
+      centered
+      onExited={resetData}
+    >
+      <Form onSubmit={handleSubmit}>
         <Modal.Header closeButton>
-          <Modal.Title>Report Package</Modal.Title>
+          <Modal.Title id="report-package-modal">Report Package</Modal.Title>
         </Modal.Header>
-        <ToastContainer
-          position="top-center"
-          autoClose={5000}
-          hideProgressBar={false}
-          newestOnTop={false}
-          closeOnClick
-          rtl={false}
-          pauseOnFocusLoss
-          pauseOnHover
-          theme="light"
-        />
         <Modal.Body>
-          <Form.Group
-            className="mb-3"
-            controlId="formReportPackage"
-            id="namespace-description-textfield"
-          >
-            <Form.Label>Reason for reporting package</Form.Label>
+          <Alert variant="warning" className="mb-3">
+            <i className="fas fa-exclamation-triangle me-2" />
+            You are about to report <strong>{namespace}/{packageName}</strong>.
+            Please provide a detailed reason.
+          </Alert>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Reason for Report</Form.Label>
             <Form.Control
-              type="text"
-              placeholder="Describe the reason for reporting the package"
               as="textarea"
-              name="report_description"
+              rows={4}
+              placeholder="Describe why you are reporting this package..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+              onBlur={handleBlur}
+              isInvalid={touched && !!validationError}
+              disabled={isLoading || isSuccess}
             />
+            <Form.Control.Feedback type="invalid">
+              {validationError}
+            </Form.Control.Feedback>
             <Form.Text className="text-muted">
-              Write a brief description of the reason for reporting the package.
+              Be specific about the issue (e.g., malicious code, license violation, spam).
             </Form.Text>
           </Form.Group>
+
+          {message && (
+            <Alert variant={isSuccess ? "success" : "danger"} className="mb-0">
+              {isSuccess && <i className="fas fa-check-circle me-2" />}
+              {!isSuccess && <i className="fas fa-exclamation-circle me-2" />}
+              {message}
+            </Alert>
+          )}
         </Modal.Body>
         <Modal.Footer>
-          {!isLoading ? (
-            <Button variant="primary" type="submit" onClick={handleSubmit}>
-              Submit
-            </Button>
-          ) : (
-            <div style={{ margin: 0 }}>
-              <Spinner
-                className="spinner-border m-3"
-                animation="border"
-                role="status"
-              >
-                <span className="visually-hidden">Loading...</span>
-              </Spinner>
-            </div>
-          )}
+          <Button variant="secondary" onClick={onHide} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            type="submit"
+            disabled={isLoading || isSuccess}
+          >
+            {isLoading ? (
+              <>
+                <Spinner as="span" animation="border" size="sm" className="me-2" />
+                Submitting...
+              </>
+            ) : isSuccess ? (
+              <>
+                <i className="fas fa-check me-2" />
+                Reported
+              </>
+            ) : (
+              <>
+                <i className="fas fa-flag me-2" />
+                Submit Report
+              </>
+            )}
+          </Button>
         </Modal.Footer>
-      </Modal>
-    </Form>
+      </Form>
+    </Modal>
   );
 };
 
