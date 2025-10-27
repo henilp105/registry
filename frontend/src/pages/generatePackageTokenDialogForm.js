@@ -1,93 +1,144 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Button from "react-bootstrap/Button";
 import Modal from "react-bootstrap/Modal";
+import Alert from "react-bootstrap/Alert";
+import Spinner from "react-bootstrap/Spinner";
+import InputGroup from "react-bootstrap/InputGroup";
+import Form from "react-bootstrap/Form";
 import {
   generatePackageToken,
   resetMessages,
 } from "../store/actions/generatePackageTokenActions";
 
-const GeneratePackageTokenDialogForm = (props) => {
-  const [validationError, setValidationError] = useState("");
-  const accessToken = useSelector((state) => state.auth.accessToken);
-  const successMessage = useSelector(
-    (state) => state.generatePackageToken.successMessage
-  );
-  const errorMessage = useSelector(
-    (state) => state.generatePackageToken.errorMessage
-  );
-  const uploadToken = useSelector(
-    (state) => state.generatePackageToken.uploadToken
-  );
-
+const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show, onHide }) => {
+  const [copied, setCopied] = useState(false);
   const dispatch = useDispatch();
+  
+  const accessToken = useSelector((state) => state.auth.accessToken);
+  const { successMessage, errorMessage, uploadToken, isLoading } = useSelector(
+    (state) => state.generatePackageToken
+  );
 
-  const onSubmit = (event) => {
-    dispatch(resetMessages());
-    event.preventDefault();
+  const handleGenerate = useCallback((e) => {
+    e.preventDefault();
 
-    // If the form input is not valid. Do not proceed.
-    if (!validateForm()) {
+    if (!accessToken) {
       return;
     }
 
     dispatch(
       generatePackageToken({
-        accessToken: accessToken,
-        namespace: props.namespace,
-        package: props.package,
+        accessToken,
+        namespace,
+        package: packageName,
       })
     );
-  };
+  }, [dispatch, accessToken, namespace, packageName]);
 
-  const resetData = () => {
-    setValidationError("");
-    dispatch(resetMessages());
-  };
-
-  const validateForm = () => {
-    if (!accessToken) {
-      setValidationError("Access token is required");
-      return false;
+  const handleCopy = useCallback(() => {
+    if (uploadToken) {
+      navigator.clipboard.writeText(uploadToken);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
+  }, [uploadToken]);
 
-    setValidationError("");
-    return true;
-  };
+  const resetData = useCallback(() => {
+    setCopied(false);
+    dispatch(resetMessages());
+  }, [dispatch]);
 
   return (
-    <form id="add-maintainer-form">
-      <Modal
-        {...props}
-        size="md"
-        aria-labelledby="contained-modal-title-vcenter"
-        centered
-        onExit={resetData}
-      >
-        <Modal.Header closeButton>
-          <Modal.Title id="contained-modal-title-vcenter">
-            Generate token
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          Generate a package token for {props.package}
-          {validationError && (
-            <p id="add-maintainer-error">{validationError}</p>
-          )}
-          {successMessage && (
-            <p id="add-maintainer-success">
-              {successMessage}: {uploadToken}
-            </p>
-          )}
-          {errorMessage && <p id="add-maintainer-error">{errorMessage}</p>}
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="success" onClick={onSubmit}>
-            Generate Token
+    <Modal
+      show={show}
+      onHide={onHide}
+      size="md"
+      aria-labelledby="generate-package-token-modal"
+      centered
+      onExited={resetData}
+    >
+      <Modal.Header closeButton>
+        <Modal.Title id="generate-package-token-modal">
+          Generate Package Token
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="mb-3">
+          Generate an upload token for package <strong>{namespace}/{packageName}</strong>.
+        </p>
+        <p className="text-muted small mb-3">
+          This token can be used to upload new versions of this package via the CLI.
+        </p>
+
+        {uploadToken && (
+          <div className="mb-3">
+            <Form.Label className="text-success">
+              <i className="fas fa-check-circle me-2" />
+              Token Generated Successfully
+            </Form.Label>
+            <InputGroup>
+              <Form.Control
+                type="text"
+                value={uploadToken}
+                readOnly
+                className="font-monospace"
+              />
+              <Button
+                variant={copied ? "success" : "outline-secondary"}
+                onClick={handleCopy}
+              >
+                {copied ? (
+                  <><i className="fas fa-check me-1" /> Copied</>
+                ) : (
+                  <><i className="fas fa-copy me-1" /> Copy</>
+                )}
+              </Button>
+            </InputGroup>
+            <Form.Text className="text-muted">
+              Keep this token secure. It won't be shown again.
+            </Form.Text>
+          </div>
+        )}
+
+        {successMessage && !uploadToken && (
+          <Alert variant="success" className="mb-0">
+            <i className="fas fa-check-circle me-2" />
+            {successMessage}
+          </Alert>
+        )}
+        {errorMessage && (
+          <Alert variant="danger" className="mb-0">
+            <i className="fas fa-exclamation-circle me-2" />
+            {errorMessage}
+          </Alert>
+        )}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onHide}>
+          Close
+        </Button>
+        {!uploadToken && (
+          <Button
+            variant="success"
+            onClick={handleGenerate}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Spinner as="span" animation="border" size="sm" className="me-2" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-key me-2" />
+                Generate Token
+              </>
+            )}
           </Button>
-        </Modal.Footer>
-      </Modal>
-    </form>
+        )}
+      </Modal.Footer>
+    </Modal>
   );
 };
 
