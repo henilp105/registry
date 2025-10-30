@@ -1,102 +1,140 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import Modal from "react-bootstrap/Modal";
 import Button from "react-bootstrap/Button";
+import Form from "react-bootstrap/Form";
+import Alert from "react-bootstrap/Alert";
+import Spinner from "react-bootstrap/Spinner";
 import {
   removeNamespaceAdmin,
   resetMessages,
 } from "../store/actions/namespaceAdminsActions";
 
-const RemoveNamespaceAdminFormDialog = (props) => {
+const RemoveNamespaceAdminFormDialog = ({ namespace, show, onHide }) => {
   const [username, setUsername] = useState("");
   const [validationError, setValidationError] = useState("");
+  const [touched, setTouched] = useState(false);
+  
+  const dispatch = useDispatch();
+  
   const currUsername = useSelector((state) => state.auth.username);
   const uuid = useSelector((state) => state.auth.uuid);
-  const successMessage = useSelector(
-    (state) => state.addRemoveNamespaceAdmin.successMessage
-  );
-  const errorMessage = useSelector(
-    (state) => state.addRemoveNamespaceAdmin.errorMessage
+  const { successMessage, errorMessage, isLoading } = useSelector(
+    (state) => state.addRemoveNamespaceAdmin
   );
 
-  const dispatch = useDispatch();
+  const validateUsername = useCallback((value) => {
+    if (!value.trim()) return "Username is required";
+    if (value.length < 2) return "Username must be at least 2 characters";
+    return null;
+  }, []);
 
-  const onSubmit = (event) => {
+  const validateForm = useCallback(() => {
+    const error = validateUsername(username);
+    setValidationError(error);
+    return !error;
+  }, [username, validateUsername]);
+
+  const handleBlur = useCallback(() => {
+    setTouched(true);
+    setValidationError(validateUsername(username));
+  }, [username, validateUsername]);
+
+  const handleSubmit = useCallback((e) => {
+    e.preventDefault();
+    setTouched(true);
     dispatch(resetMessages());
-    event.preventDefault();
 
-    // If the form input is not valid. Do not proceed.
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     dispatch(
       removeNamespaceAdmin(
         {
-          uuid: uuid,
-          namespace: props.namespace,
+          uuid,
+          namespace,
           username_to_be_removed: username,
         },
         currUsername
       )
     );
-  };
+  }, [dispatch, uuid, namespace, username, currUsername, validateForm]);
 
-  const resetData = () => {
+  const resetData = useCallback(() => {
     setUsername("");
     setValidationError("");
+    setTouched(false);
     dispatch(resetMessages());
-  };
-
-  const validateForm = () => {
-    if (!username) {
-      setValidationError("Username is required");
-      return false;
-    }
-
-    setValidationError("");
-    return true;
-  };
+  }, [dispatch]);
 
   return (
-    <form id="add-maintainer-form">
-      <Modal
-        {...props}
-        size="md"
-        aria-labelledby="contained-modal-title-vcenter"
-        centered
-        onExit={resetData}
-      >
+    <Modal
+      show={show}
+      onHide={onHide}
+      size="md"
+      aria-labelledby="remove-namespace-admin-modal"
+      centered
+      onExited={resetData}
+    >
+      <Form onSubmit={handleSubmit}>
         <Modal.Header closeButton>
-          <Modal.Title id="contained-modal-title-vcenter">
-            Remove namespace admin
+          <Modal.Title id="remove-namespace-admin-modal">
+            Remove Namespace Admin
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <label>Enter username</label>
-          <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            value={username}
-            id="add-maintainer-input"
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          {validationError && (
-            <p id="add-maintainer-error">{validationError}</p>
-          )}
+          <p className="text-muted mb-3">
+            Remove an admin from namespace <strong>{namespace}</strong>
+          </p>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Username</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Enter username to remove"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onBlur={handleBlur}
+              isInvalid={touched && !!validationError}
+              disabled={isLoading}
+            />
+            <Form.Control.Feedback type="invalid">
+              {validationError}
+            </Form.Control.Feedback>
+          </Form.Group>
+
           {successMessage && (
-            <p id="add-maintainer-success">{successMessage}</p>
+            <Alert variant="success" className="mb-0">
+              <i className="fas fa-check-circle me-2" />
+              {successMessage}
+            </Alert>
           )}
-          {errorMessage && <p id="add-maintainer-error">{errorMessage}</p>}
+          {errorMessage && (
+            <Alert variant="danger" className="mb-0">
+              <i className="fas fa-exclamation-circle me-2" />
+              {errorMessage}
+            </Alert>
+          )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="danger" onClick={onSubmit}>
-            Remove
+          <Button variant="secondary" onClick={onHide} disabled={isLoading}>
+            Cancel
+          </Button>
+          <Button variant="danger" type="submit" disabled={isLoading}>
+            {isLoading ? (
+              <>
+                <Spinner as="span" animation="border" size="sm" className="me-2" />
+                Removing...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-user-minus me-2" />
+                Remove Admin
+              </>
+            )}
           </Button>
         </Modal.Footer>
-      </Modal>
-    </form>
+      </Form>
+    </Modal>
   );
 };
 
