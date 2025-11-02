@@ -17,6 +17,7 @@ import {
   DEPRECATE_PACKAGE_REQUEST,
   DEPRECATE_PACKAGE_SUCCESS,
   DEPRECATE_PACKAGE_FAILURE,
+  RESET_ADMIN_MESSAGES,
 } from "../actions/adminActions";
 
 const initialState = {
@@ -186,6 +187,14 @@ const adminReducer = (state = initialState, action) => {
         error: action.payload.message,
         statuscode: action.payload.statuscode,
         message: null,
+      };
+
+    case RESET_ADMIN_MESSAGES:
+      return {
+        ...state,
+        message: null,
+        error: null,
+        statuscode: null,
       };
 
     default:

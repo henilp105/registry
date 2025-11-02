@@ -26,6 +26,8 @@ export const DEPRECATE_PACKAGE_REQUEST = "DEPRECATE_PACKAGE_REQUEST";
 export const DEPRECATE_PACKAGE_SUCCESS = "DEPRECATE_PACKAGE_SUCCESS";
 export const DEPRECATE_PACKAGE_FAILURE = "DEPRECATE_PACKAGE_FAILURE";
 
+export const RESET_ADMIN_MESSAGES = "RESET_ADMIN_MESSAGES";
+
 // Legacy aliases for backward compatibility
 export const ADMIN_AUTH_ERROR = ADMIN_AUTH_FAILURE;
 export const DELETE_USER_ERROR = DELETE_USER_FAILURE;
@@ -238,3 +240,10 @@ export const deprecatePackage = (namespaceName, packageName, uuid) => async (dis
     });
   }
 };
+
+/**
+ * Reset admin messages and status
+ */
+export const resetAdminMessages = () => ({
+  type: RESET_ADMIN_MESSAGES,
+});

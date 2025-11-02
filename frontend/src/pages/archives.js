@@ -11,7 +11,7 @@ const Archives = () => {
 
   useEffect(() => {
     dispatch(fetchArchiveData());
-  }, []);
+  }, [dispatch]);
 
   // Unified style configuration
   const styles = {

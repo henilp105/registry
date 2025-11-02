@@ -1,17 +1,7 @@
-import React, { useEffect, useState } from "react";
-import { Container } from "react-bootstrap";
-import Button from "react-bootstrap/Button";
+import React, { useEffect, useState, useCallback } from "react";
+import { Container, Row, Col, Card, Form, Button, Alert, Modal } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  MDBModal,
-  MDBModalDialog,
-  MDBModalContent,
-  MDBModalHeader,
-  MDBModalTitle,
-  MDBModalBody,
-  MDBModalFooter,
-  MDBIcon,
-} from "mdb-react-ui-kit";
+import { MDBIcon } from "mdb-react-ui-kit";
 import {
   adminAuth,
   deleteUser,
@@ -19,34 +9,45 @@ import {
   deletePackage,
   deleteRelease,
   deprecatePackage,
+  resetAdminMessages,
 } from "../store/actions/adminActions";
 import ViewMalicousReports from "./viewMalicousReports";
 import NoPage from "./404";
 
 const AdminSection = () => {
+  const dispatch = useDispatch();
+  
   const uuid = useSelector((state) => state.auth.uuid);
   const accessToken = useSelector((state) => state.auth.accessToken);
-  const dispatch = useDispatch();
-  const message = useSelector((state) => state.admin.message);
-  const statuscode = useSelector((state) => state.admin.statuscode);
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  const isAdmin = useSelector((state) => state.admin.isAdmin);
+  const { message, statuscode, isAdmin, isLoading } = useSelector((state) => state.admin);
 
   const [showReports, setShowReports] = useState(false);
+  const [alertMessage, setAlertMessage] = useState(null);
+  const [alertVariant, setAlertVariant] = useState("info");
 
-  const handleShowReports = (value) => {
+  const handleShowReports = useCallback((value) => {
     setShowReports(value);
-  };
+  }, []);
 
   useEffect(() => {
-    dispatch(adminAuth(accessToken));
-  }, [isAuthenticated, uuid]);
-
-  useEffect(() => {
-    if (statuscode != null) {
-      openModal(statuscode + " Status Code", message, null);
+    if (accessToken) {
+      dispatch(adminAuth(accessToken));
     }
-  }, [statuscode, message]);
+  }, [isAuthenticated, accessToken, dispatch]);
+
+  useEffect(() => {
+    if (statuscode != null && message) {
+      setAlertVariant(statuscode >= 200 && statuscode < 300 ? "success" : "danger");
+      setAlertMessage(`${statuscode}: ${message}`);
+      // Auto-clear alert after 5 seconds
+      const timer = setTimeout(() => {
+        setAlertMessage(null);
+        dispatch(resetAdminMessages());
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [statuscode, message, dispatch]);
 
   const [formData, setFormData] = useState({
     namespaceName: "",
@@ -63,147 +64,103 @@ const AdminSection = () => {
     modalAction: null,
   });
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
+    setFormData(prev => ({ ...prev, [name]: value }));
+  }, []);
 
-  const openModal = (title, message, action) => {
+  const openModal = useCallback((title, message, action) => {
     setModalData({
       showModal: true,
       modalTitle: title,
       modalMessage: message,
       modalAction: action,
     });
-  };
+  }, []);
 
-  const toggleShowModal = () => {
-    setModalData({ ...modalData, showModal: !modalData.showModal });
-  };
+  const closeModal = useCallback(() => {
+    setModalData(prev => ({ ...prev, showModal: false, modalAction: null }));
+  }, []);
 
-  const isEmpty = (...values) => {
-    if (values.some((value) => value === "")) {
-      openModal("Empty Fields", "Please fill out all fields.", () => {
-        toggleShowModal();
-      });
-      return true;
+  const validateFields = useCallback((...values) => {
+    if (values.some((value) => !value || value === "")) {
+      openModal("Empty Fields", "Please fill out all fields.", null);
+      return false;
     }
-    return false;
-  };
+    return true;
+  }, [openModal]);
 
-  const handleAction = () => {
+  const handleAction = useCallback(() => {
     if (modalData.modalAction) {
       modalData.modalAction();
     }
-    toggleShowModal();
-  };
+    closeModal();
+  }, [modalData.modalAction, closeModal]);
 
-  const handleDeletePackage = () => {
-    if (!isEmpty(formData.namespaceName, formData.packageName)) {
-      openModal(
-        "Delete Package",
-        `You will not be able to recover ${formData.namespaceName}/${formData.packageName} package after you delete it.`,
-        () => {
-          dispatch(
-            deletePackage(formData.namespaceName, formData.packageName, uuid)
-          );
-        }
-      );
-    }
+  const handleDeletePackage = useCallback(() => {
+    if (!validateFields(formData.namespaceName, formData.packageName)) return;
+    
+    openModal(
+      "Delete Package",
+      `You will not be able to recover ${formData.namespaceName}/${formData.packageName} package after you delete it.`,
+      () => {
+        dispatch(deletePackage(formData.namespaceName, formData.packageName, uuid));
+        setFormData(prev => ({ ...prev, namespaceName: "", packageName: "" }));
+      }
+    );
+  }, [formData.namespaceName, formData.packageName, uuid, dispatch, openModal, validateFields]);
 
-    // clear the form data
-    setFormData({
-      namespaceName: "",
-      packageName: "",
-    });
-  };
+  const handleDeleteRelease = useCallback(() => {
+    if (!validateFields(formData.namespaceName, formData.packageName, formData.releaseName)) return;
+    
+    openModal(
+      "Delete Release",
+      `You will not be able to recover ${formData.namespaceName}/${formData.packageName}/${formData.releaseName} release after you delete it.`,
+      () => {
+        dispatch(deleteRelease(formData.namespaceName, formData.packageName, formData.releaseName, uuid));
+        setFormData(prev => ({ ...prev, namespaceName: "", packageName: "", releaseName: "" }));
+      }
+    );
+  }, [formData.namespaceName, formData.packageName, formData.releaseName, uuid, dispatch, openModal, validateFields]);
 
-  const handleDeleteRelease = () => {
-    if (
-      !isEmpty(
-        formData.namespaceName,
-        formData.packageName,
-        formData.releaseName,
-        uuid
-      )
-    ) {
-      openModal(
-        "Delete Release",
-        `You will not be able to recover ${formData.namespaceName}/${formData.packageName}/${formData.releaseName} release after you delete it.`,
-        () => {
-          dispatch(
-            deleteRelease(
-              formData.namespaceName,
-              formData.packageName,
-              formData.releaseName,
-              uuid
-            )
-          );
-        }
-      );
-    }
+  const handleDeleteUser = useCallback(() => {
+    if (!validateFields(formData.userName)) return;
+    
+    openModal(
+      "Delete User",
+      `You will not be able to recover ${formData.userName} user after you delete it.`,
+      () => {
+        dispatch(deleteUser(formData.userName, uuid));
+        setFormData(prev => ({ ...prev, userName: "" }));
+      }
+    );
+  }, [formData.userName, uuid, dispatch, openModal, validateFields]);
 
-    // clear the form data
-    setFormData({
-      namespaceName: "",
-      packageName: "",
-      releaseName: "",
-    });
-  };
+  const handleDeleteNamespace = useCallback(() => {
+    if (!validateFields(formData.namespaceName)) return;
+    
+    openModal(
+      "Delete Namespace",
+      `You will not be able to recover ${formData.namespaceName} namespace after you delete it.`,
+      () => {
+        dispatch(deleteNamespace(formData.namespaceName, uuid));
+        setFormData(prev => ({ ...prev, namespaceName: "" }));
+      }
+    );
+  }, [formData.namespaceName, uuid, dispatch, openModal, validateFields]);
 
-  const handleDeleteUser = () => {
-    if (!isEmpty(formData.userName, uuid)) {
-      openModal(
-        "Delete User",
-        `You will not be able to recover ${formData.userName} user after you delete it.`,
-        () => {
-          dispatch(deleteUser(formData.userName, uuid));
-        }
-      );
-    }
-
-    // clear the form data
-    setFormData({
-      userName: "",
-    });
-  };
-
-  const handleDeleteNamespace = () => {
-    if (!isEmpty(formData.namespaceName, uuid)) {
-      openModal(
-        "Delete Namespace",
-        `You will not be able to recover ${formData.namespaceName} namespace after you delete it.`,
-        () => {
-          dispatch(deleteNamespace(formData.namespaceName, uuid));
-        }
-      );
-    }
-
-    // clear the form data
-    setFormData({
-      namespaceName: "",
-    });
-  };
-
-  const handleDeprecatePackage = () => {
-    if (!isEmpty(formData.namespaceName, formData.packageName, uuid)) {
-      openModal(
-        "Delete Package",
-        `You will not be able to recover ${formData.namespaceName}/${formData.packageName} package after you delete it.`,
-        () => {
-          dispatch(
-            deprecatePackage(formData.namespaceName, formData.packageName, uuid)
-          );
-        }
-      );
-    }
-
-    // clear the form data
-    setFormData({
-      namespaceName: "",
-      packageName: "",
-    });
-  };
+  const handleDeprecatePackage = useCallback(() => {
+    if (!validateFields(formData.namespaceName, formData.packageName)) return;
+    
+    openModal(
+      "Deprecate Package",
+      `Are you sure you want to deprecate ${formData.namespaceName}/${formData.packageName}?`,
+      () => {
+        dispatch(deprecatePackage(formData.namespaceName, formData.packageName, uuid));
+        setFormData(prev => ({ ...prev, namespaceName: "", packageName: "" }));
+      }
+    );
+  }, [formData.namespaceName, formData.packageName, uuid, dispatch, openModal, validateFields]);
 
   //   const changePassword = () => {   // TODO: Enable this feature
   //     console.log("Changing password for user:", formData.userName);
@@ -216,195 +173,234 @@ const AdminSection = () => {
   //   };
 
   return isAdmin ? (
-    <Container>
-      <h2 style={{ textAlign: "left" }}>Admin Settings</h2>
-      <div style={{ marginBottom: "8px" }}>
-        <h4>View Malicious Reports</h4>
-        <Button
-          style={{ fontSize: 16 }}
-          onClick={() => handleShowReports(true)}
+    <Container className="py-4">
+      <h2 className="mb-4">Admin Settings</h2>
+      
+      {alertMessage && (
+        <Alert 
+          variant={alertVariant} 
+          dismissible 
+          onClose={() => setAlertMessage(null)}
+          className="mb-4"
         >
-          View Reports
-        </Button>
-      </div>
-      <div>
-        <h4>Delete package</h4>
-        <p style={{ textAlign: "left" }}>
-          <input
-            type="text"
-            placeholder="Namespace Name"
-            name="namespaceName"
-            value={formData.namespaceName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-          <input
-            type="text"
-            placeholder="Package Name"
-            name="packageName"
-            value={formData.packageName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-        </p>
-        <Button onClick={handleDeletePackage} style={{ fontSize: 16 }}>
-          Delete Package
-        </Button>
-      </div>
-      <div>
-        <br></br>
-        <h4>Delete package version</h4>
-        <p style={{ textAlign: "left" }}>
-          <input
-            type="text"
-            placeholder="Namespace Name"
-            name="namespaceName"
-            value={formData.namespaceName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-          <input
-            type="text"
-            placeholder="Package Name"
-            name="packageName"
-            value={formData.packageName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-          <input
-            type="text"
-            placeholder="Release Name"
-            name="releaseName"
-            value={formData.releaseName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-        </p>
-        <Button onClick={handleDeleteRelease} style={{ fontSize: 16 }}>
-          Delete Release
-        </Button>
-      </div>
-      <div>
-        <br></br>
-        <h4>Deprecate package</h4>
-        <p style={{ textAlign: "left" }}>
-          <input
-            type="text"
-            placeholder="Namespace Name"
-            name="namespaceName"
-            value={formData.namespaceName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-          <input
-            type="text"
-            placeholder="Package Name"
-            name="packageName"
-            value={formData.packageName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-        </p>
-        <Button onClick={handleDeprecatePackage} style={{ fontSize: 16 }}>
-          Deprecate Package
-        </Button>
-      </div>
-      <div>
-        <br></br>
-        <h4>Delete Namespace</h4>
-        <p style={{ textAlign: "left" }}>
-          <input
-            type="text"
-            placeholder="Namespace Name"
-            name="namespaceName"
-            value={formData.namespaceName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-        </p>
-        <Button onClick={handleDeleteNamespace} style={{ fontSize: 16 }}>
-          Delete Namespace
-        </Button>
-      </div>
-      <div>
-        <br></br>
-        <h4>Delete user</h4>
-        <p style={{ textAlign: "left" }}>
-          <input
-            type="text"
-            placeholder="User Name"
-            name="userName"
-            value={formData.userName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-        </p>
-        <Button onClick={handleDeleteUser} style={{ fontSize: 16 }}>
-          Delete User
-        </Button>
-      </div>
-      {/* <div>            // TODO: Enable this feature
-        <br></br>
-        <h4>Change password</h4>
-        <p style={{ textAlign: "left" }}>
-          <input
-            type="text"
-            placeholder="User Name"
-            name="userName"
-            value={formData.userName}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-          <input
-            type="text"
-            placeholder="New Password"
-            name="newPassword"
-            value={formData.newPassword}
-            onChange={handleInputChange}
-            style={{ width: 300 }}
-          />
-        </p>
-        <Button
-          onClick={() =>
-            openModal(
-              "Change Password",
-              `You will not be able to recover ${formData.userName} user's password after you change password.`,
-              changePassword
-            )
-          }
-          style={{ fontSize: 16 }}
-        >
-          Change Password
-        </Button>
-      </div> */}
+          {alertMessage}
+        </Alert>
+      )}
+
+      <Card className="mb-4">
+        <Card.Header>
+          <h5 className="mb-0">
+            <MDBIcon fas icon="flag" className="me-2" />
+            Malicious Reports
+          </h5>
+        </Card.Header>
+        <Card.Body>
+          <p className="text-muted mb-3">View and manage user-submitted malicious package reports.</p>
+          <Button onClick={() => handleShowReports(true)}>
+            <MDBIcon fas icon="eye" className="me-2" />
+            View Reports
+          </Button>
+        </Card.Body>
+      </Card>
+
+      <Row>
+        <Col md={6} className="mb-4">
+          <Card className="h-100">
+            <Card.Header className="bg-danger text-white">
+              <h5 className="mb-0">
+                <MDBIcon fas icon="trash-alt" className="me-2" />
+                Delete Package
+              </h5>
+            </Card.Header>
+            <Card.Body>
+              <Form.Group className="mb-3">
+                <Form.Label>Namespace Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter namespace name"
+                  name="namespaceName"
+                  value={formData.namespaceName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Package Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter package name"
+                  name="packageName"
+                  value={formData.packageName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Button variant="danger" onClick={handleDeletePackage} disabled={isLoading}>
+                Delete Package
+              </Button>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={6} className="mb-4">
+          <Card className="h-100">
+            <Card.Header className="bg-danger text-white">
+              <h5 className="mb-0">
+                <MDBIcon fas icon="tag" className="me-2" />
+                Delete Release
+              </h5>
+            </Card.Header>
+            <Card.Body>
+              <Form.Group className="mb-3">
+                <Form.Label>Namespace Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter namespace name"
+                  name="namespaceName"
+                  value={formData.namespaceName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Package Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter package name"
+                  name="packageName"
+                  value={formData.packageName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Release Version</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter release version"
+                  name="releaseName"
+                  value={formData.releaseName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Button variant="danger" onClick={handleDeleteRelease} disabled={isLoading}>
+                Delete Release
+              </Button>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={6} className="mb-4">
+          <Card className="h-100">
+            <Card.Header className="bg-warning">
+              <h5 className="mb-0">
+                <MDBIcon fas icon="archive" className="me-2" />
+                Deprecate Package
+              </h5>
+            </Card.Header>
+            <Card.Body>
+              <Form.Group className="mb-3">
+                <Form.Label>Namespace Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter namespace name"
+                  name="namespaceName"
+                  value={formData.namespaceName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Form.Group className="mb-3">
+                <Form.Label>Package Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter package name"
+                  name="packageName"
+                  value={formData.packageName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Button variant="warning" onClick={handleDeprecatePackage} disabled={isLoading}>
+                Deprecate Package
+              </Button>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={6} className="mb-4">
+          <Card className="h-100">
+            <Card.Header className="bg-danger text-white">
+              <h5 className="mb-0">
+                <MDBIcon fas icon="folder-minus" className="me-2" />
+                Delete Namespace
+              </h5>
+            </Card.Header>
+            <Card.Body>
+              <Form.Group className="mb-3">
+                <Form.Label>Namespace Name</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter namespace name"
+                  name="namespaceName"
+                  value={formData.namespaceName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Button variant="danger" onClick={handleDeleteNamespace} disabled={isLoading}>
+                Delete Namespace
+              </Button>
+            </Card.Body>
+          </Card>
+        </Col>
+
+        <Col md={6} className="mb-4">
+          <Card className="h-100">
+            <Card.Header className="bg-danger text-white">
+              <h5 className="mb-0">
+                <MDBIcon fas icon="user-minus" className="me-2" />
+                Delete User
+              </h5>
+            </Card.Header>
+            <Card.Body>
+              <Form.Group className="mb-3">
+                <Form.Label>Username</Form.Label>
+                <Form.Control
+                  type="text"
+                  placeholder="Enter username"
+                  name="userName"
+                  value={formData.userName}
+                  onChange={handleInputChange}
+                />
+              </Form.Group>
+              <Button variant="danger" onClick={handleDeleteUser} disabled={isLoading}>
+                Delete User
+              </Button>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
       <ViewMalicousReports
         show={showReports}
         onHide={() => handleShowReports(false)}
       />
-      <MDBModal show={modalData.showModal} tabIndex="-1">
-        <MDBModalDialog>
-          <MDBModalContent>
-            <MDBModalHeader>
-              <MDBModalTitle>{modalData.modalTitle}</MDBModalTitle>
-              <Button
-                className="btn-close"
-                color="none"
-                onClick={toggleShowModal}
-              ></Button>
-            </MDBModalHeader>
-            <MDBModalBody>
-              <MDBIcon fas icon="exclamation-triangle" />{" "}
-              {modalData.modalMessage}
-            </MDBModalBody>
-            <MDBModalFooter>
-              <Button color="secondary" onClick={toggleShowModal}>
-                Close
-              </Button>
-              <Button onClick={handleAction}>Delete</Button>
-            </MDBModalFooter>
-          </MDBModalContent>
-        </MDBModalDialog>
-      </MDBModal>
+
+      <Modal show={modalData.showModal} onHide={closeModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>{modalData.modalTitle}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="d-flex align-items-center">
+            <MDBIcon fas icon="exclamation-triangle" className="text-warning me-3" size="2x" />
+            <span>{modalData.modalMessage}</span>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeModal}>
+            Cancel
+          </Button>
+          {modalData.modalAction && (
+            <Button variant="danger" onClick={handleAction}>
+              Confirm
+            </Button>
+          )}
+        </Modal.Footer>
+      </Modal>
     </Container>
   ) : (
     <NoPage />
