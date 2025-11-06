@@ -1,57 +1,86 @@
-import { useState, useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Card, Container, Modal, Spinner } from "react-bootstrap";
+import { Card, Modal, Spinner, Alert } from "react-bootstrap";
 import {
   fetchMalicousReports,
   resetData,
 } from "../store/actions/viewMalicousReportActions";
 
-const ViewMalicousReports = (props) => {
-  const accessToken = useSelector((state) => state.auth.accessToken);
-  const reports = useSelector((state) => state.malicousReport.reports);
-  const loading = useSelector((state) => state.malicousReport.isLoading);
+const ViewMalicousReports = ({ show, onHide }) => {
   const dispatch = useDispatch();
+  
+  const accessToken = useSelector((state) => state.auth.accessToken);
+  const { reports, isLoading, error } = useSelector((state) => state.malicousReport);
 
   useEffect(() => {
-    if (!props.show) {
-      return;
+    if (!show) return;
+    dispatch(fetchMalicousReports(accessToken));
+  }, [show, accessToken, dispatch]);
+
+  const handleExit = useCallback(() => {
+    dispatch(resetData());
+  }, [dispatch]);
+
+  const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="d-flex justify-content-center py-4">
+          <Spinner animation="border" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </Spinner>
+        </div>
+      );
     }
 
-    dispatch(fetchMalicousReports(accessToken));
-  }, [props.show]);
+    if (error) {
+      return (
+        <Alert variant="danger">
+          <i className="fas fa-exclamation-circle me-2" />
+          {error}
+        </Alert>
+      );
+    }
 
-  const onExit = () => {
-    dispatch(resetData());
+    if (reports.length === 0) {
+      return (
+        <Alert variant="info">
+          <i className="fas fa-info-circle me-2" />
+          No malicious reports found.
+        </Alert>
+      );
+    }
+
+    return reports.map((report, index) => (
+      <Card key={index} className="mb-3">
+        <Card.Body>
+          <Card.Title className="h6">
+            <i className="fas fa-folder me-2" />
+            {report.namespace}/{report.package}
+          </Card.Title>
+          <Card.Text className="text-muted">
+            {report.reason}
+          </Card.Text>
+        </Card.Body>
+      </Card>
+    ));
   };
 
   return (
-    <Modal show={props.show} onHide={props.onHide} onExit={onExit}>
+    <Modal 
+      show={show} 
+      onHide={onHide} 
+      onExited={handleExit}
+      size="lg"
+      centered
+    >
       <Modal.Header closeButton>
-        <Modal.Title>View Malicious Reports</Modal.Title>
+        <Modal.Title>
+          <i className="fas fa-flag me-2" />
+          Malicious Reports
+        </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
-        {loading && (
-          <div className="d-flex justify-content-center">
-            <Spinner
-              animation="border"
-              role="status"
-              style={{ alignItems: "center" }}
-            >
-              <span className="visually-hidden">Loading...</span>
-            </Spinner>
-          </div>
-        )}
-        {reports.map((report, index) => {
-          return (
-            <Card key={index}>
-              <Card.Body>
-                <h5>Namespace - {report.namespace}</h5>
-                <h6>Package - {report.package}</h6>
-                <p style={{ textAlign: "left" }}>{report.reason}</p>
-              </Card.Body>
-            </Card>
-          );
-        })}
+      <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+        {renderContent()}
       </Modal.Body>
     </Modal>
   );
