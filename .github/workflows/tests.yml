@@ -2,9 +2,9 @@ name: Run Tests for Backend
 
 on:
   push:
-    branches: ["main"]
+    branches: ["*"]
   pull_request:
-    branches: ["main"]
+    branches: ["*"]
   workflow_dispatch:
 
 env:
@@ -18,10 +18,12 @@ env:
     RESET_PASSWORD: reset
     SUDO_PASSWORD: fortran
     IS_CI: true
+    JWT_SECRET_KEY: fpm-registry-test-secret-key
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout page source
@@ -34,9 +36,21 @@ jobs:
           
       - name: Setup Python
         uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
   
       - name: Install python libraries
         run: pip3 install --user -r backend/requirements.txt
 
-      - name: run tests
-        run: cd backend && python -m unittest discover -s tests
+      - name: Run unit tests
+        run: |
+          cd backend
+          python -m pytest tests/ -v --tb=short --color=yes
+
+      - name: Run tests with coverage
+        if: github.event_name == 'pull_request'
+        run: |
+          cd backend
+          pip install pytest-cov
+          python -m pytest tests/ -v --cov=. --cov-report=term-missing
