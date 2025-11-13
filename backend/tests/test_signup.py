@@ -1,135 +1,126 @@
+"""
+Test cases for user signup functionality.
+"""
+
 from base_case import BaseTestClass
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 class TestSignUp(BaseTestClass):
+    """Test cases for the /auth/signup endpoint."""
+    
+    # Test data constants
+    TEST_EMAIL = "testemail@gmail.com"
+    TEST_PASSWORD = "123456"
+    TEST_USERNAME = "testuser"
 
     def test_successful_signup(self):
         """
-        Test case to verify the behavior of the system when a user provides the correct information and is able to successfully signup to the system.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test successful user registration with valid data.
+        
+        Given: Valid email, password, and username
+        When: POST to /auth/signup
+        Then: Response code should be 200
         """
-        email = "testemail@gmail.com"
-        password="123456"
-        username="testuser"
-
         data = {
-            "email": email,
-            "password": password,
-            "username": username,
+            "email": self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD,
+            "username": self.TEST_USERNAME,
         }
 
         response = self.client.post("/auth/signup", data=data)
-        self.assertEqual(200, response.json["code"])
+        self.assertResponseCode(response, 200)
 
-    def test_signup_without_data(self):
+    def test_signup_without_email(self):
         """
-        Test case to verify the behavior of the system when a user tries to sign up without providing all the required information such as email, password, or username.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test signup fails when email is missing.
+        
+        Given: Empty email with valid password and username
+        When: POST to /auth/signup
+        Then: Response code should be 400
         """
-        email = "testemail@gmail.com"
-        password = "123456"
-        username = "testuser"
-
-        data_without_email = {
+        data = {
             "email": "",
-            "password" : password,
-            "username": username
+            "password": self.TEST_PASSWORD,
+            "username": self.TEST_USERNAME
         }
 
-        data_without_password = {
-            "email": email,
+        response = self.client.post("/auth/signup", data=data)
+        self.assertResponseCode(response, 400)
+
+    def test_signup_without_password(self):
+        """
+        Test signup fails when password is missing.
+        
+        Given: Valid email and username with empty password
+        When: POST to /auth/signup
+        Then: Response code should be 400
+        """
+        data = {
+            "email": self.TEST_EMAIL,
             "password": "",
-            "username": username
+            "username": self.TEST_USERNAME
         }
 
-        data_without_username = {
-            "email": email,
-            "password": password,
+        response = self.client.post("/auth/signup", data=data)
+        self.assertResponseCode(response, 400)
+
+    def test_signup_without_username(self):
+        """
+        Test signup fails when username is missing.
+        
+        Given: Valid email and password with empty username
+        When: POST to /auth/signup
+        Then: Response code should be 400
+        """
+        data = {
+            "email": self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD,
             "username": ""
         }
 
-        response_for_email = self.client.post("/auth/signup", data=data_without_email)
-        self.assertEqual(400, response_for_email.json["code"])
+        response = self.client.post("/auth/signup", data=data)
+        self.assertResponseCode(response, 400)
 
-        response_for_password = self.client.post("/auth/signup", data=data_without_password)
-        self.assertEqual(400, response_for_password.json["code"])
-
-        response_for_username = self.client.post("/auth/signup", data=data_without_username)
-        self.assertEqual(400, response_for_username.json["code"])
-
-    def test_signup_already_existing_user(self):
+    def test_signup_duplicate_user(self):
         """
-        Test case to verify the behavior of the system when a user tries to sign up with an email, username, and password that already exists in the system.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test signup fails when user already exists.
+        
+        Given: User with email/username already registered
+        When: POST to /auth/signup with same data
+        Then: Response code should be 400
         """
-        email = "testemail@gmail.com"
-        password = "123456"
-        username = "testuser"
-
-        # Create a new user first.
         data = {
-            "email": email,
-            "password": password,
-            "username": username,
+            "email": self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD,
+            "username": self.TEST_USERNAME,
+        }
+
+        # Create user first
+        response = self.client.post("/auth/signup", data=data)
+        self.assertResponseCode(response, 200)
+
+        # Try to signup again with same data
+        response = self.client.post("/auth/signup", data=data)
+        self.assertResponseCode(response, 400)
+
+    def test_sudo_user_signup(self):
+        """
+        Test sudo user registration with SUDO_PASSWORD.
+        
+        Given: Valid data with SUDO_PASSWORD as password
+        When: POST to /auth/signup
+        Then: Response code should be 200
+        """
+        sudo_password = os.getenv("SUDO_PASSWORD")
+        if not sudo_password:
+            self.skipTest("SUDO_PASSWORD not set in environment")
+        
+        data = {
+            "email": "sudouser@gmail.com",
+            "password": sudo_password,
+            "username": "sudouser",
         }
 
         response = self.client.post("/auth/signup", data=data)
-        self.assertEqual(200, response.json["code"])
-
-        # Try to signup again with the same user.
-        response = self.client.post("/auth/signup", data=data)
-        self.assertEqual(400, response.json["code"])
-
-    def test_successful_sudo_signup(self):
-        """
-        Test case to verify the signup of a sudo user.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
-        """
-        email = "testuser@gmail.com"
-        password = os.getenv("SUDO_PASSWORD")
-        username = "testuser"
-
-        data = {
-            "email": email,
-            "password": password,
-            "username": username,
-        }
-
-        response = self.client.post('/auth/signup', data=data)
-        self.assertEqual(200, response.status_code)
+        self.assertResponseCode(response, 200)
