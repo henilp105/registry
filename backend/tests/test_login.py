@@ -1,98 +1,131 @@
+"""
+Test cases for user login and logout functionality.
+"""
+
 from base_case import BaseTestClass
-from uuid import uuid4
+
 
 class TestLogin(BaseTestClass):
+    """Test cases for /auth/login and /auth/logout endpoints."""
+    
+    # Test data constants
+    TEST_EMAIL = "testemail@gmail.com"
+    TEST_PASSWORD = "123456"
+    TEST_USERNAME = "testuser"
 
-    email = "testemail@gmail.com"
-    password = "123456"
-    username = "testuser"
+    def _create_and_login_user(self):
+        """
+        Helper to create a user and return the access token.
+        
+        Returns:
+            str: Access token for the logged-in user
+        """
+        # Create user
+        signup_data = {
+            "email": self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD,
+            "username": self.TEST_USERNAME
+        }
+        response = self.client.post("/auth/signup", data=signup_data)
+        self.assertResponseCode(response, 200)
+        
+        # Login
+        login_data = {
+            "user_identifier": self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD
+        }
+        response = self.client.post("/auth/login", data=login_data)
+        self.assertResponseCode(response, 200)
+        
+        return response.json["access_token"]
 
     def test_successful_login(self):
         """
-        Test case to verify the behavior of the system when a user provides the correct login credentials and is able to successfully login to the system.
-
-        Parameters:
-        None
-
-        Returns:
-        access_token (str): The access_token of the user who successfully logged in.
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test successful login with valid credentials.
+        
+        Given: A registered user
+        When: POST to /auth/login with correct credentials
+        Then: Response code should be 200 and access_token should be present
         """
+        access_token = self._create_and_login_user()
+        self.assertIsNotNone(access_token)
+        self.assertIsInstance(access_token, str)
+        self.assertGreater(len(access_token), 0)
 
-        signup_data = {
-            "email": self.email,
-            "password": self.password,
-            "username": self.username
-        }
-
-        # Create a user first.
-        response_for_signup = self.client.post("/auth/signup", data=signup_data)
-        self.assertEqual(200, response_for_signup.json["code"])
+    def test_login_with_incorrect_password(self):
+        """
+        Test login fails with incorrect password.
+        
+        Given: A registered user
+        When: POST to /auth/login with wrong password
+        Then: Response code should be 401
+        """
+        self._create_and_login_user()
 
         login_data = {
-            "user_identifier": self.email,
-            "password": self.password
+            "user_identifier": self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD + "wrong",
         }
 
-        # Login with the same user.
-        response_for_login = self.client.post("/auth/login", data=login_data)
-        self.assertEqual(200, response_for_login.json["code"]) 
-        return response_for_login.json["access_token"]
-    
-    def test_unsuccessful_login(self):
+        response = self.client.post("/auth/login", data=login_data)
+        self.assertResponseCode(response, 401)
+
+    def test_login_with_incorrect_email(self):
         """
-        Test case to verify the behavior of the system when a user provides incorrect login credentials and is unable to login to the system.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test login fails with incorrect email.
+        
+        Given: A registered user
+        When: POST to /auth/login with wrong email
+        Then: Response code should be 401
         """
+        self._create_and_login_user()
 
-        self.test_successful_login()
-
-        login_data_incorrect_password = {
-            "user_identifier": self.email,
-            "password": self.password+'123',
+        login_data = {
+            "user_identifier": "wrong" + self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD,
         }
 
-        login_data_incorrect_email = {
-            "user_identifier": "hello"+self.email,
-            "password": self.password,
+        response = self.client.post("/auth/login", data=login_data)
+        self.assertResponseCode(response, 401)
+
+    def test_login_nonexistent_user(self):
+        """
+        Test login fails for user that doesn't exist.
+        
+        Given: No registered user
+        When: POST to /auth/login
+        Then: Response code should be 401
+        """
+        login_data = {
+            "user_identifier": "nonexistent@example.com",
+            "password": "anypassword",
         }
 
-        # Login with incorrect password for the same user.
-        response_for_login = self.client.post("/auth/login", data=login_data_incorrect_password)
-        self.assertEqual(401, response_for_login.json["code"])
-
-        # Login with incorrect email for the same user.
-        response_for_login = self.client.post("/auth/login", data=login_data_incorrect_email)
-        self.assertEqual(401, response_for_login.json["code"])
-
+        response = self.client.post("/auth/login", data=login_data)
+        self.assertResponseCode(response, 401)
 
     def test_successful_logout(self):
         """
-        Test case to verify the behavior of the system when a user successfully logs out of the system.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test successful logout with valid token.
+        
+        Given: A logged-in user
+        When: POST to /auth/logout with valid token
+        Then: Response code should be 200
         """
+        access_token = self._create_and_login_user()
+        headers = self.get_auth_headers(access_token)
+        
+        response = self.client.post("/auth/logout", headers=headers)
+        self.assertResponseCode(response, 200)
 
-        access_token = self.test_successful_login()
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-        response_from_logout = self.client.post('/auth/logout', headers=headers)
-        self.assertEqual(200, response_from_logout.json["code"])
+    def test_logout_without_token(self):
+        """
+        Test logout fails without authorization token.
+        
+        Given: No authorization header
+        When: POST to /auth/logout
+        Then: Response should indicate missing authorization
+        """
+        response = self.client.post("/auth/logout")
+        # Should fail - no auth header
+        self.assertIn(response.status_code, [401, 422])
