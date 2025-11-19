@@ -1,239 +1,180 @@
+"""
+Test cases for namespace management functionality.
+"""
+
 from base_case import BaseTestClass
 
+
 class TestNamespaces(BaseTestClass):
+    """Test cases for namespace-related endpoints."""
+    
+    # Test data constants
+    TEST_EMAIL = "testemail@gmail.com"
+    TEST_PASSWORD = "123456"
+    TEST_USERNAME = "testuser"
+    
+    TEST_NAMESPACE = "test_namespace"
+    TEST_NAMESPACE_DESC = "test namespace description"
 
-    email = "testemail@gmail.com"
-    password = "123456"
-    username = "testuser"
-
-    test_namespace_data = {
-        "namespace": "test_namespace",
-        "namespace_description": "test namespace description"
-    }
-
-    def login(self):
+    def _login(self):
         """
-        Helper function to signup and login a user.
-
-        Parameters:
-        None
-
-        Returns:
-        uuid (str): The UUID of the user who successfully logged in.
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
-        """
+        Helper to signup and login a user.
         
+        Returns:
+            str: Access token for the logged-in user
+        """
         signup_data = {
-            "email": self.email,
-            "password": self.password,
-            "username": self.username
+            "email": self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD,
+            "username": self.TEST_USERNAME
         }
 
-        response_for_signup = self.client.post("/auth/signup", data=signup_data)
-        self.assertEqual(200, response_for_signup.json["code"])
+        response = self.client.post("/auth/signup", data=signup_data)
+        self.assertResponseCode(response, 200)
 
         login_data = {
-            "user_identifier": self.email,
-            "password": self.password
+            "user_identifier": self.TEST_EMAIL,
+            "password": self.TEST_PASSWORD
         }
 
-        # Login with the same user.
-        response_for_login = self.client.post("/auth/login", data=login_data)
-        self.assertEqual(200, response_for_login.json["code"])
-        return response_for_login.json["access_token"]    
+        response = self.client.post("/auth/login", data=login_data)
+        self.assertResponseCode(response, 200)
+        return response.json["access_token"]
+    
+    def _get_namespace_data(self):
+        """Get test namespace data."""
+        return {
+            "namespace": self.TEST_NAMESPACE,
+            "namespace_description": self.TEST_NAMESPACE_DESC
+        }
 
     def test_successful_namespace_creation(self):
         """
-        Test case to verify the behaviour of the system when a namespace is created successfully.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test successful namespace creation.
+        
+        Given: A logged-in user
+        When: POST to /namespaces with valid data
+        Then: Response code should be 200
         """
+        access_token = self._login()
+        headers = self.get_auth_headers(access_token)
 
-        access_token = self.login()
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
+        response = self.client.post("/namespaces", data=self._get_namespace_data(), headers=headers)
+        self.assertResponseCode(response, 200)
 
-        response = self.client.post("/namespaces", data=TestNamespaces.test_namespace_data, headers=headers)
-        self.assertEqual(200, response.json["code"])
-
-    def test_creating_existing_namespace(self):
+    def test_create_duplicate_namespace(self):
         """
-        Test case to verify the behaviour of the system when user tries to create an already existing namespace.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test creating an already existing namespace fails.
+        
+        Given: A namespace already exists
+        When: POST to /namespaces with same namespace name
+        Then: Response code should be 400
         """
+        access_token = self._login()
+        headers = self.get_auth_headers(access_token)
 
-        access_token = self.login()
+        # Create namespace
+        response = self.client.post("/namespaces", data=self._get_namespace_data(), headers=headers)
+        self.assertResponseCode(response, 200)
 
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-
-        # Create a namespace entry in the database.
-        response = self.client.post("/namespaces", data=TestNamespaces.test_namespace_data, headers=headers)
-        self.assertEqual(200, response.json["code"])
-
-        # Try to create the namespace entry with same namespace.
-        response = self.client.post("/namespaces", data=TestNamespaces.test_namespace_data, headers=headers)
-        self.assertEqual(400, response.json["code"])
+        # Try to create same namespace again
+        response = self.client.post("/namespaces", data=self._get_namespace_data(), headers=headers)
+        self.assertResponseCode(response, 400)
     
     def test_create_upload_token_success(self):
         """
-        Test case to verify the behaviour of the system when a user tries to generate upload token 
-        successfully.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test successful upload token generation.
+        
+        Given: User is admin/maintainer of namespace
+        When: POST to /namespaces/{namespace}/uploadToken
+        Then: Response code should be 200 and token should be present
         """
+        access_token = self._login()
+        headers = self.get_auth_headers(access_token)
 
-        access_token = self.login()
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
+        # Create namespace
+        response = self.client.post("/namespaces", data=self._get_namespace_data(), headers=headers)
+        self.assertResponseCode(response, 200)
 
-        # Create a namespace.
-        response = self.client.post("/namespaces", data=TestNamespaces.test_namespace_data, headers=headers)
-        self.assertEqual(200, response.json["code"])
-
-        namespace_name = TestNamespaces.test_namespace_data['namespace']
-
-        # Generate a token.
-        response = self.client.post(f"/namespaces/{namespace_name}/uploadToken", headers=headers)
-        self.assertEqual(200, response.json["code"])
+        # Generate token
+        response = self.client.post(f"/namespaces/{self.TEST_NAMESPACE}/uploadToken", headers=headers)
+        self.assertResponseCode(response, 200)
+        self.assertIn("uploadToken", response.json)
 
     def test_create_upload_token_unauthorized(self):
         """
-        Test case to verify the behaviour of the system when a user who is not a maintainer not an admin 
-        of the namespace tries to create an upload token.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
-        """
-
-        access_token = self.login()
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-
-        # Create a namespace.
-        response = self.client.post("/namespaces", data=TestNamespaces.test_namespace_data, headers=headers)
-        self.assertEqual(200, response.json["code"])
-
-        namespace_name = TestNamespaces.test_namespace_data['namespace']
+        Test upload token generation fails for unauthorized user.
         
-        # Generate a token.
-        response = self.client.post(f"/namespaces/{namespace_name}/uploadToken", headers=headers)
-        self.assertEqual(200, response.json["code"])
-
-        # Sign up using a new user.
-        new_user_obj = {
-            "username": "new_username",
-            "password": "new_test_password",
-            "email": "newtestemail@gmail.com",
-            "user_identifier": "new_username"
-        }
-
-        response = self.client.post("/auth/signup", data=new_user_obj)
-        self.assertEqual(200, response.json["code"])  
-
-        response_for_login = self.client.post("/auth/login", data=new_user_obj)
-        self.assertEqual(200, response_for_login.json["code"]) 
-        access_token = response_for_login.json["access_token"]  
-
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
-
-        # Try to generate a token using a new user.
-        # This user is not a maintainer nor an admin of the namespace.
-        response = self.client.post(f"/namespaces/{namespace_name}/uploadToken", headers=headers)
-        self.assertEqual(401, response.json["code"])
-
-    def test_namespace_maintainers_list(self):
+        Given: User is not admin/maintainer of namespace
+        When: POST to /namespaces/{namespace}/uploadToken
+        Then: Response code should be 401
         """
-        Test case to verify the behaviour of the system when a user tries to get the list of maintainers of a namespace.
+        access_token = self._login()
+        headers = self.get_auth_headers(access_token)
 
-        Parameters:
-        None
+        # Create namespace
+        response = self.client.post("/namespaces", data=self._get_namespace_data(), headers=headers)
+        self.assertResponseCode(response, 200)
 
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
-        """
-
-        access_token = self.login()
-        headers = {
-            "Authorization": f"Bearer {access_token}"
+        # Create and login as different user
+        new_user = {
+            "username": "newuser",
+            "password": "newpassword",
+            "email": "newuser@gmail.com",
         }
+        response = self.client.post("/auth/signup", data=new_user)
+        self.assertResponseCode(response, 200)
 
-        # Create a namespace.
-        response = self.client.post("/namespaces", data=TestNamespaces.test_namespace_data, headers=headers)
-        self.assertEqual(200, response.json["code"])
+        response = self.client.post("/auth/login", data={
+            "user_identifier": "newuser",
+            "password": "newpassword"
+        })
+        self.assertResponseCode(response, 200)
+        new_token = response.json["access_token"]
 
-        namespace_name = TestNamespaces.test_namespace_data['namespace']
+        # Try to generate token as new user (should fail)
+        headers = self.get_auth_headers(new_token)
+        response = self.client.post(f"/namespaces/{self.TEST_NAMESPACE}/uploadToken", headers=headers)
+        self.assertResponseCode(response, 401)
 
-        # Get the list of maintainers.
-        response = self.client.post(f"/namespaces/{namespace_name}/maintainers", headers=headers)
-        self.assertEqual(200, response.json["code"])
+    def test_get_namespace_maintainers(self):
+        """
+        Test getting list of namespace maintainers.
+        
+        Given: A namespace exists
+        When: POST to /namespaces/{namespace}/maintainers
+        Then: Response code should be 200 and creator should be in list
+        """
+        access_token = self._login()
+        headers = self.get_auth_headers(access_token)
+
+        # Create namespace
+        response = self.client.post("/namespaces", data=self._get_namespace_data(), headers=headers)
+        self.assertResponseCode(response, 200)
+
+        # Get maintainers list
+        response = self.client.post(f"/namespaces/{self.TEST_NAMESPACE}/maintainers", headers=headers)
+        self.assertResponseCode(response, 200)
+        self.assertIn("users", response.json)
         self.assertEqual(1, len(response.json["users"]))
 
-    def test_namespace_admins_list(self):
+    def test_get_namespace_admins(self):
         """
-        Test case to verify the behaviour of the system when a user tries to get the list of admins of a namespace.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test getting list of namespace admins.
+        
+        Given: A namespace exists
+        When: POST to /namespaces/{namespace}/admins
+        Then: Response code should be 200 and creator should be in list
         """
+        access_token = self._login()
+        headers = self.get_auth_headers(access_token)
 
-        access_token = self.login()
-        headers = {
-            "Authorization": f"Bearer {access_token}"
-        }
+        # Create namespace
+        response = self.client.post("/namespaces", data=self._get_namespace_data(), headers=headers)
+        self.assertResponseCode(response, 200)
 
-        # Create a namespace.
-        response = self.client.post("/namespaces", data=TestNamespaces.test_namespace_data, headers=headers)
-        self.assertEqual(200, response.json["code"])
-
-        namespace_name = TestNamespaces.test_namespace_data['namespace']
-
-        # Get the list of admins.
-        response = self.client.post(f"/namespaces/{namespace_name}/admins", headers=headers)
-        self.assertEqual(200, response.json["code"])
+        # Get admins list
+        response = self.client.post(f"/namespaces/{self.TEST_NAMESPACE}/admins", headers=headers)
+        self.assertResponseCode(response, 200)
+        self.assertIn("users", response.json)
         self.assertEqual(1, len(response.json["users"]))
