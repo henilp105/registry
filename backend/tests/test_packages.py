@@ -1,568 +1,495 @@
+"""
+Test cases for package management functionality.
+"""
+
 from base_case import BaseTestClass
-from mongo import client
-from server import app
 from packages import check_token_expiry
 from datetime import datetime
-import random
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 class TestPackages(BaseTestClass):
+    """Test cases for package-related endpoints."""
+    
+    # Test data constants
+    TEST_EMAIL = "testemail@gmail.com"
+    TEST_PASSWORD = "123456"
+    TEST_USERNAME = "testuser"
+    TEST_NAMESPACE = "test_namespace"
+    TEST_NAMESPACE_DESC = "Test namespace description"
+    TEST_PACKAGE_NAME = "test_package"
+    TEST_PACKAGE_VERSION = "0.0.1"
+    TEST_PACKAGE_LICENSE = "MIT"
+    TEST_HOMEPAGE = "fortran-lang.org"
+
     def setUp(self):
-        app.config["SERVER_NAME"] = "localhost:9090"  # set server to localhost
-        self.client = app.test_client()
+        """Set up test fixtures before each test method."""
+        super().setUp()
+        self._access_token = None
+        self._is_user_created = False
+        self._is_namespace_created = False
 
-        # This method is called before each test method
-        # Reset or initialize variables here if needed
-        self.access_token = None
-        self.is_created = False
-        self.is_namespace_created = False
-        self.email = f"testemail{random.randint(1,100)}@gmail.com"
-        self.password = "123456"
-        self.username = f"testuser{random.randint(1,100)}"
-        self.test_package_data = {
-            "package_name": "test_package",
-            "package_version": "0.0.1",
-            "package_license": "MIT",
-            "homepage":"fortran-lang.org"
-        }
-
-        self.test_namespace_data = {
-            "namespace": f"test_namespace{random.randint(1,100)}",
-            "namespace_description": "Test namespace description",
-        }
-
-    def login(self,is_sudo=False):
+    def _get_package_data(self, **overrides):
         """
-        Helper function to signup and login a user.
-
-        Parameters:
-        None
-
-        Returns:
-        access_token (str): The access_token of the user who successfully logged in.
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
-        """
-
-        signup_data = {
-            "email": self.email,
-            "password": self.password if not is_sudo else os.getenv("SUDO_PASSWORD"),
-            "username": self.username,
-        }
-        if self.is_created:
-            return self.access_token
+        Get test package data with optional overrides.
         
-        response_for_signup = self.client.post("/auth/signup", data=signup_data)
-        self.assertEqual(200, response_for_signup.json["code"])
-        self.is_created = True
-        login_data = {"user_identifier": self.email, "password": self.password if not is_sudo else os.getenv("SUDO_PASSWORD")}
-
-        # Login with the same user.
-        response_for_login = self.client.post("/auth/login", data=login_data)
-
-        self.assertEqual(200, response_for_login.json["code"])
-        self.access_token = response_for_login.json["access_token"]
-        return response_for_login.json["access_token"]
-
-    def upload(self):
-        """
-        Helper function to upload a package.
-
-        Parameters:
-        None
-
+        Args:
+            **overrides: Key-value pairs to override default values
+            
         Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+            dict: Package data for upload
         """
-        access_token = self.login()
+        data = {
+            "package_name": self.TEST_PACKAGE_NAME,
+            "package_version": self.TEST_PACKAGE_VERSION,
+            "package_license": self.TEST_PACKAGE_LICENSE,
+            "homepage": self.TEST_HOMEPAGE
+        }
+        data.update(overrides)
+        return data
 
-        headers = {"Authorization": f"Bearer {access_token}"}
+    def _login(self, is_sudo=False):
+        """
+        Helper to signup and login a user.
+        
+        Args:
+            is_sudo: Whether to use SUDO_PASSWORD
+            
+        Returns:
+            str: Access token for the logged-in user
+        """
+        if self._is_user_created and self._access_token:
+            return self._access_token
+        
+        password = os.getenv("SUDO_PASSWORD") if is_sudo else self.TEST_PASSWORD
+        
+        signup_data = {
+            "email": self.TEST_EMAIL,
+            "password": password,
+            "username": self.TEST_USERNAME,
+        }
 
-        # Try to create a namespace.
-        if not self.is_namespace_created:
-            response = self.client.post("/namespaces", data=self.test_namespace_data, headers=headers)
-            self.assertEqual(200, response.json["code"])
-            self.is_namespace_created = True
+        response = self.client.post("/auth/signup", data=signup_data)
+        self.assertResponseCode(response, 200)
+        self._is_user_created = True
 
-        # Create an upload token for the namespace.
-        response = self.client.post(
-            f"/namespaces/{self.test_namespace_data['namespace']}/uploadToken",
-            headers=headers,
-        )
+        login_data = {
+            "user_identifier": self.TEST_EMAIL,
+            "password": password
+        }
 
-        self.assertEqual(200, response.json["code"])
+        response = self.client.post("/auth/login", data=login_data)
+        self.assertResponseCode(response, 200)
+        self._access_token = response.json["access_token"]
+        return self._access_token
 
-        upload_token = response.json["uploadToken"]
+    def _create_namespace(self, access_token):
+        """
+        Helper to create test namespace.
+        
+        Args:
+            access_token: JWT access token
+        """
+        if self._is_namespace_created:
+            return
+            
+        headers = self.get_auth_headers(access_token)
+        data = {
+            "namespace": self.TEST_NAMESPACE,
+            "namespace_description": self.TEST_NAMESPACE_DESC,
+        }
+        response = self.client.post("/namespaces", data=data, headers=headers)
+        self.assertResponseCode(response, 200)
+        self._is_namespace_created = True
 
-        # Upload the package.
+    def _upload_package(self, package_data=None, upload_token=None):
+        """
+        Helper to upload a package.
+        
+        Args:
+            package_data: Override package data
+            upload_token: Use specific token (for testing invalid tokens)
+            
+        Returns:
+            dict: Response JSON
+        """
+        access_token = self._login()
+        headers = self.get_auth_headers(access_token)
+        
+        self._create_namespace(access_token)
+
+        # Get upload token if not provided
+        if upload_token is None:
+            response = self.client.post(
+                f"/namespaces/{self.TEST_NAMESPACE}/uploadToken",
+                headers=headers,
+            )
+            self.assertResponseCode(response, 200)
+            upload_token = response.json["uploadToken"]
+
+        # Use provided package data or defaults
+        pkg_data = package_data or self._get_package_data()
+
+        # Upload the package
         response = self.client.post(
             "/packages",
             content_type="multipart/form-data",
             data={
                 "upload_token": upload_token,
-                **self.test_package_data,
+                **pkg_data,
                 "dry_run": "false",
                 "tarball": ("static/registry.tar.gz", "package.tar.gz"),
             },
             headers=headers,
         )
 
-        response.json["uploadToken"] = upload_token
-        return response.json
+        result = response.json.copy()
+        result["uploadToken"] = upload_token
+        return result
+
+    # ===== Package Upload Tests =====
 
     def test_successful_package_upload(self):
         """
-        Test case to verify the behaviour of the system when a user tries to upload a package successfully.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test successful package upload.
+        
+        Given: Valid package data and upload token
+        When: POST to /packages
+        Then: Response code should be 200
         """
-        response = self.upload()
-        self.assertEqual(200, response["code"])
-        print("test_successful_package_upload passed")
-
-    def test_upload_existing_package(self):
-        """
-        Test case to verify the behaviour of the system when a user tries to upload already existing
-        package in the registry.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
-        """
-
-        response = self.upload()
+        response = self._upload_package()
         self.assertEqual(200, response["code"])
 
-        response = self.upload()
+    def test_upload_duplicate_package(self):
+        """
+        Test uploading duplicate package fails.
+        
+        Given: Package already exists
+        When: POST to /packages with same package
+        Then: Response code should be 400
+        """
+        response = self._upload_package()
+        self.assertEqual(200, response["code"])
+
+        response = self._upload_package()
         self.assertEqual(400, response["code"])
-        print("test_upload_existing_package passed")
 
-    def test_incorrect_version_upload(self):
+    def test_upload_invalid_version(self):
         """
-        Test case to verify the behaviour of the system when a user tries to upload a package with
-        incorrect version.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
+        Test uploading package with invalid version fails.
+        
+        Given: Package data with invalid version string
+        When: POST to /packages
+        Then: Response code should be 400
         """
-
-        response = self.upload()
+        response = self._upload_package()
         self.assertEqual(200, response["code"])
 
-        self.test_package_data["package_version"] = "somerandomstring"
-        # Upload the package again with version change.
-
-        response = self.upload()
+        # Try with invalid version
+        response = self._upload_package(
+            package_data=self._get_package_data(package_version="invalid_version")
+        )
         self.assertEqual(400, response["code"])
-        print("test_incorrect_version_upload passed")
 
-    def test_invalid_token_upload(self):
+    def test_upload_invalid_token(self):
         """
-        Test case to verify the behaviour of the system if an invalid token is used to upload a package.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
+        Test uploading with invalid token fails.
+        
+        Given: Invalid upload token
+        When: POST to /packages
+        Then: Response code should be 401
         """
-
-        self.test_package_data["upload_token"] = "somerandomtoken123"
-        self.test_package_data["package_version"] = "0.0.1"
-        response = self.upload()
+        response = self._upload_package(upload_token="invalid_token_12345")
         self.assertEqual(401, response["code"])
-        print("test_invalid_token_upload passed")
+
+    def test_upload_invalid_license(self):
+        """
+        Test uploading package with invalid license fails.
+        
+        Given: Package data with invalid SPDX license
+        When: POST to /packages
+        Then: Response code should be 400
+        """
+        response = self._upload_package(
+            package_data=self._get_package_data(package_license="INVALID_LICENSE")
+        )
+        self.assertEqual(400, response["code"])
+
+    # ===== Package Search Tests =====
 
     def test_search_package(self):
         """
-        Test case to verify the behaviour of the system while searching for a package.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
+        Test searching for packages.
+        
+        Given: Package exists
+        When: GET /packages with query
+        Then: Response code should be 200 and packages returned
         """
-
-        response = self.upload()
+        response = self._upload_package()
         self.assertEqual(200, response["code"])
 
+        # Search for existing package
         response = self.client.get(
-            "/packages", query_string={"query": self.test_package_data["package_name"]}
+            "/packages",
+            query_string={"query": self.TEST_PACKAGE_NAME}
         )
+        self.assertResponseCode(response, 200)
 
-        self.assertEqual(200, response.json["code"])
-
+        # Search for non-existent package
         response = self.client.get(
-            "/packages", query_string={"query": "somerandompackage"}
+            "/packages",
+            query_string={"query": "nonexistent_package_xyz"}
         )
-        self.assertEqual(200, response.json["code"])
+        self.assertResponseCode(response, 200)
         self.assertEqual([], response.json["packages"])
-        print("test_search_package passed")
 
-    def test_get_exisiting_package(self):
+    # ===== Package Retrieval Tests =====
+
+    def test_get_existing_package(self):
         """
-        Test case to verify the behaviour of the system while trying to get a package.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
+        Test getting an existing package.
+        
+        Given: Package exists
+        When: GET /packages/{namespace}/{package}
+        Then: Response code should be 200
         """
-
-        self.upload()
-        # Get the package.
-        response = self.client.get(
-            f"/packages/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}"
-        )
-        self.assertEqual(200, response.json["code"])
-        print("test_get_exisiting_package passed")
-
-    def test_get_nonexisting_package(self):
-        """
-        Test case to verify the behaviour of the system while trying to get non existing package.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
-        """
-
-        response = self.upload()
-        self.assertEqual(200, response["code"])
+        self._upload_package()
 
         response = self.client.get(
-            f"/packages/{self.test_namespace_data['namespace']}/test_package_hello_world"
+            f"/packages/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}"
         )
-        self.assertEqual(404, response.json["code"])
-        print("test_get_nonexisting_package passed")
+        self.assertResponseCode(response, 200)
 
-    def test_get_nonexisting_package_version(self):
+    def test_get_nonexistent_package(self):
         """
-        Test case to verify the behaviour of the system while trying to get non existing package version.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
+        Test getting a non-existent package.
+        
+        Given: Package does not exist
+        When: GET /packages/{namespace}/{package}
+        Then: Response code should be 404
         """
-
-        response = self.upload()
-        self.assertEqual(200, response["code"])
+        self._upload_package()
 
         response = self.client.get(
-            f"/packages/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}/2.0.0"
+            f"/packages/{self.TEST_NAMESPACE}/nonexistent_package"
         )
-        self.assertEqual(404, response.json["code"])
-        print("test_get_nonexisting_package_version passed")
+        self.assertResponseCode(response, 404)
 
     def test_get_existing_package_version(self):
         """
-        Test case to verify the behaviour of the system while trying to get a package using version.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
+        Test getting a specific package version.
+        
+        Given: Package version exists
+        When: GET /packages/{namespace}/{package}/{version}
+        Then: Response code should be 200
         """
-
-        response = self.upload()
-        self.assertEqual(200, response["code"])
+        self._upload_package()
 
         response = self.client.get(
-            f"/packages/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}/0.0.1"
+            f"/packages/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}/{self.TEST_PACKAGE_VERSION}"
         )
+        self.assertResponseCode(response, 200)
 
-        self.assertEqual(200, response.json["code"])
-        print("test_get_existing_package_version passed")
-
-    def test_package_invalid_license(self):
+    def test_get_nonexistent_package_version(self):
         """
-        Test case to verify the behaviour of the system when a user tries to upload a package with invalid license identifier.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
+        Test getting a non-existent package version.
+        
+        Given: Package version does not exist
+        When: GET /packages/{namespace}/{package}/{version}
+        Then: Response code should be 404
         """
+        self._upload_package()
 
-        self.test_package_data["package_license"] = "ABC"
-        response = self.upload()
+        response = self.client.get(
+            f"/packages/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}/9.9.9"
+        )
+        self.assertResponseCode(response, 404)
 
-        # Upload the package.
-        self.assertEqual(400, response["code"])
-        print("test_package_invalid_license passed")
+    # ===== Package Maintainers Tests =====
+
+    def test_get_package_maintainers(self):
+        """
+        Test getting package maintainers.
+        
+        Given: Package exists
+        When: GET /packages/{namespace}/{package}/maintainers
+        Then: Response code should be 200
+        """
+        access_token = self._login()
+        self._upload_package()
+
+        response = self.client.get(
+            f"/packages/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}/maintainers",
+            headers=self.get_auth_headers(access_token),
+        )
+        self.assertResponseCode(response, 200)
+
+    # ===== Token Expiry Unit Test =====
 
     def test_check_token_expiry(self):
         """
-        Test case to unit test the behaviour of the function to check if token is expired or not.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received is not as expected.
+        Test token expiry check function.
+        
+        Given: Token creation timestamps
+        When: check_token_expiry is called
+        Then: Old tokens should be expired, new tokens should not
         """
-        created_at = datetime(22, 1, 1)
-        response = check_token_expiry(created_at)
-        self.assertEqual(True, response)
+        # Old date should be expired
+        old_date = datetime(2022, 1, 1)
+        self.assertTrue(check_token_expiry(old_date))
 
-        created_at_now = datetime.now()
-        response = check_token_expiry(created_at_now)
-        self.assertEqual(False, response)
-        print("test_check_token_expiry passed")
+        # Current date should not be expired
+        current_date = datetime.now()
+        self.assertFalse(check_token_expiry(current_date))
 
-    def test_package_maintainers(self):
-        """
-        Test case to verify the behaviour of the system when a user tries to get the maintainers of a package.
+    # ===== Rating Tests =====
 
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response received from the server is not as expected.
-        """
-
-        # create a user
-        access_token = self.login()
-
-        # Upload the package.
-        response = self.upload()
-        self.assertEqual(200, response["code"])
-
-        response = self.client.get(
-            f"/packages/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}/maintainers",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-        self.assertEqual(200, response.json["code"])
-        print("test_package_maintainers passed")
-    
     def test_successful_rating_submit(self):
         """
-        Test case to verify the behaviour of the system when a user tries to submit rating to a package successfully.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test submitting a valid rating.
+        
+        Given: Package exists and user is logged in
+        When: POST to /ratings/{namespace}/{package} with valid rating
+        Then: Response code should be 200
         """
-        access_token = self.login()
-        upload_response = self.upload()
+        access_token = self._login()
+        self._upload_package()
+
         response = self.client.post(
-            f"/ratings/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}",
+            f"/ratings/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}",
             content_type="multipart/form-data",
-            data={"rating":5},  headers={"Authorization": f"Bearer {access_token}"},
+            data={"rating": 5},
+            headers=self.get_auth_headers(access_token),
         )
-        self.assertEqual(200, response.json["code"])
-        print("test_successful_rating_submit passed")
+        self.assertResponseCode(response, 200)
 
-    def test_unsuccessful_rating_invalid_submit(self):
+    def test_rating_invalid_value(self):
         """
-        Test case to verify the behaviour of the system when a user tries to submit invalid rating to a package successfully.
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test submitting an invalid rating value fails.
+        
+        Given: Package exists
+        When: POST to /ratings with invalid rating value
+        Then: Response code should be 400
         """
-        access_token = self.login()
+        access_token = self._login()
+
         response = self.client.post(
-            f"/ratings/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}",
+            f"/ratings/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}",
             content_type="multipart/form-data",
-            data={"rating":-1},  headers={"Authorization": f"Bearer {access_token}"},
+            data={"rating": -1},
+            headers=self.get_auth_headers(access_token),
         )
-        self.assertEqual(400, response.json["code"])
-        print("test_unsuccessful_rating_invalid_submit passed")
+        self.assertResponseCode(response, 400)
 
-    def test_unsuccessful_rating_invalid_access_token_submit(self):
+    def test_rating_invalid_token(self):
         """
-        Test case to verify the behaviour of the system when a user tries to submit valid rating to a package successfully with invalid access_token
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test submitting rating with invalid token fails.
+        
+        Given: Invalid authorization token
+        When: POST to /ratings
+        Then: Response should indicate auth error
         """
-        access_token = self.login()
+        self._login()  # Create user but use invalid token
+
         response = self.client.post(
-            f"/ratings/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}",
+            f"/ratings/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}",
             content_type="multipart/form-data",
-            data={"rating":5},  headers={"Authorization": f"Bearer access_token"},
+            data={"rating": 5},
+            headers={"Authorization": "Bearer invalid_token"},
         )
-        self.assertEqual("Not enough segments", response.json["msg"])
-        print("test_unsuccessful_rating_invalid_access_token_submit passed")
+        self.assertEqual("Not enough segments", response.json.get("msg"))
 
-    def test_successful_post_malicious(self):
+    # ===== Malicious Report Tests =====
+
+    def test_successful_malicious_report(self):
         """
-        Test case to verify the behaviour of the system when a user tries to submit malicious report to a package successfully
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test submitting a malicious package report.
+        
+        Given: Package exists and user is logged in
+        When: POST to /report/{namespace}/{package} with valid reason
+        Then: Response code should be 200
         """
-        access_token = self.login()
-        upload_response = self.upload()
+        access_token = self._login()
+        self._upload_package()
+
         response = self.client.post(
-            f"/report/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}",
+            f"/report/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}",
             content_type="multipart/form-data",
-            data={"reason":"the package is found to be malicious"},  headers={"Authorization": f"Bearer {access_token}"},
+            data={"reason": "This package contains malicious code that steals data"},
+            headers=self.get_auth_headers(access_token),
         )
-        self.assertEqual(200, response.json["code"])
-        print("test_successful_post_malicious passed")
+        self.assertResponseCode(response, 200)
 
-    def test_unsuccessful_post_malicious_invalid_access_token(self):
+    def test_malicious_report_invalid_token(self):
         """
-        Test case to verify the behaviour of the system when a user tries to submit malicious report to a package successfully with invalid access_token
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test malicious report with invalid token fails.
+        
+        Given: Invalid authorization token
+        When: POST to /report
+        Then: Response should indicate auth error
         """
-        access_token = self.login()
+        self._login()
+
         response = self.client.post(
-            f"/report/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}",
+            f"/report/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}",
             content_type="multipart/form-data",
-            data={"reason":"the package is found to be malicious"},  headers={"Authorization": f"Bearer access_token"},
+            data={"reason": "This package is malicious"},
+            headers={"Authorization": "Bearer invalid_token"},
         )
-        self.assertEqual("Not enough segments", response.json["msg"])
-        print("test_unsuccessful_post_malicious_invalid_access_token passed")
+        self.assertEqual("Not enough segments", response.json.get("msg"))
 
-    def test_unsuccessful_post_malicious_short_reason(self):
+    def test_malicious_report_short_reason(self):
         """
-        Test case to verify the behaviour of the system when a user tries to submit malicious report to a package successfully with invalid reason
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test malicious report with short reason fails.
+        
+        Given: Reason is too short
+        When: POST to /report
+        Then: Response code should be 400
         """
-        access_token = self.login()
+        access_token = self._login()
+
         response = self.client.post(
-            f"/report/{self.test_namespace_data['namespace']}/{self.test_package_data['package_name']}",
+            f"/report/{self.TEST_NAMESPACE}/{self.TEST_PACKAGE_NAME}",
             content_type="multipart/form-data",
-            data={"reason":"package"},  headers={"Authorization": f"Bearer {access_token}"},
+            data={"reason": "bad"},
+            headers=self.get_auth_headers(access_token),
         )
-        self.assertEqual(400, response.json["code"])
-        print("test_unsuccessful_post_malicious_short_reason passed")
+        self.assertResponseCode(response, 400)
 
-    def test_successful_fetch_malicious_reports(self):
+    # ===== Admin Report Access Tests =====
+
+    def test_fetch_malicious_reports_as_sudo(self):
         """
-        Test case to verify the behaviour of the system when a sudo user tries fetch the malicious reports successfully
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test sudo user can fetch malicious reports.
+        
+        Given: User is sudo
+        When: GET /report/view
+        Then: Response code should be 200
         """
+        sudo_password = os.getenv("SUDO_PASSWORD")
+        if not sudo_password:
+            self.skipTest("SUDO_PASSWORD not set in environment")
 
-        access_token = self.login(is_sudo=True)   # create a sudo user
-        response = self.client.get("/report/view",headers={"Authorization": f"Bearer {access_token}"})
-        self.assertEqual(200, response.json["code"])
-        print("test_successful_fetch_malicious_reports passed")
+        access_token = self._login(is_sudo=True)
 
-    def test_unsuccessful_fetch_malicious_reports(self):
+        response = self.client.get(
+            "/report/view",
+            headers=self.get_auth_headers(access_token)
+        )
+        self.assertResponseCode(response, 200)
+
+    def test_fetch_malicious_reports_unauthorized(self):
         """
-        Test case to verify the behaviour of the system when a sudo user tries fetch the malicious reports successfully with invalid access_token
-
-        Parameters:
-        None
-
-        Returns:
-        None
-
-        Raises:
-        AssertionError: If the response code received from the server is not as expected.
+        Test non-sudo user cannot fetch malicious reports.
+        
+        Given: User is not sudo
+        When: GET /report/view
+        Then: Response code should be 401
         """
+        access_token = self._login()
 
-        access_token = self.login()
-        response = self.client.get("/report/view",headers={"Authorization": f"Bearer {access_token}"})
-        self.assertEqual(401, response.json["code"])
-        print("test_unsuccessful_fetch_malicious_reports passed")
+        response = self.client.get(
+            "/report/view",
+            headers=self.get_auth_headers(access_token)
+        )
+        self.assertResponseCode(response, 401)
