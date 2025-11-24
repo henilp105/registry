@@ -1,14 +1,29 @@
-pymongo
-flask
-python-dateutil
-python-dotenv
-bcrypt
-flask_cors
-flasgger
-license-expression
-semantic-version
-docker
-toml
-flask-jwt-extended
-numpy
-markdown
+# Core Flask dependencies
+flask>=2.3.0,<3.0.0
+flask-cors>=4.0.0
+flask-jwt-extended>=4.5.0
+flasgger>=0.9.7
+
+# Database
+pymongo>=4.5.0
+
+# Security
+bcrypt>=4.1.0
+
+# Validation
+semantic-version>=2.10.0
+license-expression>=30.1.0
+
+# Utilities
+python-dotenv>=1.0.0
+python-dateutil>=2.8.0
+toml>=0.10.0
+numpy>=1.24.0
+markdown>=3.5.0
+
+# Production server (optional - for deployment)
+gunicorn>=21.0.0
+
+# Development/Test dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
