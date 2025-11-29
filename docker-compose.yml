@@ -1,0 +1,101 @@
+# Fortran Package Registry - Docker Compose
+# Full-stack deployment: Frontend + Backend + MongoDB
+#
+# Quick Start:
+#   docker compose up -d
+#
+# Access:
+#   - Frontend: http://localhost
+#   - API: http://localhost/api/
+#
+# Stop:
+#   docker compose down
+
+services:
+  # ===========================================
+  # Frontend - React app served by Nginx
+  # ===========================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - registry-network
+
+  # ===========================================
+  # Backend - Flask API server
+  # ===========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: docker/backend.Dockerfile
+      target: builder
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - MONGO_DB_NAME=${MONGO_DB_NAME:-fpmregistry}
+      - MONGO_USER_NAME=${MONGO_USER_NAME:-}
+      - MONGO_PASSWORD=${MONGO_PASSWORD:-}
+      - SALT=${SALT:-change_this_salt}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_this_jwt_secret}
+      - HOST=${HOST:-localhost}
+      - RESET_EMAIL=${RESET_EMAIL:-}
+      - RESET_PASSWORD=${RESET_PASSWORD:-}
+      - SUDO_PASSWORD=${SUDO_PASSWORD:-admin}
+    volumes:
+      - package-tarballs:/src/static/tarballs
+    depends_on:
+      - mongo
+    restart: unless-stopped
+    stop_signal: SIGINT
+    networks:
+      - registry-network
+
+  # ===========================================
+  # Package Validator - Validates uploaded packages
+  # ===========================================
+  validator:
+    build:
+      context: ./backend
+      dockerfile: docker/validate_package.Dockerfile
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - MONGO_DB_NAME=${MONGO_DB_NAME:-fpmregistry}
+      - SALT=${SALT:-change_this_salt}
+    depends_on:
+      - mongo
+    restart: unless-stopped
+    stop_signal: SIGINT
+    networks:
+      - registry-network
+
+  # ===========================================
+  # MongoDB - Database
+  # ===========================================
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    networks:
+      - registry-network
+
+# ===========================================
+# Volumes - Persistent data storage
+# ===========================================
+volumes:
+  mongo-data:
+    driver: local
+  package-tarballs:
+    driver: local
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  registry-network:
+    driver: bridge
