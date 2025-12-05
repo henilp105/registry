@@ -2,57 +2,126 @@
 
 We are currently in the testing phase of this registry.
 
-1. backend APIs are hosted at: https://fpm-registry.vercel.app/
-2. frontend is hosted at: https://registry-phi.vercel.app/
+1. Backend APIs are hosted at: https://fpm-registry.vercel.app/
+2. Frontend is hosted at: https://registry-phi.vercel.app/
 3. Documentation for the APIs are available at: https://fpm-registry.vercel.app/apidocs/
 
-**Please note: the current registry is a playground: its database will be fully deleted once its functionality is established. Please do not use it for production yet! more information will follow then.**
+**Please note: the current registry is a playground: its database will be fully deleted once its functionality is established. Please do not use it for production yet! More information will follow.**
 
-The fpm release [0.8.2](https://fortran-lang.discourse.group/t/fpm-version-0-8-2-released-centralized-registry-playground/5792) introduces fpm support for uploading packages to the fpm-registry server directly from the command-line interface, via
+The fpm release [0.8.2](https://fortran-lang.discourse.group/t/fpm-version-0-8-2-released-centralized-registry-playground/5792) introduces fpm support for uploading packages to the fpm-registry server directly from the command-line interface:
 
-```
+```bash
 fpm publish --token <upload-token-here>
 ```
 
-fpm will now also interact with a web interface that will help to manage the namespaces & packages. detailed information regarding the fpm cli can be found here: [docs](https://fpm.fortran-lang.org/registry/index.html)
+fpm will now also interact with a web interface that helps manage namespaces & packages. Detailed information regarding the fpm CLI can be found here: [docs](https://fpm.fortran-lang.org/registry/index.html)
 
-## Instructions to Deploy with docker containers
+---
 
-```
-$ sudo chmod 666 /var/run/docker.sock  # for root access
-```
+## 🚀 Quick Start with Docker
 
-## Environment variable configuration
+The easiest way to run the full stack (frontend + backend + database) is with Docker Compose.
 
-set the environment variables in .env file in backend directory or in the docker compose file (compose.yaml). MONGO_URI must be set in the environment to the URL value of the MongoDB to use. For example,If deploying to production, MONGO_URI should be set to mongo container address. set the following env variables in the .env file in the backend folder: 
-   - SALT
-   - MONGO_URI=MONGO_DB_ATLAS_UR
-   - MONGO_DB_NAME
-   - SUDO_PASSWORD
-   - MONGO_USER_NAME
-   - MONGO_PASSWORD
-   - HOST
-   - RESET_EMAIL 
-   - RESET_PASSWORD
+### Prerequisites
 
-#### before building the docker containers, you must configure the environment variables ("RESET_EMAIL" and "RESET_PASSWORD") in the compose.yaml file .
+- [Docker](https://docs.docker.com/get-docker/) (v20.10+)
+- [Docker Compose](https://docs.docker.com/compose/install/) (v2.0+)
 
-```
-$ docker compose -f "compose.yaml" up -d --build
-$ cd frontend && REACT_APP_REGISTRY_API_URL="http://127.0.0.1:80"  npm start run
+### One-Command Deployment
+
+```bash
+# Clone the repository
+git clone https://github.com/fortran-lang/registry.git
+cd registry
+
+# Start everything
+docker compose up -d
 ```
 
-After the application starts, navigate to `http://localhost:80` in your web browser or run:
+That's it! 🎉
 
-```
-$ curl localhost:80
-Hello world, Mongo Flask
+- **Frontend**: http://localhost
+- **API**: http://localhost/api/
+
+### Stop the Application
+
+```bash
+docker compose down
 ```
 
-Stop and remove the containers
+### View Logs
 
+```bash
+# All services
+docker compose logs -f
+
+# Specific service
+docker compose logs -f backend
 ```
-$ docker compose down
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Copy the example environment file and customize:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your values:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `FRONTEND_PORT` | Port to expose frontend | `80` |
+| `MONGO_DB_NAME` | MongoDB database name | `fpmregistry` |
+| `SALT` | Password hashing salt | ⚠️ Change this! |
+| `JWT_SECRET_KEY` | JWT signing secret | ⚠️ Change this! |
+| `SUDO_PASSWORD` | Admin password | `admin` |
+| `RESET_EMAIL` | SMTP email for password reset | (optional) |
+| `RESET_PASSWORD` | SMTP password | (optional) |
+
+### Production Deployment
+
+For production, make sure to:
+
+1. Change `SALT`, `JWT_SECRET_KEY`, and `SUDO_PASSWORD` to secure random values
+2. Configure `RESET_EMAIL` and `RESET_PASSWORD` for password reset functionality
+3. Consider using an external MongoDB instance for better data management
+
+```bash
+# Generate secure random values
+openssl rand -hex 32  # Use for SALT and JWT_SECRET_KEY
+```
+
+---
+
+## 🛠️ Development Setup
+
+### Backend Only (with existing MongoDB)
+
+```bash
+cd backend
+cp .env.example .env  # Configure your MongoDB URI
+pip install -r requirements.txt
+python server.py
+```
+
+### Frontend Only
+
+```bash
+cd frontend
+npm install
+REACT_APP_REGISTRY_API_URL="http://localhost:9090" npm start
+```
+
+### Running Tests
+
+```bash
+cd backend
+docker compose -f compose.test.yaml up --build
 ```
 
 ## Steps to setup mongodump for registry Archives functionality
