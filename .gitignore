@@ -1,5 +1,10 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Root environment file (keep .env.example)
+.env
+!.env.example
+!.env.production
+
 /.vscode/
 /.vercel/
 /.docker/
