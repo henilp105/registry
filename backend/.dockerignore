@@ -1,0 +1,49 @@
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+
+# Virtual environments
+.venv
+venv
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Test files
+tests/
+*.test.py
+
+# Documentation
+*.md
+documentation/
+
+# Build artifacts
+*.egg-info
+dist/
+build/
+
+# Environment (local only)
+.env
+.env.local
+
+# Logs
+*.log
+
+# Static tarballs (mounted as volume)
+static/tarballs/
+static/*.tar.gz
+
+# Vercel
+.vercel
+vercel.json
