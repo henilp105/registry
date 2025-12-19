@@ -1,72 +1,137 @@
+"""
+Authentication module for FPM Registry.
+Handles user authentication, registration, and password management.
+"""
 import os
+import logging
 from dotenv import load_dotenv
 from flask import request, jsonify
 from datetime import datetime
 from uuid import uuid4
-from app import app
-from mongo import db
-import hashlib
-from app import swagger
+import bcrypt
 from flasgger.utils import swag_from
 from flask_jwt_extended import jwt_required, create_access_token, create_refresh_token, get_jwt_identity
+
+from app import app
+from mongo import db
 from models.user import User
-from mail import mailer  # Import the mailer service
+from mail import mailer
+from utils.responses import (
+    success_response, error_response, unauthorized_response,
+    not_found_response, validation_error_response
+)
+from utils.validators import validate_email, validate_password, validate_username
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
-env_var = dict()
+# Configuration
 is_ci = os.getenv("IS_CI", "false").lower()
+SUDO_PASSWORD = os.getenv("SUDO_PASSWORD", "")
+BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", 12))
 
-try:
-    salt = os.getenv("SALT")
-    sudo_password = os.getenv("SUDO_PASSWORD")
-    env_var["salt"] = salt
-    env_var["sudo_password"] = sudo_password
-except KeyError as err:
-    print("Add SALT to .env file")
+# Legacy salt for migration (to be removed after migration)
+LEGACY_SALT = os.getenv("SALT", "")
 
 
 def generate_uuid():
-    while True:
+    """
+    Generate a unique UUID for a new user.
+    Checks database to ensure uniqueness.
+    """
+    max_attempts = 10
+    for _ in range(max_attempts):
         uuid = uuid4().hex
-        user = db.users.find_one({"uuid": uuid})
-        if not user:
+        if not db.users.find_one({"uuid": uuid}, {"_id": 1}):
             return uuid
+    raise RuntimeError("Failed to generate unique UUID")
+
+
+def hash_password(password: str) -> str:
+    """
+    Hash a password using bcrypt.
+    """
+    password_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt(rounds=BCRYPT_ROUNDS)
+    return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
+
+
+def verify_password(password: str, hashed: str) -> bool:
+    """
+    Verify a password against its hash.
+    Supports both bcrypt and legacy SHA256 hashes for migration.
+    """
+    try:
+        # Try bcrypt first
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except ValueError:
+        # Fallback to legacy SHA256 for old passwords
+        import hashlib
+        legacy_hash = hashlib.sha256((password + LEGACY_SALT).encode()).hexdigest()
+        return legacy_hash == hashed
+
+
+def migrate_password_if_needed(user_doc, password: str):
+    """
+    Migrate legacy SHA256 password to bcrypt.
+    """
+    current_hash = user_doc.get('password', '')
+    if not current_hash.startswith('$2'):
+        # Legacy password, migrate to bcrypt
+        new_hash = hash_password(password)
+        db.users.update_one(
+            {"_id": user_doc["_id"]},
+            {"$set": {"password": new_hash}}
+        )
+        logger.info(f"Migrated password to bcrypt for user {user_doc.get('username')}")
+
 
 @app.route("/auth/login", methods=["POST"])
 @swag_from("documentation/login.yaml", methods=["POST"])
 def login():
-    salt = env_var["salt"]
-    user_identifier = request.form.get("user_identifier")
-    password = request.form.get("password")
-    password += salt
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    query = {
-        "$and": [
-            {"$or": [{"email": user_identifier}, {"username": user_identifier}]},
-            {"password": hashed_password},
+    """
+    Authenticate user and return JWT tokens.
+    """
+    user_identifier = request.form.get("user_identifier", "").strip()
+    password = request.form.get("password", "")
+
+    if not user_identifier:
+        return error_response("Email or username is required", 400)
+    if not password:
+        return error_response("Password is required", 400)
+
+    # Find user by email or username
+    user_doc = db.users.find_one({
+        "$or": [
+            {"email": user_identifier.lower()},
+            {"username": user_identifier}
         ]
-    }
+    })
 
-    user = db.users.find_one(query)
-    if not user:
-        return jsonify({"message": "Invalid email or password", "code": 401}), 401
+    if not user_doc:
+        return unauthorized_response("Invalid email or password")
     
-    user = User.from_json(user)
-
+    # Verify password
+    if not verify_password(password, user_doc.get('password', '')):
+        return unauthorized_response("Invalid email or password")
+    
+    user = User.from_json(user_doc)
+    
+    # Check email verification
     if not user.isVerified and is_ci != 'true':
-        return jsonify({"message": "Please verify your email", "code": 401}), 401
+        return unauthorized_response("Please verify your email")
 
+    # Migrate password if using legacy hash
+    migrate_password_if_needed(user_doc, password)
+
+    # Generate tokens
     access_token = create_access_token(identity=user.uuid)
     refresh_token = create_refresh_token(identity=user.uuid)
 
+    # Update login timestamp
     db.users.update_one(
-        {"_id": user.id},
-        {
-            "$set": {
-                "loginAt": datetime.utcnow(),
-            }
-        },
+        {"_id": user_doc["_id"]},
+        {"$set": {"loginAt": datetime.utcnow()}}
     )
 
     return jsonify({
@@ -81,53 +146,74 @@ def login():
 @app.route("/auth/signup", methods=["POST"])
 @swag_from("documentation/signup.yaml", methods=["POST"])
 def signup():
-    sudo_password = env_var["sudo_password"]
-    salt = env_var["salt"]
-    uuid = generate_uuid()
+    """
+    Register a new user account.
+    """
+    username = request.form.get("username", "").strip()
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
 
-    username = request.form.get("username")
-    email = request.form.get("email").lower()
-    password = request.form.get("password")
+    # Validate inputs
+    is_valid, error = validate_username(username)
+    if not is_valid:
+        return error_response(error, 400)
+    
+    is_valid, error = validate_email(email)
+    if not is_valid:
+        return error_response(error, 400)
+    
+    is_valid, error = validate_password(password)
+    if not is_valid:
+        return error_response(error, 400)
 
-    if not username:
-        return jsonify({"message": "Username is required", "code": 400}), 400
-    if not email:
-        return jsonify({"message": "Email is required", "code": 400}), 400
-    if not password:
-        return jsonify({"message": "Password is required", "code": 400}), 400
-
-    password += salt
-    sudo_password += salt
-    sudo_hashed_password = hashlib.sha256(sudo_password.encode()).hexdigest()
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    registry_user = db.users.find_one(
-        {"$or": [{"username": username}, {"email": email}]}
+    # Check for existing user
+    existing_user = db.users.find_one(
+        {"$or": [{"username": username}, {"email": email}]},
+        {"_id": 1, "username": 1, "email": 1}
     )
+    
+    if existing_user:
+        if existing_user.get("email") == email:
+            return error_response("An account with this email already exists", 400)
+        return error_response("This username is already taken", 400)
 
-    user = User(
-        id=None,
-        username=username,
-        email=email,
-        password=hashed_password,
-        lastLogout=None,
-        login_at=datetime.utcnow(),
-        created_at=datetime.utcnow(),
-        uuid=uuid,
-        is_verified=False,
-        new_email='',
-    )
-
-    if not registry_user:
-        user.roles = ["admin"] if hashed_password == sudo_hashed_password else ["user"]
+    try:
+        uuid = generate_uuid()
+        hashed_password = hash_password(password)
+        
+        # Check if this is the first admin user
+        is_admin = password == SUDO_PASSWORD and SUDO_PASSWORD
+        
+        user = User(
+            id=None,
+            username=username,
+            email=email,
+            password=hashed_password,
+            lastLogout=None,
+            login_at=datetime.utcnow(),
+            created_at=datetime.utcnow(),
+            uuid=uuid,
+            is_verified=False,
+            new_email='',
+        )
+        user.roles = ["admin"] if is_admin else ["user"]
+        
         db.users.insert_one(user.to_json())
         
+        # Send verification email (skip in CI)
         if is_ci != 'true':
             mailer.send_verification_email(email, username, uuid)
-            
+        
+        logger.info(f"New user registered: {username}")
+        
         return jsonify({
-            "message": "Signup successful, Please verify your email",
+            "message": "Signup successful. Please verify your email.",
             "code": 200,
         }), 200
+        
+    except Exception as e:
+        logger.exception(f"Error during signup: {e}")
+        return error_response("An error occurred during registration", 500)
     else:
         return jsonify({
             "message": "A user with this email or username already exists",

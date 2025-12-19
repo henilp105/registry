@@ -199,4 +199,18 @@ def validate() -> None:
                 run_command(cleanup_command)
 
 
-validate()
+if __name__ == "__main__":
+    import time
+    
+    # Run validation in a loop with configurable interval
+    VALIDATION_INTERVAL = int(os.environ.get('VALIDATION_INTERVAL', 60))  # Default: 60 seconds
+    
+    print(f"Package validator started. Checking every {VALIDATION_INTERVAL} seconds...")
+    
+    while True:
+        try:
+            validate()
+        except Exception as e:
+            print(f"Error during validation: {e}")
+        
+        time.sleep(VALIDATION_INTERVAL)

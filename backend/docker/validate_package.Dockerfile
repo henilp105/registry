@@ -25,5 +25,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 COPY . .
 
+# Ensure Python output is unbuffered for Docker logs
+ENV PYTHONUNBUFFERED=1
 
 CMD ["python3", "validate.py"]
