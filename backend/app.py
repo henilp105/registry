@@ -146,3 +146,64 @@ def get_registry_archives():
         return jsonify(
             {"message": "Archives folder not found", "archives": [], "code": 200}
         )
+
+
+# ============================================================================
+# Latency Testing Route
+# ============================================================================
+@app.route("/latency", methods=["GET"])
+def test_latency():
+    """
+    Test API endpoint latency.
+    
+    This endpoint runs comprehensive latency tests against all API endpoints
+    using real database data. It provides detailed timing information for
+    each endpoint as well as aggregate statistics.
+    
+    Query Parameters:
+        category (str): Filter results by category (health, packages, namespaces, users, database)
+        
+    Returns:
+        JSON object containing:
+        - total_endpoints: Number of endpoints tested
+        - successful: Number of successful tests
+        - failed: Number of failed tests
+        - total_time_ms: Total time to run all tests
+        - avg_latency_ms: Average latency across all endpoints
+        - min_latency_ms: Minimum latency recorded
+        - max_latency_ms: Maximum latency recorded
+        - results: Array of individual endpoint results
+    ---
+    tags:
+      - Monitoring
+    responses:
+      200:
+        description: Latency test results
+    """
+    from flask import jsonify, request
+    from latency import get_latency_report
+    
+    report = get_latency_report(app)
+    
+    # Filter by category if requested
+    category = request.args.get('category')
+    if category:
+        report['results'] = [
+            r for r in report['results'] 
+            if r.get('category') == category
+        ]
+        # Recalculate stats for filtered results
+        if report['results']:
+            latencies = [r['latency_ms'] for r in report['results']]
+            report['total_endpoints'] = len(report['results'])
+            report['successful'] = sum(1 for r in report['results'] if r.get('success'))
+            report['failed'] = report['total_endpoints'] - report['successful']
+            report['avg_latency_ms'] = round(sum(latencies) / len(latencies), 2)
+            report['min_latency_ms'] = round(min(latencies), 2)
+            report['max_latency_ms'] = round(max(latencies), 2)
+    
+    return jsonify({
+        "code": 200,
+        "message": "Latency test completed",
+        **report
+    })
