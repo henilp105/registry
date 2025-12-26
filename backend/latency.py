@@ -10,8 +10,7 @@ import time
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
-from flask import Flask, jsonify, request
-import requests
+from flask import Flask
 from functools import wraps
 
 logger = logging.getLogger(__name__)
