@@ -256,7 +256,7 @@ class LatencyTester:
         # Test packages count
         start = time.perf_counter()
         try:
-            count = count_documents_fast(db.packages)
+            count = count_documents_fast(db.packages, {})
             end = time.perf_counter()
             latency_ms = (end - start) * 1000
             
@@ -283,7 +283,7 @@ class LatencyTester:
         # Test namespaces count
         start = time.perf_counter()
         try:
-            count = count_documents_fast(db.namespaces)
+            count = count_documents_fast(db.namespaces, {})
             end = time.perf_counter()
             latency_ms = (end - start) * 1000
             
@@ -310,7 +310,7 @@ class LatencyTester:
         # Test users count
         start = time.perf_counter()
         try:
-            count = count_documents_fast(db.users)
+            count = count_documents_fast(db.users, {})
             end = time.perf_counter()
             latency_ms = (end - start) * 1000
             
