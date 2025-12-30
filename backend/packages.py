@@ -201,7 +201,8 @@ def search_packages_cli():
     mongo_db_query["$and"].extend(cond for cond in conditions if cond)
     total_documents = db.packages.count_documents(mongo_db_query)
 
-    packages_per_page = total_documents if packages_per_page > total_documents else packages_per_page
+    # Ensure packages_per_page is at least 1 to avoid division by zero
+    packages_per_page = max(1, min(packages_per_page, total_documents) if total_documents > 0 else packages_per_page)
 
     packages = (
         db.packages.find(mongo_db_query)
@@ -211,7 +212,7 @@ def search_packages_cli():
     )
 
     if packages:
-        total_pages = math.ceil(total_documents / packages_per_page)
+        total_pages = math.ceil(total_documents / packages_per_page) if total_documents > 0 else 0
 
         search_packages = []
         for i in packages:
