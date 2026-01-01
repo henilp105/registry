@@ -178,8 +178,8 @@ def search_packages_cli():
         else "name"
     )
     query = unquote(query.strip().lower())
-    page = int_validation(page,0)-1
-    packages_per_page = int_validation(packages_per_page,10)
+    page = max(0, int_validation(page, 1) - 1)  # Ensure page is at least 0 for skip calculation
+    packages_per_page = int_validation(packages_per_page, 10)
 
     conditions = [
     {"namespace_name": {"$regex": namespace, "$options": "i"}} if namespace else None,
