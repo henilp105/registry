@@ -5,13 +5,12 @@ Welcome to the official documentation for the **Fortran Package Manager (FPM) Re
 ## Table of Contents
 
 1. [Getting Started](getting-started.md) - Installation and quick start guide
-2. [Architecture](architecture.md) - System design and components
-3. [API Reference](api-reference.md) - Complete REST API documentation
-4. [Authentication](authentication.md) - User authentication and authorization
-5. [Package Management](package-management.md) - Publishing and managing packages
-6. [Namespace Management](namespace-management.md) - Organizing packages with namespaces
-7. [Deployment Guide](deployment.md) - Production deployment instructions
-8. [Contributing](contributing.md) - Development setup and contribution guidelines
+2. [API Reference](api-reference.md) - Complete REST API documentation
+3. [Authentication](authentication.md) - User authentication and authorization
+4. [Package Management](package-management.md) - Publishing and managing packages
+5. [Namespace Management](namespace-management.md) - Organizing packages with namespaces
+6. [Deployment Guide](deployment.md) - Production deployment instructions
+7. [Contributing](contributing.md) - Development setup and contribution guidelines
 
 ## Overview
 
