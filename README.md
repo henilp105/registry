@@ -1,20 +1,67 @@
-# Registry for Fortran Package Manager
+# FPM Registry
 
-We are currently in the testing phase of this registry.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
+[![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://reactjs.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-6.0+-47A248.svg)](https://www.mongodb.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 
-1. Backend APIs are hosted at: https://fpm-registry.vercel.app/
-2. Frontend is hosted at: https://registry-phi.vercel.app/
-3. Documentation for the APIs are available at: https://fpm-registry.vercel.app/apidocs/
+The official package registry for the **Fortran Package Manager (fpm)**. A modern, full-stack web application for publishing, discovering, and managing Fortran packages.
 
-**Please note: the current registry is a playground: its database will be fully deleted once its functionality is established. Please do not use it for production yet! More information will follow.**
+> **Note**: This registry is currently in testing phase. The database may be reset during development. Production use is not recommended yet.
 
-The fpm release [0.8.2](https://fortran-lang.discourse.group/t/fpm-version-0-8-2-released-centralized-registry-playground/5792) introduces fpm support for uploading packages to the fpm-registry server directly from the command-line interface:
+---
+
+## ✨ Features
+
+- 📦 **Package Management** - Upload, version, and distribute Fortran packages
+- 🔍 **Package Discovery** - Search and browse packages with filtering
+- 👥 **Namespace Organization** - Group packages under organizational namespaces
+- 🔐 **Access Control** - Role-based permissions (admins, maintainers, users)
+- 🔑 **Secure Authentication** - JWT-based auth with upload tokens for CI/CD
+- 📊 **Package Ratings** - Community ratings and feedback
+- 🚀 **CLI Integration** - Direct publishing via `fpm publish`
+- 📖 **API Documentation** - Interactive Swagger/OpenAPI docs
+- 🐳 **Docker Ready** - One-command deployment with Docker Compose
+
+---
+
+## 🌐 Live Instances
+
+| Service | URL |
+|---------|-----|
+| **Backend API** | https://fpm-registry.vercel.app/ |
+| **Frontend** | https://registry-phi.vercel.app/ |
+| **API Docs** | https://fpm-registry.vercel.app/apidocs/ |
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Getting Started](docs/getting-started.md) | Installation and first steps |
+| [API Reference](docs/api-reference.md) | Complete REST API documentation |
+| [Authentication](docs/authentication.md) | Auth flows, JWT, and RBAC |
+| [Package Management](docs/package-management.md) | Publishing and managing packages |
+| [Namespace Management](docs/namespace-management.md) | Organizing packages |
+| [Deployment Guide](docs/deployment.md) | Production deployment |
+| [Contributing](docs/contributing.md) | Development setup and guidelines |
+
+---
+
+## 🚀 Quick Start
+
+### Publishing Packages with fpm
+
+The fpm CLI (v0.8.2+) supports direct publishing to the registry:
 
 ```bash
-fpm publish --token <upload-token-here>
+# Publish your package
+fpm publish --token <upload-token>
 ```
 
-fpm will now also interact with a web interface that helps manage namespaces & packages. Detailed information regarding the fpm CLI can be found here: [docs](https://fpm.fortran-lang.org/registry/index.html)
+See [fpm documentation](https://fpm.fortran-lang.org/registry/index.html) for details.
 
 ---
 
