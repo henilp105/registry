@@ -63,47 +63,119 @@ fpm publish --token <upload-token>
 
 See [fpm documentation](https://fpm.fortran-lang.org/registry/index.html) for details.
 
----
+### Running with Docker
 
-## 🚀 Quick Start with Docker
-
-The easiest way to run the full stack (frontend + backend + database) is with Docker Compose.
-
-### Prerequisites
-
-- [Docker](https://docs.docker.com/get-docker/) (v20.10+)
-- [Docker Compose](https://docs.docker.com/compose/install/) (v2.0+)
-
-### One-Command Deployment
+The easiest way to run the full stack locally:
 
 ```bash
 # Clone the repository
 git clone https://github.com/fortran-lang/registry.git
 cd registry
 
-# Start everything
+# Start all services (frontend + backend + MongoDB)
 docker compose up -d
 ```
 
-That's it! 🎉
-
-- **Frontend**: http://localhost
-- **API**: http://localhost/api/
-
-### Stop the Application
+**Access Points:**
+- 🌐 **Frontend**: http://localhost
+- 🔌 **API**: http://localhost/api/
+- 📖 **API Docs**: http://localhost/api/apidocs/
 
 ```bash
+# View logs
+docker compose logs -f
+
+# Stop services
 docker compose down
 ```
 
-### View Logs
+---
+
+## 📁 Project Structure
+
+```
+registry/
+├── backend/                 # Flask API server
+│   ├── app.py              # Application entry point
+│   ├── auth.py             # Authentication logic
+│   ├── packages.py         # Package endpoints
+│   ├── namespaces.py       # Namespace endpoints
+│   ├── user.py             # User management
+│   ├── mongo.py            # Database client
+│   ├── models/             # Data models
+│   ├── tests/              # Test suite
+│   ├── docker/             # Dockerfiles
+│   └── documentation/      # API specs (YAML)
+├── frontend/               # React web application
+│   ├── src/
+│   │   ├── pages/          # Page components
+│   │   ├── components/     # Reusable components
+│   │   └── store/          # State management
+│   ├── public/             # Static assets
+│   └── build/              # Production build
+├── docs/                   # Documentation
+├── docker-compose.yaml     # Container orchestration
+└── README.md
+```
+
+---
+
+## 🛠️ Development Setup
+
+### Prerequisites
+
+| Requirement | Version | Purpose |
+|-------------|---------|---------|
+| Python | 3.10+ | Backend API |
+| Node.js | 18+ | Frontend build |
+| MongoDB | 6.0+ | Database |
+| Docker | 20.10+ | Containerization |
+
+### Backend Development
 
 ```bash
-# All services
-docker compose logs -f
+cd backend
 
-# Specific service
-docker compose logs -f backend
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/macOS
+# venv\Scripts\activate   # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your MongoDB URI and secrets
+
+# Run development server
+python server.py
+# API available at http://localhost:9090
+```
+
+### Frontend Development
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+REACT_APP_REGISTRY_API_URL="http://localhost:9090" npm start
+# Frontend available at http://localhost:3000
+```
+
+### Running Tests
+
+```bash
+cd backend
+
+# Run tests with Docker
+docker compose -f compose.test.yaml up --build
+
+# Or run directly with pytest
+pytest tests/ -v
 ```
 
 ---
