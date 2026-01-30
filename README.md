@@ -243,26 +243,87 @@ cd backend
 docker compose -f compose.test.yaml up --build
 ```
 
-## Steps to setup mongodump for registry Archives functionality
-fpm - registry archives automatically created at weekly intervals by the mongodump command and stored in a tar archives format in the static directory of flask , to support caching and direct rendering of archives without manually fetching the mongodb for each archive request. to reduce the resource used by mongodb , we will only be installing the `mongodb-org-tools` only. the steps to setup mongodump on a Ubuntu linux 22.04 are:
+---
 
-1. Import the public key used by the package management system.
+## 📦 MongoDB Tools Setup
 
+For the registry archives functionality (weekly database dumps), install MongoDB tools:
+
+<details>
+<summary><strong>Ubuntu/Debian Installation</strong></summary>
+
+```bash
+# Import MongoDB public key
+wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
+
+# Add repository
+echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/6.0 multiverse" | \
+  sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
+
+# Install tools
+sudo apt-get update
+sudo apt install mongodb-org-tools
 ```
- wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
- ```
 
- 2. Create a list file for MongoDB.
+</details>
 
- ```
-echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/6.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
- ```
+See [MongoDB Tools Installation](https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-ubuntu/) for other platforms.
 
- 3. Reload local package database and install the tools:
+---
 
- ```
-  sudo apt-get update
-  sudo apt install mongodb-org-tools
- ```
+## 🤝 Contributing
 
-for more details, please refer: [mongodb tools installation docs](https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-ubuntu/).
+We welcome contributions! Please see our [Contributing Guide](docs/contributing.md) for:
+
+- Development environment setup
+- Coding standards and style guide
+- Testing requirements
+- Pull request process
+
+### Quick Contribution Steps
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+---
+
+## 🐛 Reporting Issues
+
+Found a bug or have a feature request?
+
+1. Check [existing issues](https://github.com/fortran-lang/registry/issues)
+2. Open a [new issue](https://github.com/fortran-lang/registry/issues/new)
+3. Include steps to reproduce and environment details
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Fortran-lang community](https://fortran-lang.org/) - For building the modern Fortran ecosystem
+- [fpm](https://github.com/fortran-lang/fpm) - The Fortran Package Manager
+- All [contributors](https://github.com/fortran-lang/registry/graphs/contributors) who helped build this registry
+
+---
+
+## 📞 Support
+
+| Channel | Link |
+|---------|------|
+| 💬 **Discourse** | [fortran-lang.discourse.group](https://fortran-lang.discourse.group/) |
+| 💻 **GitHub Issues** | [fortran-lang/registry/issues](https://github.com/fortran-lang/registry/issues) |
+| 📧 **Email** | fpm@fortran-lang.org |
+
+---
+
+<p align="center">
+  Built with ❤️ by the <a href="https://fortran-lang.org/">Fortran community</a>
+</p>
