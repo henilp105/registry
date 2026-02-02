@@ -217,35 +217,7 @@ openssl rand -hex 32  # Use for SALT and JWT_SECRET_KEY
 
 ---
 
-## 🛠️ Development Setup
-
-### Backend Only (with existing MongoDB)
-
-```bash
-cd backend
-cp .env.example .env  # Configure your MongoDB URI
-pip install -r requirements.txt
-python server.py
-```
-
-### Frontend Only
-
-```bash
-cd frontend
-npm install
-REACT_APP_REGISTRY_API_URL="http://localhost:9090" npm start
-```
-
-### Running Tests
-
-```bash
-cd backend
-docker compose -f compose.test.yaml up --build
-```
-
----
-
-## 📦 MongoDB Tools Setup
+##  MongoDB Tools Setup
 
 For the registry archives functionality (weekly database dumps), install MongoDB tools:
 
