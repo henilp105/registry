@@ -95,7 +95,7 @@ const AdminSection = () => {
       modalData.modalAction();
     }
     closeModal();
-  }, [modalData.modalAction, closeModal]);
+  }, [modalData, closeModal]);
 
   const handleDeletePackage = useCallback(() => {
     if (!validateFields(formData.namespaceName, formData.packageName)) return;
