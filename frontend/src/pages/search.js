@@ -2,7 +2,6 @@ import React, { useEffect, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import PackageItem from "../components/packageItem";
 import { SkeletonPackageList } from "../components/SkeletonLoader";
-import ListGroup from "react-bootstrap/ListGroup";
 import Pagination from "../components/pagination";
 import Dropdown from "react-bootstrap/Dropdown";
 import DropdownButton from "react-bootstrap/DropdownButton";
@@ -134,7 +133,7 @@ const EmptySearchState = ({ query }) => (
 // Package list with animation
 const ListView = ({ packages, currentPage, totalPages }) => {
   return (
-    <ListGroup style={{ alignItems: "center" }} variant="flush">
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
       {packages.map((packageEntity, index) => (
         <div 
           key={packageEntity.name + packageEntity.namespace}
@@ -146,10 +145,10 @@ const ListView = ({ packages, currentPage, totalPages }) => {
           <PackageItem packageEntity={packageEntity} />
         </div>
       ))}
-      <div className="mt-4">
+      <div className="mt-4 d-flex justify-content-center">
         <Pagination currentPage={currentPage} totalPages={totalPages} />
       </div>
-    </ListGroup>
+    </div>
   );
 };
 

@@ -1,13 +1,13 @@
-import { MDBListGroupItem } from "mdb-react-ui-kit";
 import { Row, Col, Image } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
 import { searchPackage, setQuery } from "../store/actions/searchActions";
 import { useDispatch } from "react-redux";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 
 const PackageItem = ({ packageEntity }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [isHovered, setIsHovered] = useState(false);
 
   const handleKeywordClick = useCallback((keyword) => {
     dispatch(setQuery(keyword));
@@ -51,66 +51,111 @@ const PackageItem = ({ packageEntity }) => {
     }
   };
 
-  const keywordStyle = {
+  const cardStyle = {
+    background: "#ffffff",
     borderRadius: "12px",
-    backgroundColor: "#f0f4f8",
-    padding: "4px 10px",
+    padding: "1.25rem",
+    border: "1px solid #e5e7eb",
+    transition: "all 0.2s ease",
+    boxShadow: isHovered 
+      ? "0 8px 25px rgba(99, 102, 241, 0.15)" 
+      : "0 2px 8px rgba(0, 0, 0, 0.04)",
+    transform: isHovered ? "translateY(-2px)" : "translateY(0)",
+    borderColor: isHovered ? "#c7d2fe" : "#e5e7eb"
+  };
+
+  const keywordStyle = {
+    borderRadius: "16px",
+    backgroundColor: "#f3f4f6",
+    padding: "4px 12px",
     margin: "2px",
     textDecoration: "none",
-    color: "#555",
+    color: "#4b5563",
     fontSize: "12px",
     cursor: "pointer",
     display: "inline-block",
     transition: "all 0.2s ease",
-    border: "1px solid transparent"
+    border: "1px solid #e5e7eb",
+    fontWeight: "500"
   };
 
   const keywords = packageEntity.keywords?.slice(0, 5) || [];
   const hasMoreKeywords = (packageEntity.keywords?.length || 0) > 5;
 
   return (
-    <MDBListGroupItem 
-      id="list-item"
-      className="py-3"
-      style={{ borderRadius: "8px", marginBottom: "0.5rem" }}
+    <div 
+      style={cardStyle}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      <Row className="align-items-start">
-        <Col xs={2} md={1} className="d-flex justify-content-center">
-          <Image
-            src="https://fortran-lang.org/_static/fortran-logo-256x256.png"
-            fluid
-            width={50}
-            height={50}
-            alt=""
-            loading="lazy"
-            style={{ minWidth: "40px" }}
-          />
+      <Row className="align-items-start g-3">
+        <Col xs="auto">
+          <div style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "10px",
+            overflow: "hidden",
+            backgroundColor: "#f0f4ff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center"
+          }}>
+            <Image
+              src="https://fortran-lang.org/_static/fortran-logo-256x256.png"
+              width={36}
+              height={36}
+              alt=""
+              loading="lazy"
+            />
+          </div>
         </Col>
-        <Col xs={10} md={7} className="ps-2">
-          <Link
-            to={`/packages/${packageEntity.namespace}/${packageEntity.name}`}
-            className="text-decoration-none"
-          >
-            <h5 
-              id="list-item-package-name" 
-              className="mb-1 fw-semibold"
-              style={{ fontSize: "1.1rem" }}
-            >
-              {packageEntity.name}
-            </h5>
-          </Link>
-          <Link
-            to={`/namespaces/${packageEntity.namespace}`}
-            className="text-decoration-none text-muted small"
-          >
-            <i className="fas fa-folder-open me-1" style={{ fontSize: "0.8rem" }} />
-            {packageEntity.namespace}
-          </Link>
+        <Col>
+          <div className="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div style={{ flex: 1, minWidth: "200px" }}>
+              <Link
+                to={`/packages/${packageEntity.namespace}/${packageEntity.name}`}
+                className="text-decoration-none"
+              >
+                <h5 
+                  className="mb-1 fw-bold"
+                  style={{ 
+                    fontSize: "1.1rem",
+                    color: "#6366f1",
+                    transition: "color 0.2s ease"
+                  }}
+                >
+                  {packageEntity.name}
+                </h5>
+              </Link>
+              <Link
+                to={`/namespaces/${packageEntity.namespace}`}
+                className="text-decoration-none"
+                style={{ color: "#9ca3af", fontSize: "0.85rem" }}
+              >
+                <i className="fas fa-folder-open me-1" style={{ fontSize: "0.75rem" }} />
+                {packageEntity.namespace}
+              </Link>
+            </div>
+            <div className="text-end" style={{ flexShrink: 0 }}>
+              <span style={{ 
+                color: "#9ca3af", 
+                fontSize: "0.85rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px"
+              }}>
+                <i className="fas fa-clock" style={{ fontSize: "0.75rem" }} />
+                {formatDate(packageEntity.updated_at)}
+              </span>
+            </div>
+          </div>
+          
           <p 
-            className="text-muted mt-2 mb-2" 
+            className="mb-2 mt-2" 
             style={{ 
               fontSize: "0.9rem",
-              lineHeight: "1.5",
+              lineHeight: "1.6",
+              color: "#6b7280",
               overflow: "hidden",
               textOverflow: "ellipsis",
               display: "-webkit-box",
@@ -122,19 +167,21 @@ const PackageItem = ({ packageEntity }) => {
           </p>
           
           {/* Keywords */}
-          <div className="d-flex flex-wrap gap-1 mt-2">
+          <div className="d-flex flex-wrap gap-1 mt-3">
             {keywords.map((keyword, index) => (
               <button
                 key={index}
                 style={keywordStyle}
                 onClick={() => handleKeywordClick(keyword)}
                 onMouseOver={(e) => {
-                  e.target.style.backgroundColor = "#e0e8f0";
-                  e.target.style.borderColor = "#3d94f6";
+                  e.target.style.backgroundColor = "#e0e7ff";
+                  e.target.style.borderColor = "#a5b4fc";
+                  e.target.style.color = "#4f46e5";
                 }}
                 onMouseOut={(e) => {
-                  e.target.style.backgroundColor = "#f0f4f8";
-                  e.target.style.borderColor = "transparent";
+                  e.target.style.backgroundColor = "#f3f4f6";
+                  e.target.style.borderColor = "#e5e7eb";
+                  e.target.style.color = "#4b5563";
                 }}
                 type="button"
                 aria-label={`Search for ${keyword}`}
@@ -144,24 +191,16 @@ const PackageItem = ({ packageEntity }) => {
             ))}
             {hasMoreKeywords && (
               <span 
-                className="text-muted small align-self-center"
-                style={{ fontSize: "11px" }}
+                className="align-self-center"
+                style={{ fontSize: "11px", color: "#9ca3af", fontWeight: "500" }}
               >
                 +{packageEntity.keywords.length - 5} more
               </span>
             )}
           </div>
         </Col>
-        <Col xs={12} md={4} className="text-md-end mt-2 mt-md-0">
-          <div className="d-flex flex-column align-items-md-end">
-            <span className="text-muted small">
-              <i className="fas fa-clock me-1" />
-              {formatDate(packageEntity.updated_at)}
-            </span>
-          </div>
-        </Col>
       </Row>
-    </MDBListGroupItem>
+    </div>
   );
 };
 

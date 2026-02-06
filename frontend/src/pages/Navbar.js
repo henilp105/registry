@@ -91,7 +91,14 @@ const UnauthenticatedNav = ({ onNavigate }) => (
     </Nav.Link>
     <Nav.Link 
       onClick={() => onNavigate("/account/register")} 
-      className="btn btn-primary text-white ms-2 px-3"
+      className="ms-2 px-3"
+      style={{
+        backgroundColor: '#0d6efd',
+        color: '#ffffff',
+        borderRadius: '4px',
+        fontWeight: '500',
+        textDecoration: 'none'
+      }}
     >
       Register
     </Nav.Link>

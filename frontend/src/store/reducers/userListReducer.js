@@ -3,7 +3,6 @@ import {
   FETCH_USERS_LIST_SUCCESS,
   FETCH_USERS_LIST_FAILURE,
 } from "../actions/userListActions";
-import { handleRequest, handleSuccess, handleFailure } from "../utils";
 
 const initialState = {
   users: null,
@@ -20,15 +19,28 @@ const initialState = {
 const userListReducer = (state = initialState, action) => {
   switch (action.type) {
     case FETCH_USERS_LIST_REQUEST:
-      return handleRequest(state);
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+        users: null,
+      };
 
     case FETCH_USERS_LIST_SUCCESS:
-      return handleSuccess(state, {
+      return {
+        ...state,
+        isLoading: false,
         users: action.payload.users,
-      });
+        error: null,
+      };
 
     case FETCH_USERS_LIST_FAILURE:
-      return handleFailure(state, action.payload?.message);
+      return {
+        ...state,
+        isLoading: false,
+        error: action.payload?.message || "An error occurred",
+        users: null,
+      };
 
     default:
       return state;

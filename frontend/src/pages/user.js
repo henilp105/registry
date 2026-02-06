@@ -1,14 +1,14 @@
 import React, { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserData } from "../store/actions/userActions";
-import { PersonCircle, CalendarEvent, Envelope } from "react-bootstrap-icons";
+import { PersonCircle, CalendarEvent, Envelope, Archive } from "react-bootstrap-icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Container from "react-bootstrap/Container";
-import Figure from "react-bootstrap/Figure";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
 import Spinner from "react-bootstrap/Spinner";
 import PackageItem from "../components/packageItem";
+import "./namespace.css";
 
 const UserPage = () => {
   const { user } = useParams();
@@ -19,81 +19,99 @@ const UserPage = () => {
     (state) => state.user
   );
 
-  // Fetch user data on mount or user change
   useEffect(() => {
     dispatch(fetchUserData(user));
   }, [dispatch, user]);
 
-  // Handle 404 redirect
   useEffect(() => {
     if (notFound) {
       navigate("/404");
     }
   }, [notFound, navigate]);
 
-  // Format date for display
   const formattedDate = useMemo(() => {
-    if (!dateJoined) return "";
+    if (!dateJoined) return "Unknown";
     return new Date(dateJoined).toLocaleDateString("en-US", {
       year: "numeric",
-      month: "short",
+      month: "long",
       day: "numeric",
     });
   }, [dateJoined]);
 
   if (isLoading) {
     return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: "400px" }}>
+      <Container className="namespace-loading">
         <Spinner animation="border" role="status">
           <span className="visually-hidden">Loading...</span>
         </Spinner>
+        <p className="namespace-loading-text">Loading user profile...</p>
       </Container>
     );
   }
 
   return (
-    <Container>
+    <Container className="namespace-container">
       <Row>
-        <Col sm={4}>
-          <Row style={{ marginLeft: "10px", marginTop: "20px" }}>
-            <Figure>
-              <Figure.Image
-                width={171}
-                height={180}
-                alt={`Avatar for ${user} from gravatar.com`}
-                src={`https://www.gravatar.com/avatar/${user}`}
+        {/* Sidebar */}
+        <Col lg={3} md={4}>
+          <div className="namespace-sidebar">
+            <div className="namespace-card">
+              <img
+                className="namespace-avatar"
+                alt={`Avatar for ${user}`}
+                src={`https://www.gravatar.com/avatar/${user}?d=identicon&s=200`}
               />
-            </Figure>
-          </Row>
-          <Row
-            style={{ marginLeft: "10px", marginTop: "10px", fontSize: "20px" }}
-          >
-            <div className="d-flex align-items-center mb-2">
-              <PersonCircle style={{ marginRight: "8px" }} />
-              {user}
+              
+              <h1 className="namespace-title">{user}</h1>
+              
+              <ul className="namespace-info-list">
+                <li className="namespace-info-item">
+                  <PersonCircle className="namespace-info-icon" />
+                  <span className="namespace-info-label">User Profile</span>
+                </li>
+                
+                <li className="namespace-info-item">
+                  <CalendarEvent className="namespace-info-icon" />
+                  <span className="namespace-info-value">{formattedDate}</span>
+                </li>
+                
+                {email && (
+                  <li className="namespace-info-item">
+                    <Envelope className="namespace-info-icon" />
+                    <span className="namespace-info-value" style={{ fontSize: "0.9rem" }}>{email}</span>
+                  </li>
+                )}
+              </ul>
             </div>
-            <div className="d-flex align-items-center mb-2">
-              <CalendarEvent style={{ marginRight: "8px" }} />
-              {`Joined ${formattedDate}`}
-            </div>
-            <div className="d-flex align-items-center mb-2">
-              <Envelope style={{ marginRight: "8px" }} />
-              {email}
-            </div>
-          </Row>
+          </div>
         </Col>
-        <Col sm={8}>
-          <Row style={{ fontSize: "20px", marginTop: "20px", padding: "5px" }}>
-            {projects.length === 0
-              ? "0 projects"
-              : `${projects.length} projects`}
-          </Row>
-          {projects.map((packageEntity) => (
-            <PackageItem
-              key={`${packageEntity.namespace}-${packageEntity.name}`}
-              packageEntity={packageEntity}
-            />
-          ))}
+
+        {/* Packages Section */}
+        <Col lg={9} md={8}>
+          <div className="packages-section">
+            <div className="packages-header">
+              <h2 className="packages-title">Packages</h2>
+              <span className="packages-count">
+                {projects.length} {projects.length === 1 ? 'Package' : 'Packages'}
+              </span>
+            </div>
+
+            {projects.length === 0 ? (
+              <div className="no-packages-message">
+                <Archive className="no-packages-icon" size={48} />
+                <p>No packages from this user yet.</p>
+              </div>
+            ) : (
+              <div className="packages-list">
+                {projects.map((packageEntity) => (
+                  <PackageItem 
+                    key={`${packageEntity.namespace}-${packageEntity.name}`} 
+                    packageEntity={packageEntity} 
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </Col>
       </Row>
     </Container>

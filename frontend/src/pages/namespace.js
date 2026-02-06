@@ -1,16 +1,22 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchNamespaceData } from "../store/actions/namespaceActions";
-import { Box, CalendarEvent, Person } from "react-bootstrap-icons";
+import { 
+  Box, 
+  CalendarEvent, 
+  ChevronRight,
+  ShieldCheck,
+  People,
+  Archive
+} from "react-bootstrap-icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Container from "react-bootstrap/Container";
-import Figure from "react-bootstrap/Figure";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
 import Spinner from "react-bootstrap/Spinner";
 import PackageItem from "../components/packageItem";
-import "./upload.css";
 import ShowUserListDialog from "./showUserListDialog";
+import "./namespace.css";
 
 const NamespacePage = () => {
   const { namespace } = useParams();
@@ -22,14 +28,12 @@ const NamespacePage = () => {
   );
 
   const [isListDialogOpen, setListDialogOpen] = useState(false);
-  const [dialogType, setDialogType] = useState(null); // 'admins' | 'maintainers'
+  const [dialogType, setDialogType] = useState(null);
 
-  // Fetch namespace data on mount or namespace change
   useEffect(() => {
     dispatch(fetchNamespaceData(namespace));
   }, [dispatch, namespace]);
 
-  // Handle 404 redirect
   useEffect(() => {
     if (notFound) {
       navigate("/404");
@@ -46,86 +50,83 @@ const NamespacePage = () => {
     setDialogType(null);
   }, []);
 
-  // Format date for display
   const formatDate = (dateString) => {
-    if (!dateString) return "";
-    return dateString.slice(4, 16);
+    if (!dateString) return "Unknown";
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }).format(date);
+    } catch {
+      return dateString.slice(4, 16);
+    }
   };
 
   if (isLoading) {
     return (
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: "400px" }}>
+      <Container className="namespace-loading">
         <Spinner animation="border" role="status">
           <span className="visually-hidden">Loading...</span>
         </Spinner>
+        <p className="namespace-loading-text">Loading namespace...</p>
       </Container>
     );
   }
 
   return (
-    <Container>
+    <Container className="namespace-container">
       <Row>
-        <Col sm={4}>
-          <Row style={{ marginLeft: "10px", marginTop: "20px" }}>
-            <Figure>
-              <Figure.Image
-                width={100}
-                height={100}
-                alt={`Avatar for ${namespace} from gravatar.com`}
-                src={`https://www.gravatar.com/avatar/${namespace}`}
+        {/* Sidebar */}
+        <Col lg={3} md={4}>
+          <div className="namespace-sidebar">
+            <div className="namespace-card">
+              <img
+                className="namespace-avatar"
+                alt={`Avatar for ${namespace}`}
+                src={`https://www.gravatar.com/avatar/${namespace}?d=identicon&s=200`}
               />
-            </Figure>
-          </Row>
-          <Row
-            style={{ marginLeft: "10px", marginTop: "10px", fontSize: "20px" }}
-          >
-            <div className="d-flex align-items-center mb-2">
-              <Box style={{ marginRight: "8px" }} />
-              {`Namespace: ${namespace}`}
+              
+              <h1 className="namespace-title">{namespace}</h1>
+              
+              <ul className="namespace-info-list">
+                <li className="namespace-info-item">
+                  <Box className="namespace-info-icon" />
+                  <span className="namespace-info-label">Namespace</span>
+                </li>
+                
+                <li className="namespace-info-item">
+                  <CalendarEvent className="namespace-info-icon" />
+                  <span className="namespace-info-value">{formatDate(dateJoined)}</span>
+                </li>
+                
+                <li 
+                  className="namespace-info-item namespace-info-clickable"
+                  onClick={() => openDialog('admins')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && openDialog('admins')}
+                >
+                  <ShieldCheck className="namespace-info-icon" />
+                  <span>Admins</span>
+                  <ChevronRight className="chevron-icon" size={16} />
+                </li>
+                
+                <li 
+                  className="namespace-info-item namespace-info-clickable"
+                  onClick={() => openDialog('maintainers')}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && openDialog('maintainers')}
+                >
+                  <People className="namespace-info-icon" />
+                  <span>Maintainers</span>
+                  <ChevronRight className="chevron-icon" size={16} />
+                </li>
+              </ul>
             </div>
-            <div className="d-flex align-items-center mb-2">
-              <CalendarEvent style={{ marginRight: "8px" }} />
-              {`Created: ${formatDate(dateJoined)}`}
-            </div>
-          </Row>
-          <Row
-            style={{
-              marginLeft: "10px",
-              marginTop: "10px",
-              fontSize: "20px",
-              cursor: "pointer",
-            }}
-          >
-            <div 
-              className="d-flex align-items-center mb-2"
-              onClick={() => openDialog('admins')}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && openDialog('admins')}
-            >
-              <Person style={{ marginRight: "8px" }} />
-              Admins
-            </div>
-          </Row>
-          <Row
-            style={{
-              marginLeft: "10px",
-              marginTop: "10px",
-              fontSize: "20px",
-              cursor: "pointer",
-            }}
-          >
-            <div 
-              className="d-flex align-items-center mb-2"
-              onClick={() => openDialog('maintainers')}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && openDialog('maintainers')}
-            >
-              <Person style={{ marginRight: "8px" }} />
-              Namespace Maintainers
-            </div>
-          </Row>
+          </div>
           
           {dialogType && (
             <ShowUserListDialog
@@ -137,17 +138,33 @@ const NamespacePage = () => {
             />
           )}
         </Col>
-        <Col sm={8}>
-          <Row style={{ fontSize: 24, marginTop: "20px" }}>
-            {projects.length === 0
-              ? "0 projects"
-              : `${projects.length} Packages`}
-          </Row>
-          {projects.map((packageEntity) => (
-            <Row key={`${packageEntity.namespace}-${packageEntity.name}`} style={{ marginTop: "20px" }}>
-              <PackageItem packageEntity={packageEntity} />
-            </Row>
-          ))}
+
+        {/* Packages Section */}
+        <Col lg={9} md={8}>
+          <div className="packages-section">
+            <div className="packages-header">
+              <h2 className="packages-title">Packages</h2>
+              <span className="packages-count">
+                {projects.length} {projects.length === 1 ? 'Package' : 'Packages'}
+              </span>
+            </div>
+
+            {projects.length === 0 ? (
+              <div className="no-packages-message">
+                <Archive className="no-packages-icon" size={48} />
+                <p>No packages in this namespace yet.</p>
+              </div>
+            ) : (
+              <div className="packages-list">
+                {projects.map((packageEntity) => (
+                  <PackageItem 
+                    key={`${packageEntity.namespace}-${packageEntity.name}`} 
+                    packageEntity={packageEntity} 
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </Col>
       </Row>
     </Container>

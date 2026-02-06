@@ -165,12 +165,13 @@ const PackagePage = () => {
       </header>
 
       {/* Navigation Tabs */}
-      <MDBTabs className="mb-3">
+      <MDBTabs className="mb-4" style={{ borderBottom: '1px solid #dee2e6' }}>
         <MDBTabsItem>
           <MDBTabsLink
             onClick={() => handleTabClick("readme")}
             active={activeTab === "readme"}
             type="button"
+            style={{ padding: '12px 20px' }}
           >
             <MDBIcon fab icon="readme" className="me-2" aria-hidden="true" />
             Readme
@@ -181,6 +182,7 @@ const PackagePage = () => {
             onClick={() => handleTabClick("dependencies")}
             active={activeTab === "dependencies"}
             type="button"
+            style={{ padding: '12px 20px' }}
           >
             <MDBIcon fas icon="boxes" className="me-2" aria-hidden="true" />
             Dependencies
@@ -191,6 +193,7 @@ const PackagePage = () => {
             onClick={() => handleTabClick("versions")}
             active={activeTab === "versions"}
             type="button"
+            style={{ padding: '12px 20px' }}
           >
             <MDBIcon fas icon="tag" className="me-2" aria-hidden="true" />
             Versions
@@ -204,6 +207,7 @@ const PackagePage = () => {
             onClick={() => handleTabClick("stats")}
             active={activeTab === "stats"}
             type="button"
+            style={{ padding: '12px 20px' }}
           >
             <MDBIcon fas icon="chart-bar" className="me-2" aria-hidden="true" />
             Stats
@@ -236,9 +240,7 @@ const PackagePage = () => {
           <MDBContainer>
             <MDBRow>
               <MDBCol md="9" className="mb-4">
-                <h2 style={{ fontSize: 24, textAlign: "left" }}>Dependencies</h2>
-                <hr />
-                <p className="text-muted">
+                <p className="text-muted mt-3">
                   <MDBIcon fas icon="info-circle" className="me-2" />
                   Dependency information is parsed from the package manifest.
                 </p>
@@ -252,10 +254,8 @@ const PackagePage = () => {
           <MDBContainer>
             <MDBRow>
               <MDBCol md="9" className="mb-4">
-                <h2 style={{ fontSize: 24, textAlign: "left" }}>Version History</h2>
-                <hr />
                 {sortedVersionsList.length > 0 ? (
-                  <MDBTable hover responsive>
+                  <MDBTable hover responsive className="mt-3">
                     <MDBTableHead>
                       <tr>
                         <th scope="col">Version</th>
