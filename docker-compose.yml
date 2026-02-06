@@ -1,17 +1,56 @@
 # Fortran Package Registry - Docker Compose
-# Full-stack deployment: Frontend + Backend + MongoDB
+# Full-stack deployment: Frontend + Backend + MongoDB + HTTPS
 #
 # Quick Start:
-#   docker compose up -d
+#   1. Generate SSL certificates (self-signed for dev):
+#      cd nginx/ssl && openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+#        -keyout privkey.pem -out fullchain.pem -subj "/CN=localhost"
+#   2. docker compose up -d
+#
+# For Let's Encrypt certificates:
+#   docker compose --profile certbot up -d
+#   docker compose exec certbot certbot certonly --webroot -w /var/www/certbot -d yourdomain.com
 #
 # Access:
-#   - Frontend: http://localhost
-#   - API: http://localhost/api/
+#   - Frontend: https://localhost (HTTP redirects to HTTPS)
+#   - API: https://localhost/api/
 #
 # Stop:
 #   docker compose down
 
 services:
+  # ===========================================
+  # HTTPS Nginx - SSL termination reverse proxy
+  # ===========================================
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      - frontend
+    restart: unless-stopped
+    networks:
+      - registry-network
+
+  # ===========================================
+  # Certbot - SSL certificate management (optional)
+  # ===========================================
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./nginx/ssl:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    profiles:
+      - certbot
+    networks:
+      - registry-network
+
   # ===========================================
   # Frontend - React app served by Nginx
   # ===========================================
@@ -19,8 +58,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "${FRONTEND_PORT:-80}:80"
+    expose:
+      - "80"
     depends_on:
       - backend
     restart: unless-stopped
@@ -91,6 +130,8 @@ volumes:
   mongo-data:
     driver: local
   package-tarballs:
+    driver: local
+  certbot-webroot:
     driver: local
 
 # ===========================================
