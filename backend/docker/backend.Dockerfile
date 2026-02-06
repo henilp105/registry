@@ -1,5 +1,10 @@
-# Prod environment
-FROM --platform=$BUILDPLATFORM python:3.10.13-bookworm AS builder
+# Prod environment with Python 3.13 (latest)
+FROM --platform=$BUILDPLATFORM python:3.13-bookworm AS builder
+
+# Enable Python debug mode for better error messages
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONFAULTHANDLER=1
 
 WORKDIR /src
 COPY requirements.txt /src
