@@ -30,9 +30,9 @@ The official package registry for the **Fortran Package Manager (fpm)**. A moder
 
 | Service | URL |
 |---------|-----|
-| **Backend API** | https://fpm-registry.vercel.app/ |
+| **Backend API** | https://64.226.81.128/ |
 | **Frontend** | https://registry-phi.vercel.app/ |
-| **API Docs** | https://fpm-registry.vercel.app/apidocs/ |
+| **API Docs** | https://64.226.81.128/apidocs/ |
 
 ---
 
@@ -87,35 +87,6 @@ docker compose logs -f
 
 # Stop services
 docker compose down
-```
-
----
-
-## 📁 Project Structure
-
-```
-registry/
-├── backend/                 # Flask API server
-│   ├── app.py              # Application entry point
-│   ├── auth.py             # Authentication logic
-│   ├── packages.py         # Package endpoints
-│   ├── namespaces.py       # Namespace endpoints
-│   ├── user.py             # User management
-│   ├── mongo.py            # Database client
-│   ├── models/             # Data models
-│   ├── tests/              # Test suite
-│   ├── docker/             # Dockerfiles
-│   └── documentation/      # API specs (YAML)
-├── frontend/               # React web application
-│   ├── src/
-│   │   ├── pages/          # Page components
-│   │   ├── components/     # Reusable components
-│   │   └── store/          # State management
-│   ├── public/             # Static assets
-│   └── build/              # Production build
-├── docs/                   # Documentation
-├── docker-compose.yaml     # Container orchestration
-└── README.md
 ```
 
 ---
@@ -283,18 +254,6 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - [Fortran-lang community](https://fortran-lang.org/) - For building the modern Fortran ecosystem
 - [fpm](https://github.com/fortran-lang/fpm) - The Fortran Package Manager
 - All [contributors](https://github.com/fortran-lang/registry/graphs/contributors) who helped build this registry
-
----
-
-## 📞 Support
-
-| Channel | Link |
-|---------|------|
-| 💬 **Discourse** | [fortran-lang.discourse.group](https://fortran-lang.discourse.group/) |
-| 💻 **GitHub Issues** | [fortran-lang/registry/issues](https://github.com/fortran-lang/registry/issues) |
-| 📧 **Email** | fpm@fortran-lang.org |
-
----
 
 <p align="center">
   Built with ❤️ by the <a href="https://fortran-lang.org/">Fortran community</a>

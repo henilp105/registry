@@ -4,7 +4,6 @@ import { fetchNamespaceData } from "../store/actions/namespaceActions";
 import { 
   Box, 
   CalendarEvent, 
-  Person, 
   ChevronRight,
   ShieldCheck,
   People,

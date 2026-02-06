@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserData } from "../store/actions/userActions";
-import { PersonCircle, CalendarEvent, Envelope, Archive, BoxSeam } from "react-bootstrap-icons";
+import { PersonCircle, CalendarEvent, Envelope, BoxSeam } from "react-bootstrap-icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
