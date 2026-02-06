@@ -4,11 +4,12 @@ services:
       context: .
       target: builder
       dockerfile: docker/backend.Dockerfile
-    command: python -m unittest discover -s tests
+    command: python -m unittest discover -s tests -v
     volumes:
       - .:/src
     depends_on:
-      - mongo
+      mongo:
+        condition: service_started
     environment:
       # these are the test environment variables.
       - MONGO_DB_NAME=testregistry
@@ -21,11 +22,12 @@ services:
       - RESET_PASSWORD=reset
       - SUDO_PASSWORD=fortran
       - IS_CI=true
-
-  validate_package:
-    build:
-      dockerfile: docker/validate_package.Dockerfile
-    stop_signal: SIGINT
+      - JWT_SECRET_KEY=test-jwt-secret-key
 
   mongo:
-    image: mongo
+    image: mongo:latest
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
