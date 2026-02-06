@@ -11,7 +11,7 @@ class TestSignUp(BaseTestClass):
     
     # Test data constants
     TEST_EMAIL = "testemail@gmail.com"
-    TEST_PASSWORD = "123456"
+    TEST_PASSWORD = "testpass123"
     TEST_USERNAME = "testuser"
 
     def test_successful_signup(self):

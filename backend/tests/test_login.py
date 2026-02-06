@@ -10,7 +10,7 @@ class TestLogin(BaseTestClass):
     
     # Test data constants
     TEST_EMAIL = "testemail@gmail.com"
-    TEST_PASSWORD = "123456"
+    TEST_PASSWORD = "testpass123"
     TEST_USERNAME = "testuser"
 
     def _create_and_login_user(self):
