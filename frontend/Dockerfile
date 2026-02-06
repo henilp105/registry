@@ -1,6 +1,10 @@
 # Frontend Dockerfile - Multi-stage build for React app
 # Stage 1: Build the React application
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
+
+# Enable Node.js debug mode for better error messages
+ENV NODE_ENV=development
+ENV NPM_CONFIG_LOGLEVEL=verbose
 
 WORKDIR /app
 
@@ -12,6 +16,9 @@ RUN npm ci --silent
 
 # Copy source code
 COPY . .
+
+# Set production mode for build
+ENV NODE_ENV=production
 
 # Build the production bundle
 RUN npm run build
