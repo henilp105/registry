@@ -129,7 +129,8 @@ export const LoadingSpinner = ({ size = 'md', className = '' }) => {
   );
 };
 
-export default {
+// Named export object for all skeleton components
+const SkeletonLoaders = {
   Skeleton,
   SkeletonText,
   SkeletonAvatar,
@@ -140,3 +141,5 @@ export default {
   LoadingOverlay,
   LoadingSpinner
 };
+
+export default SkeletonLoaders;
