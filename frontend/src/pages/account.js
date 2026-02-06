@@ -19,9 +19,7 @@ import Form from "react-bootstrap/Form";
 import Button from "react-bootstrap/Button";
 import Alert from "react-bootstrap/Alert";
 
-import "@fortawesome/fontawesome-free/css/all.min.css";
-import "bootstrap-css-only/css/bootstrap.min.css";
-import "mdbreact/dist/css/mdb.css";
+import "bootstrap/dist/css/bootstrap.min.css";
 
 const Account = () => {
   const dispatch = useDispatch();
