@@ -238,18 +238,20 @@ export const useFocusTrap = (isActive) => {
       }
     };
 
-    ref.current.addEventListener('keydown', handleTabKey);
+    const currentRef = ref.current;
+    currentRef.addEventListener('keydown', handleTabKey);
     firstFocusable?.focus();
 
     return () => {
-      ref.current?.removeEventListener('keydown', handleTabKey);
+      currentRef?.removeEventListener('keydown', handleTabKey);
     };
   }, [isActive]);
 
   return ref;
 };
 
-export default {
+// Named export object for all hooks
+const CustomHooks = {
   useDebounce,
   useDebouncedCallback,
   usePrevious,
@@ -259,3 +261,5 @@ export default {
   useIntersectionObserver,
   useFocusTrap
 };
+
+export default CustomHooks;
