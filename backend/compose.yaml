@@ -28,10 +28,7 @@ services:
       /bin/bash -c "
         if [ -n \"$$SOURCE_MONGO_URI\" ]; then
           echo 'Running database migration from SOURCE_MONGO_URI...';
-          python /src/scripts/migrate_db.py 
-            --source-uri \"$$SOURCE_MONGO_URI\" 
-            --target-uri mongodb://mongo:27017/ 
-            --db-name $${MONGO_DB_NAME:-fpm_registry};
+          python /src/scripts/migrate_db.py --source-uri \"$$SOURCE_MONGO_URI\" --target-uri mongodb://mongo:27017/ --db-name $${MONGO_DB_NAME:-fpm_registry};
         else
           echo 'SOURCE_MONGO_URI not set, skipping database migration';
         fi
