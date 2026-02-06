@@ -57,12 +57,6 @@ const Register = () => {
     }
   }, [formErrors]);
 
-  const handleBlur = useCallback((e) => {
-    const { name } = e.target;
-    setTouched(prev => ({ ...prev, [name]: true }));
-    validateField(name, formData[name]);
-  }, [formData]);
-
   const validateField = useCallback((name, value) => {
     let error = '';
     
@@ -104,6 +98,12 @@ const Register = () => {
     setFormErrors(prev => ({ ...prev, [name]: error }));
     return !error;
   }, [formData.password]);
+
+  const handleBlur = useCallback((e) => {
+    const { name } = e.target;
+    setTouched(prev => ({ ...prev, [name]: true }));
+    validateField(name, formData[name]);
+  }, [formData, validateField]);
 
   const validateForm = useCallback(() => {
     const fields = ['username', 'email', 'password', 'confirmPassword'];
