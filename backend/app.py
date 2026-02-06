@@ -43,16 +43,8 @@ app.config["JSONIFY_PRETTYPRINT_REGULAR"] = False  # Faster JSON responses
 # ============================================================================
 # CORS Configuration
 # ============================================================================
-# Get allowed origins from environment or use defaults
-allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
-cors_config = {
-    "origins": allowed_origins,
-    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
-    "supports_credentials": True,
-    "max_age": 86400  # Cache preflight requests for 24 hours
-}
-CORS(app, resources={r"/*": cors_config})
+# TODO: Disable permissive CORS in production - currently allowing everything for development
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 # ============================================================================
 # JWT Manager
