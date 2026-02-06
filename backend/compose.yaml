@@ -45,9 +45,9 @@ services:
       context: .
       target: builder
       dockerfile: docker/backend.Dockerfile
-    # flask requires SIGINT to stop gracefully
-    # (default stop signal from Compose is SIGTERM)
-    stop_signal: SIGINT
+    # Gunicorn handles SIGTERM gracefully
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
     volumes:
       - .:/src
     environment:
@@ -57,8 +57,15 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_this_jwt_secret}
       - HOST=${HOST:-localhost}
       - RESET_EMAIL=${RESET_EMAIL:-}
-      - RESET_PASSWORD=${RESET_PASSWORD:-}
-      - SUDO_PASSWORD=${SUDO_PASSWORD:-admin}
+      - SUDO_PASSWORD=${SUDO_PASSWORD:-}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - FLASK_ENV=production
+      - IS_CI=${IS_CI:-false}
+    # Enable external network access for SMTP
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     restart: unless-stopped
     depends_on:
       db_migrate:

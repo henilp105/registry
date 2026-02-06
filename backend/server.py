@@ -100,7 +100,8 @@ def handle_exception(e):
 # Application Startup
 # ============================================================================
 is_ci = os.getenv("IS_CI", "false").lower()
-debug = is_ci != "true" and os.getenv("FLASK_ENV") != "production"
+is_production = os.getenv("FLASK_ENV") == "production" or is_ci == "true"
+debug = not is_production
 
 def initialize_app():
     """Initialize application on startup."""
@@ -111,18 +112,22 @@ def initialize_app():
     
     logger.info("FPM Registry initialized successfully")
 
+# Initialize app on module load (for Gunicorn)
+initialize_app()
+
 if __name__ == "__main__":
-    initialize_app()
-    
     port = int(os.getenv("FLASK_SERVER_PORT", 9090))
     host = os.getenv("FLASK_HOST", "0.0.0.0")
     
-    logger.info(f"Starting server on {host}:{port} (debug={debug})")
-    
-    # Use threaded mode for better concurrent request handling
-    app.run(
-        host=host,
-        port=port,
-        debug=debug,
-        threaded=True
-    )
+    if is_production:
+        # Production: Use Gunicorn (this block is for reference, actual startup via CMD)
+        logger.info(f"Production mode: Use 'gunicorn -w 4 -b {host}:{port} server:app'")
+    else:
+        # Development: Use Flask's built-in server
+        logger.info(f"Starting dev server on {host}:{port} (debug={debug})")
+        app.run(
+            host=host,
+            port=port,
+            debug=debug,
+            threaded=True
+        )

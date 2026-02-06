@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class MailService:
+    # Timeout in seconds for SMTP operations (prevents long hangs)
+    SMTP_TIMEOUT = 10
+
     def __init__(self):
         self.is_ci = os.getenv("IS_CI", "false").lower()
         self.sender_email = os.getenv("RESET_EMAIL")
@@ -23,13 +26,19 @@ class MailService:
             return False
 
         try:
-            with SMTP(host=self.host, port=self.port) as server:
+            with SMTP(host=self.host, port=self.port, timeout=self.SMTP_TIMEOUT) as server:
                 server.starttls()
                 server.ehlo()
                 server.login(user=self.sender_email, password=self.sender_password)
                 message = f"Subject: {subject}\nTo: {to}\n{body}"
                 server.sendmail(self.sender_email, to, message)
             return True
+        except TimeoutError:
+            print(f"MailService Error: SMTP connection timed out after {self.SMTP_TIMEOUT}s")
+            return False
+        except OSError as e:
+            print(f"MailService Error: Network unreachable - {str(e)}")
+            return False
         except Exception as e:
             print(f"MailService Error: {str(e)}")
             return False
