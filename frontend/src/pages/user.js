@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserData } from "../store/actions/userActions";
-import { MDBIcon } from "mdbreact";
+import { PersonCircle, CalendarEvent, Envelope } from "react-bootstrap-icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Container from "react-bootstrap/Container";
 import Figure from "react-bootstrap/Figure";
@@ -68,15 +68,18 @@ const UserPage = () => {
           <Row
             style={{ marginLeft: "10px", marginTop: "10px", fontSize: "20px" }}
           >
-            <MDBIcon style={{ marginTop: "5px" }} far icon="user-circle">
-              {` ${user}`}
-            </MDBIcon>
-            <MDBIcon style={{ marginTop: "5px" }} far icon="calendar-alt">
-              {` Joined ${formattedDate}`}
-            </MDBIcon>
-            <MDBIcon style={{ marginTop: "5px" }} far icon="envelope">
-              {` ${email}`}
-            </MDBIcon>
+            <div className="d-flex align-items-center mb-2">
+              <PersonCircle style={{ marginRight: "8px" }} />
+              {user}
+            </div>
+            <div className="d-flex align-items-center mb-2">
+              <CalendarEvent style={{ marginRight: "8px" }} />
+              {`Joined ${formattedDate}`}
+            </div>
+            <div className="d-flex align-items-center mb-2">
+              <Envelope style={{ marginRight: "8px" }} />
+              {email}
+            </div>
           </Row>
         </Col>
         <Col sm={8}>
