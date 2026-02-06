@@ -2,7 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Card, Modal, Spinner, Alert } from "react-bootstrap";
 import { fetchUserListData } from "../store/actions/userListActions";
-import { MDBIcon } from "mdbreact";
+import { Person } from "react-bootstrap-icons";
 import { Link } from "react-router-dom";
 
 const ShowUserListDialog = ({
@@ -73,11 +73,7 @@ const ShowUserListDialog = ({
         {!isLoading && users && users.map((user) => (
           <Card key={user.id} className="mb-2">
             <Card.Body className="d-flex align-items-center py-2">
-              <MDBIcon
-                fas
-                icon="user"
-                className="me-2 text-muted"
-              />
+              <Person className="me-2 text-muted" />
               <Link
                 to={`/users/${user.username}`}
                 className="text-decoration-none"
