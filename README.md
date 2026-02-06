@@ -126,8 +126,8 @@ registry/
 
 | Requirement | Version | Purpose |
 |-------------|---------|---------|
-| Python | 3.10+ | Backend API |
-| Node.js | 18+ | Frontend build |
+| Python | 3.13+ | Backend API |
+| Node.js | 24+ | Frontend build |
 | MongoDB | 6.0+ | Database |
 | Docker | 20.10+ | Containerization |
 
