@@ -1,19 +1,22 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { login, resetErrorMessage } from "../store/actions/authActions";
-import { Link } from "react-router-dom";
-import Container from "react-bootstrap/Container";
-import Form from "react-bootstrap/Form";
-import Button from "react-bootstrap/Button";
-import Alert from "react-bootstrap/Alert";
-import InputGroup from "react-bootstrap/InputGroup";
+import { InfoCircle, ExclamationCircleFill, Eye, EyeSlash } from "react-bootstrap-icons";
+import "./auth.css";
+
+const Tooltip = ({ text }) => (
+  <span className="auth-tooltip">
+    <InfoCircle className="auth-tooltip-icon" />
+    <span className="auth-tooltip-text">{text}</span>
+  </span>
+);
 
 const Login = () => {
   const [user_identifier, setUser_identifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [fromValidationErrors, setFormValidationError] = useState({});
+  const [formValidationErrors, setFormValidationError] = useState({});
   const [touched, setTouched] = useState({ user_identifier: false, password: false });
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -82,101 +85,119 @@ const Login = () => {
     setShowPassword(!showPassword);
   };
 
+  const getFieldState = (fieldName) => {
+    if (!touched[fieldName]) return '';
+    return formValidationErrors[fieldName] ? 'is-invalid' : '';
+  };
+
   return (
-    <Container className="d-flex justify-content-center" style={{ paddingTop: 50 }}>
-      <div id="login-form" style={{ width: '100%', maxWidth: '400px' }}>
-        <h1 className="mb-2">Welcome back!</h1>
-        <p className="text-muted mb-4">Sign in to your FPM Registry account</p>
+    <div className="auth-container">
+      <div className="auth-card">
+        <div className="auth-header">
+          <img 
+            src="https://fortran-lang.org/_static/fortran-logo-256x256.png" 
+            alt="FPM Registry" 
+            className="auth-logo"
+          />
+          <h1 className="auth-title">Welcome Back</h1>
+          <p className="auth-subtitle">Sign in to your fpm Registry account</p>
+        </div>
         
         {errorMessage && (
-          <Alert 
-            variant="danger" 
-            dismissible 
-            onClose={() => dispatch(resetErrorMessage())}
-            className="mb-3"
-          >
-            <i className="fas fa-exclamation-circle me-2" />
-            {errorMessage}
-          </Alert>
+          <div className="auth-alert auth-alert-error">
+            <ExclamationCircleFill className="auth-alert-icon" />
+            <span>{errorMessage}</span>
+          </div>
         )}
         
-        <Form onSubmit={handleSubmit} noValidate>
-          <Form.Group className="mb-3" controlId="user_identifier">
-            <Form.Label className="text-start w-100">Email or Username</Form.Label>
-            <Form.Control
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="auth-form-group">
+            <label htmlFor="user_identifier" className="auth-label">
+              Email or Username
+              <Tooltip text="Enter the email or username you used during registration" />
+            </label>
+            <input
+              id="user_identifier"
               type="text"
               name="user_identifier"
+              className={`auth-input ${getFieldState('user_identifier')}`}
               placeholder="Enter your email or username"
               value={user_identifier}
               onChange={(e) => setUser_identifier(e.target.value)}
               onBlur={() => handleBlur('user_identifier')}
-              isInvalid={touched.user_identifier && !!fromValidationErrors.user_identifier}
               autoComplete="username"
               autoFocus
             />
-            <Form.Control.Feedback type="invalid">
-              {fromValidationErrors.user_identifier}
-            </Form.Control.Feedback>
-          </Form.Group>
+            {touched.user_identifier && formValidationErrors.user_identifier && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
+                {formValidationErrors.user_identifier}
+              </div>
+            )}
+          </div>
 
-          <Form.Group className="mb-3" controlId="password">
-            <Form.Label className="text-start w-100">Password</Form.Label>
-            <InputGroup>
-              <Form.Control
+          <div className="auth-form-group">
+            <label htmlFor="password" className="auth-label">
+              Password
+            </label>
+            <div className="auth-password-wrapper">
+              <input
+                id="password"
                 type={showPassword ? "text" : "password"}
                 name="password"
+                className={`auth-input ${getFieldState('password')}`}
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onBlur={() => handleBlur('password')}
-                isInvalid={touched.password && !!fromValidationErrors.password}
                 autoComplete="current-password"
               />
-              <Button 
-                variant="outline-secondary"
+              <button
+                type="button"
                 onClick={togglePasswordVisibility}
+                className="auth-password-toggle"
                 aria-label={showPassword ? "Hide password" : "Show password"}
-                tabIndex={-1}
               >
-                <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`} />
-              </Button>
-              <Form.Control.Feedback type="invalid">
-                {fromValidationErrors.password}
-              </Form.Control.Feedback>
-            </InputGroup>
-          </Form.Group>
+                {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {touched.password && formValidationErrors.password && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
+                {formValidationErrors.password}
+              </div>
+            )}
+          </div>
 
-          <div className="d-flex justify-content-end mb-3">
-            <Link to="/account/forgot-password" className="text-decoration-none">
+          <div style={{ textAlign: 'right', marginBottom: '1rem' }}>
+            <Link to="/account/forgot-password" style={{ color: '#6366f1', fontSize: '0.875rem', textDecoration: 'none' }}>
               Forgot password?
             </Link>
           </div>
 
-          <Button 
-            variant="primary" 
+          <button 
             type="submit" 
-            className="w-100 mb-3"
+            className="auth-submit-btn"
             disabled={isLoading}
           >
             {isLoading ? (
               <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />
+                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
                 Signing in...
               </>
             ) : (
-              "Sign In"
+              'Sign In'
             )}
-          </Button>
-          
-          <p className="text-center text-muted">
-            Don't have an account?{" "}
-            <Link to="/account/register" className="text-decoration-none fw-medium">
-              Create one
-            </Link>
+          </button>
+        </form>
+
+        <div className="auth-links">
+          <p>
+            Don't have an account? <Link to="/account/register">Create one</Link>
           </p>
-        </Form>
+        </div>
       </div>
-    </Container>
+    </div>
   );
 };
 

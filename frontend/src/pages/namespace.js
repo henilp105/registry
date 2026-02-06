@@ -4,10 +4,11 @@ import { fetchNamespaceData } from "../store/actions/namespaceActions";
 import { 
   Box, 
   CalendarEvent, 
+  Person, 
   ChevronRight,
   ShieldCheck,
   People,
-  Archive
+  BoxSeam
 } from "react-bootstrap-icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Container from "react-bootstrap/Container";
@@ -77,7 +78,7 @@ const NamespacePage = () => {
 
   return (
     <Container className="namespace-container">
-      <Row>
+      <Row className="g-4">
         {/* Sidebar */}
         <Col lg={3} md={4}>
           <div className="namespace-sidebar">
@@ -151,7 +152,7 @@ const NamespacePage = () => {
 
             {projects.length === 0 ? (
               <div className="no-packages-message">
-                <Archive className="no-packages-icon" size={48} />
+                <BoxSeam className="no-packages-icon" size={56} />
                 <p>No packages in this namespace yet.</p>
               </div>
             ) : (

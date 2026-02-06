@@ -2,8 +2,15 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { signup, resetErrorMessage } from "../store/actions/authActions";
-import Container from "react-bootstrap/Container";
-import Form from "react-bootstrap/Form";
+import { InfoCircle, CheckCircleFill, ExclamationCircleFill, Eye, EyeSlash } from "react-bootstrap-icons";
+import "./auth.css";
+
+const Tooltip = ({ text }) => (
+  <span className="auth-tooltip">
+    <InfoCircle className="auth-tooltip-icon" />
+    <span className="auth-tooltip-text">{text}</span>
+  </span>
+);
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -148,184 +155,187 @@ const Register = () => {
   }, []);
 
   const getFieldState = useCallback((fieldName) => {
-    if (!touched[fieldName]) return {};
-    return formErrors[fieldName] ? { isInvalid: true } : { isValid: true };
+    if (!touched[fieldName]) return '';
+    return formErrors[fieldName] ? 'is-invalid' : 'is-valid';
   }, [touched, formErrors]);
 
   return (
-    <Container style={{ paddingTop: 25 }}>
-      <form id="login-form" onSubmit={handleSubmit} noValidate>
-        <h1>Welcome to fpm Registry!</h1>
-        <p className="text-muted mb-4">Create your account to get started.</p>
-        
-        <Form.Group className="mb-3">
-          <Form.Label htmlFor="username" className="visually-hidden">Username</Form.Label>
-          <Form.Control
-            id="username"
-            type="text"
-            name="username"
-            placeholder="Username"
-            value={formData.username}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            autoComplete="username"
-            aria-describedby={formErrors.username ? "username-error" : undefined}
-            {...getFieldState('username')}
+    <div className="auth-container">
+      <div className="auth-card">
+        <div className="auth-header">
+          <img 
+            src="https://fortran-lang.org/_static/fortran-logo-256x256.png" 
+            alt="FPM Registry" 
+            className="auth-logo"
           />
-          {touched.username && formErrors.username && (
-            <Form.Control.Feedback type="invalid" id="username-error" className="d-block">
-              {formErrors.username}
-            </Form.Control.Feedback>
-          )}
-        </Form.Group>
-
-        <Form.Group className="mb-3">
-          <Form.Label htmlFor="email" className="visually-hidden">Email</Form.Label>
-          <Form.Control
-            id="email"
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            autoComplete="email"
-            aria-describedby={formErrors.email ? "email-error" : undefined}
-            {...getFieldState('email')}
-          />
-          {touched.email && formErrors.email && (
-            <Form.Control.Feedback type="invalid" id="email-error" className="d-block">
-              {formErrors.email}
-            </Form.Control.Feedback>
-          )}
-        </Form.Group>
-
-        <Form.Group className="mb-3">
-          <Form.Label htmlFor="password" className="visually-hidden">Password</Form.Label>
-          <div className="position-relative">
-            <Form.Control
-              id="password"
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              onBlur={handleBlur}
-              autoComplete="new-password"
-              aria-describedby={formErrors.password ? "password-error" : "password-strength"}
-              {...getFieldState('password')}
-              style={{ paddingRight: '45px' }}
-            />
-            <button
-              type="button"
-              onClick={togglePasswordVisibility}
-              className="btn btn-link position-absolute"
-              style={{ 
-                right: '5px', 
-                top: '50%', 
-                transform: 'translateY(-50%)',
-                padding: '0.25rem',
-                color: '#6c757d',
-                textDecoration: 'none'
-              }}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`} aria-hidden="true"></i>
-            </button>
-          </div>
-          {touched.password && formErrors.password && (
-            <Form.Control.Feedback type="invalid" id="password-error" className="d-block">
-              {formErrors.password}
-            </Form.Control.Feedback>
-          )}
-          {formData.password && !formErrors.password && (
-            <div id="password-strength" className="mt-2">
-              <div className="d-flex align-items-center gap-2">
-                <div 
-                  className="progress flex-grow-1" 
-                  style={{ height: '6px' }}
-                  role="progressbar"
-                  aria-valuenow={passwordStrength.strength * 20}
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                  aria-label="Password strength"
-                >
-                  <div 
-                    className="progress-bar" 
-                    style={{ 
-                      width: `${passwordStrength.strength * 20}%`,
-                      backgroundColor: passwordStrength.color,
-                      transition: 'width 0.3s ease, background-color 0.3s ease'
-                    }}
-                  ></div>
-                </div>
-                <small style={{ color: passwordStrength.color, minWidth: '70px' }}>
-                  {passwordStrength.label}
-                </small>
-              </div>
-            </div>
-          )}
-        </Form.Group>
-
-        <Form.Group className="mb-3">
-          <Form.Label htmlFor="confirmPassword" className="visually-hidden">Confirm Password</Form.Label>
-          <Form.Control
-            id="confirmPassword"
-            type={showPassword ? "text" : "password"}
-            name="confirmPassword"
-            placeholder="Confirm Password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            autoComplete="new-password"
-            aria-describedby={formErrors.confirmPassword ? "confirm-password-error" : undefined}
-            {...getFieldState('confirmPassword')}
-          />
-          {touched.confirmPassword && formErrors.confirmPassword && (
-            <Form.Control.Feedback type="invalid" id="confirm-password-error" className="d-block">
-              {formErrors.confirmPassword}
-            </Form.Control.Feedback>
-          )}
-        </Form.Group>
+          <h1 className="auth-title">Create Account</h1>
+          <p className="auth-subtitle">Join the fpm Registry community</p>
+        </div>
 
         {errorMessage && (
-          <div className="alert alert-danger py-2 d-flex align-items-center" role="alert">
-            <i className="fas fa-exclamation-circle me-2" aria-hidden="true"></i>
-            {errorMessage}
+          <div className="auth-alert auth-alert-error">
+            <ExclamationCircleFill className="auth-alert-icon" />
+            <span>{errorMessage}</span>
           </div>
         )}
         
         {message && (
-          <div className="alert alert-success py-2 d-flex align-items-center" role="alert">
-            <i className="fas fa-check-circle me-2" aria-hidden="true"></i>
-            {message}
+          <div className="auth-alert auth-alert-success">
+            <CheckCircleFill className="auth-alert-icon" />
+            <span>{message}</span>
           </div>
         )}
 
-        <button 
-          type="submit" 
-          className="btn btn-primary w-100 py-2 mb-3"
-          disabled={isLoading}
-          aria-busy={isLoading}
-        >
-          {isLoading ? (
-            <>
-              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-              Creating account...
-            </>
-          ) : (
-            'Create Account'
-          )}
-        </button>
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="auth-form-group">
+            <label htmlFor="username" className="auth-label">
+              Username
+              <Tooltip text="3+ characters: letters, numbers, underscores, hyphens" />
+            </label>
+            <input
+              id="username"
+              type="text"
+              name="username"
+              className={`auth-input ${getFieldState('username')}`}
+              placeholder="Enter your username"
+              value={formData.username}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              autoComplete="username"
+            />
+            {touched.username && formErrors.username && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
+                {formErrors.username}
+              </div>
+            )}
+          </div>
 
-        <p className="text-center mb-2">
-          Already have an account? <Link to="/account/login">Log in</Link>
-        </p>
-        <p className="text-center">
-          <Link to="/account/forgot-password">Forgot password?</Link>
-        </p>
-      </form>
-    </Container>
+          <div className="auth-form-group">
+            <label htmlFor="email" className="auth-label">
+              Email
+              <Tooltip text="We'll send a verification email to this address" />
+            </label>
+            <input
+              id="email"
+              type="email"
+              name="email"
+              className={`auth-input ${getFieldState('email')}`}
+              placeholder="Enter your email address"
+              value={formData.email}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              autoComplete="email"
+            />
+            {touched.email && formErrors.email && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
+                {formErrors.email}
+              </div>
+            )}
+          </div>
+
+          <div className="auth-form-group">
+            <label htmlFor="password" className="auth-label">
+              Password
+              <Tooltip text="Minimum 8 characters. Mix letters, numbers & symbols for strength." />
+            </label>
+            <div className="auth-password-wrapper">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                name="password"
+                className={`auth-input ${getFieldState('password')}`}
+                placeholder="Create a strong password"
+                value={formData.password}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={togglePasswordVisibility}
+                className="auth-password-toggle"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {touched.password && formErrors.password && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
+                {formErrors.password}
+              </div>
+            )}
+            {formData.password && !formErrors.password && (
+              <div className="password-strength">
+                <div className="password-strength-bar">
+                  <div 
+                    className="password-strength-fill"
+                    style={{ 
+                      width: `${passwordStrength.strength * 20}%`,
+                      backgroundColor: passwordStrength.color
+                    }}
+                  />
+                </div>
+                <span className="password-strength-label" style={{ color: passwordStrength.color }}>
+                  {passwordStrength.label}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="auth-form-group">
+            <label htmlFor="confirmPassword" className="auth-label">
+              Confirm Password
+            </label>
+            <div className="auth-password-wrapper">
+              <input
+                id="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                name="confirmPassword"
+                className={`auth-input ${getFieldState('confirmPassword')}`}
+                placeholder="Re-enter your password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                onBlur={handleBlur}
+                autoComplete="new-password"
+              />
+            </div>
+            {touched.confirmPassword && formErrors.confirmPassword && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
+                {formErrors.confirmPassword}
+              </div>
+            )}
+          </div>
+
+          <button 
+            type="submit" 
+            className="auth-submit-btn"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
+                Creating account...
+              </>
+            ) : (
+              'Create Account'
+            )}
+          </button>
+        </form>
+
+        <div className="auth-links">
+          <p>
+            Already have an account? <Link to="/account/login">Sign in</Link>
+          </p>
+          <p>
+            <Link to="/account/forgot-password">Forgot password?</Link>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 };
 

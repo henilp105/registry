@@ -2,11 +2,15 @@ import React, { useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { forgot } from "../store/actions/resetPasswordActions";
 import { Link } from "react-router-dom";
-import Container from "react-bootstrap/Container";
-import Form from "react-bootstrap/Form";
-import Button from "react-bootstrap/Button";
-import Alert from "react-bootstrap/Alert";
-import Spinner from "react-bootstrap/Spinner";
+import { InfoCircle, ExclamationCircleFill, CheckCircleFill } from "react-bootstrap-icons";
+import "./auth.css";
+
+const Tooltip = ({ text }) => (
+  <span className="auth-tooltip">
+    <InfoCircle className="auth-tooltip-icon" />
+    <span className="auth-tooltip-text">{text}</span>
+  </span>
+);
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState("");
@@ -53,72 +57,85 @@ const ForgotPassword = () => {
   }, [dispatch, email, validateForm]);
 
   const isSuccess = statuscode === 200;
+  const getFieldState = () => {
+    if (!touched) return '';
+    return formErrors.email ? 'is-invalid' : '';
+  };
 
   return (
-    <Container 
-      className="d-flex justify-content-center" 
-      style={{ paddingTop: 50 }}
-    >
-      <div style={{ width: "100%", maxWidth: "400px" }}>
-        <h1 className="mb-2">Forgot Password?</h1>
-        <p className="text-muted mb-4">
-          Enter your email address and we'll send you a link to reset your password.
-        </p>
+    <div className="auth-container">
+      <div className="auth-card">
+        <div className="auth-header">
+          <img 
+            src="https://fortran-lang.org/_static/fortran-logo-256x256.png" 
+            alt="FPM Registry" 
+            className="auth-logo"
+          />
+          <h1 className="auth-title">Forgot Password?</h1>
+          <p className="auth-subtitle">
+            Enter your email address and we'll send you a link to reset your password.
+          </p>
+        </div>
 
         {message && (
-          <Alert variant={isSuccess ? "success" : "danger"} className="mb-3">
-            {isSuccess && <i className="fas fa-check-circle me-2" />}
-            {!isSuccess && <i className="fas fa-exclamation-circle me-2" />}
-            {message}
-          </Alert>
+          <div className={`auth-alert ${isSuccess ? 'auth-alert-success' : 'auth-alert-error'}`}>
+            {isSuccess ? (
+              <CheckCircleFill className="auth-alert-icon" />
+            ) : (
+              <ExclamationCircleFill className="auth-alert-icon" />
+            )}
+            <span>{message}</span>
+          </div>
         )}
 
-        <Form onSubmit={handleSubmit}>
-          <Form.Group className="mb-3">
-            <Form.Label>Email address</Form.Label>
-            <Form.Control
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="auth-form-group">
+            <label htmlFor="email" className="auth-label">
+              Email Address
+              <Tooltip text="Enter the email you used to create your account" />
+            </label>
+            <input
+              id="email"
               type="email"
-              placeholder="Enter your email"
+              name="email"
+              className={`auth-input ${getFieldState()}`}
+              placeholder="Enter your email address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onBlur={handleBlur}
-              isInvalid={touched && !!formErrors.email}
               disabled={isLoading}
             />
-            <Form.Control.Feedback type="invalid">
-              {formErrors.email}
-            </Form.Control.Feedback>
-          </Form.Group>
+            {touched && formErrors.email && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
+                {formErrors.email}
+              </div>
+            )}
+          </div>
 
-          <Button
-            type="submit"
-            variant="primary"
-            className="w-100 mb-3"
+          <button 
+            type="submit" 
+            className="auth-submit-btn"
             disabled={isLoading}
           >
             {isLoading ? (
               <>
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
-                  role="status"
-                  aria-hidden="true"
-                  className="me-2"
-                />
+                <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
                 Sending...
               </>
             ) : (
-              "Send Reset Link"
+              'Send Reset Link'
             )}
-          </Button>
-        </Form>
+          </button>
+        </form>
 
-        <p className="text-center text-muted">
-          Remember your password? <Link to="/account/login">Login</Link>
-        </p>
+        <div className="auth-links">
+          <p>
+            Remember your password? <Link to="/account/login">Sign in</Link>
+          </p>
+        </div>
       </div>
-    </Container>
+    </div>
   );
 };
 

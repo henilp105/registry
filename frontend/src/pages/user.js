@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUserData } from "../store/actions/userActions";
-import { PersonCircle, CalendarEvent, Envelope, Archive } from "react-bootstrap-icons";
+import { PersonCircle, CalendarEvent, Envelope, Archive, BoxSeam } from "react-bootstrap-icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
@@ -30,7 +30,7 @@ const UserPage = () => {
   }, [notFound, navigate]);
 
   const formattedDate = useMemo(() => {
-    if (!dateJoined) return "Unknown";
+    if (!dateJoined) return null;
     return new Date(dateJoined).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
@@ -51,7 +51,7 @@ const UserPage = () => {
 
   return (
     <Container className="namespace-container">
-      <Row>
+      <Row className="g-4">
         {/* Sidebar */}
         <Col lg={3} md={4}>
           <div className="namespace-sidebar">
@@ -70,18 +70,41 @@ const UserPage = () => {
                   <span className="namespace-info-label">User Profile</span>
                 </li>
                 
-                <li className="namespace-info-item">
-                  <CalendarEvent className="namespace-info-icon" />
-                  <span className="namespace-info-value">{formattedDate}</span>
-                </li>
+                {formattedDate && (
+                  <li className="namespace-info-item">
+                    <CalendarEvent className="namespace-info-icon" />
+                    <span className="namespace-info-value">Joined {formattedDate}</span>
+                  </li>
+                )}
                 
                 {email && (
                   <li className="namespace-info-item">
                     <Envelope className="namespace-info-icon" />
-                    <span className="namespace-info-value" style={{ fontSize: "0.9rem" }}>{email}</span>
+                    <span className="namespace-info-value" style={{ 
+                      fontSize: "0.875rem",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap"
+                    }}>
+                      {email}
+                    </span>
                   </li>
                 )}
               </ul>
+              
+              {/* Stats Section */}
+              <div className="user-stats-container">
+                <div className="user-stat-item">
+                  <div className="user-stat-value">{projects.length}</div>
+                  <div className="user-stat-label">Packages</div>
+                </div>
+                <div className="user-stat-item">
+                  <div className="user-stat-value">
+                    {new Set(projects.map(p => p.namespace)).size}
+                  </div>
+                  <div className="user-stat-label">Namespaces</div>
+                </div>
+              </div>
             </div>
           </div>
         </Col>
@@ -98,7 +121,7 @@ const UserPage = () => {
 
             {projects.length === 0 ? (
               <div className="no-packages-message">
-                <Archive className="no-packages-icon" size={48} />
+                <BoxSeam className="no-packages-icon" size={56} />
                 <p>No packages from this user yet.</p>
               </div>
             ) : (
