@@ -19,8 +19,8 @@ services:
       - SALT=MYSALT
       - HOST=localhost
       - RESET_EMAIL=reset@localhost.com
-      - RESET_PASSWORD=reset
-      - SUDO_PASSWORD=fortran
+      - RESET_PASSWORD=resetpass
+      - SUDO_PASSWORD=fortranpass
       - IS_CI=true
       - JWT_SECRET_KEY=test-jwt-secret-key
 
