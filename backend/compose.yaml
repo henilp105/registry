@@ -11,6 +11,35 @@ services:
     depends_on:
       - backend
 
+  # Database migration service - loads data from external MongoDB
+  # Set SOURCE_MONGO_URI environment variable to enable migration
+  db_migrate:
+    build:
+      context: .
+      target: builder
+      dockerfile: docker/backend.Dockerfile
+    volumes:
+      - .:/src
+    environment:
+      - SOURCE_MONGO_URI=${SOURCE_MONGO_URI:-}
+      - TARGET_MONGO_URI=mongodb://mongo:27017/
+      - MONGO_DB_NAME=${MONGO_DB_NAME:-fpm_registry}
+    command: >
+      /bin/bash -c "
+        if [ -n \"$$SOURCE_MONGO_URI\" ]; then
+          echo 'Running database migration from SOURCE_MONGO_URI...';
+          python /src/scripts/migrate_db.py 
+            --source-uri \"$$SOURCE_MONGO_URI\" 
+            --target-uri mongodb://mongo:27017/ 
+            --db-name $${MONGO_DB_NAME:-fpm_registry};
+        else
+          echo 'SOURCE_MONGO_URI not set, skipping database migration';
+        fi
+      "
+    depends_on:
+      mongo:
+        condition: service_started
+
   backend:
     build:
       context: .
@@ -22,7 +51,10 @@ services:
     volumes:
       - .:/src
     depends_on:
-      - mongo
+      db_migrate:
+        condition: service_completed_successfully
+      mongo:
+        condition: service_started
 
   validate_package:
     build:
