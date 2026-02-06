@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchNamespaceData } from "../store/actions/namespaceActions";
-import { MDBIcon } from "mdbreact";
+import { Box, CalendarEvent, Person } from "react-bootstrap-icons";
 import { useNavigate, useParams } from "react-router-dom";
 import Container from "react-bootstrap/Container";
 import Figure from "react-bootstrap/Figure";
@@ -79,13 +79,14 @@ const NamespacePage = () => {
           <Row
             style={{ marginLeft: "10px", marginTop: "10px", fontSize: "20px" }}
           >
-            <MDBIcon style={{ marginTop: "5px" }} far icon="box">
-              {` Namespace: ${namespace}`}
-            </MDBIcon>
-            <br />
-            <MDBIcon style={{ marginTop: "5px" }} far icon="calendar-alt">
-              {` Created: ${formatDate(dateJoined)}`}
-            </MDBIcon>
+            <div className="d-flex align-items-center mb-2">
+              <Box style={{ marginRight: "8px" }} />
+              {`Namespace: ${namespace}`}
+            </div>
+            <div className="d-flex align-items-center mb-2">
+              <CalendarEvent style={{ marginRight: "8px" }} />
+              {`Created: ${formatDate(dateJoined)}`}
+            </div>
           </Row>
           <Row
             style={{
@@ -95,15 +96,16 @@ const NamespacePage = () => {
               cursor: "pointer",
             }}
           >
-            <MDBIcon
-              style={{ marginTop: "5px" }}
-              far
-              icon="user"
+            <div 
+              className="d-flex align-items-center mb-2"
               onClick={() => openDialog('admins')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && openDialog('admins')}
             >
-              {" "}
+              <Person style={{ marginRight: "8px" }} />
               Admins
-            </MDBIcon>
+            </div>
           </Row>
           <Row
             style={{
@@ -113,15 +115,16 @@ const NamespacePage = () => {
               cursor: "pointer",
             }}
           >
-            <MDBIcon
-              style={{ marginTop: "5px" }}
-              far
-              icon="user"
+            <div 
+              className="d-flex align-items-center mb-2"
               onClick={() => openDialog('maintainers')}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && openDialog('maintainers')}
             >
-              {" "}
+              <Person style={{ marginRight: "8px" }} />
               Namespace Maintainers
-            </MDBIcon>
+            </div>
           </Row>
           
           {dialogType && (
