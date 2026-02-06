@@ -1,4 +1,10 @@
-FROM --platform=$BUILDPLATFORM python:3.10-alpine AS builder
+# Package validator with Python 3.13 (latest)
+FROM --platform=$BUILDPLATFORM python:3.13-alpine AS builder
+
+# Enable Python debug mode for better error messages
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONFAULTHANDLER=1
 
 RUN apk add --no-cache \
     bash \
@@ -24,8 +30,5 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install -r requirements.txt
 
 COPY . .
-
-# Ensure Python output is unbuffered for Docker logs
-ENV PYTHONUNBUFFERED=1
 
 CMD ["python3", "validate.py"]
