@@ -397,7 +397,8 @@ class TestPackages(BaseTestClass):
             data={"rating": 5},
             headers={"Authorization": "Bearer invalid_token"},
         )
-        self.assertEqual("Not enough segments", response.json.get("msg"))
+        self.assertEqual(401, response.json.get("code"))
+        self.assertEqual("Invalid token", response.json.get("message"))
 
     # ===== Malicious Report Tests =====
 
@@ -436,7 +437,8 @@ class TestPackages(BaseTestClass):
             data={"reason": "This package is malicious"},
             headers={"Authorization": "Bearer invalid_token"},
         )
-        self.assertEqual("Not enough segments", response.json.get("msg"))
+        self.assertEqual(401, response.json.get("code"))
+        self.assertEqual("Invalid token", response.json.get("message"))
 
     def test_malicious_report_short_reason(self):
         """
