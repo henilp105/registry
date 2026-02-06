@@ -85,6 +85,9 @@ services:
       - RESET_EMAIL=${RESET_EMAIL:-}
       - RESET_PASSWORD=${RESET_PASSWORD:-}
       - SUDO_PASSWORD=${SUDO_PASSWORD:-admin}
+      - BREVO_API_KEY=${BREVO_API_KEY:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-FPM Registry}
     volumes:
       - package-tarballs:/src/static/tarballs
     depends_on:
