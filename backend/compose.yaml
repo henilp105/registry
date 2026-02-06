@@ -50,6 +50,16 @@ services:
     stop_signal: SIGINT
     volumes:
       - .:/src
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/
+      - MONGO_DB_NAME=${MONGO_DB_NAME:-fpmregistry}
+      - SALT=${SALT:-MYSALT}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_this_jwt_secret}
+      - HOST=${HOST:-localhost}
+      - RESET_EMAIL=${RESET_EMAIL:-}
+      - RESET_PASSWORD=${RESET_PASSWORD:-}
+      - SUDO_PASSWORD=${SUDO_PASSWORD:-admin}
+    restart: unless-stopped
     depends_on:
       db_migrate:
         condition: service_completed_successfully
