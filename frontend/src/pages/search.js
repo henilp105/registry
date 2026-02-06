@@ -2,7 +2,7 @@ import React, { useEffect, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import PackageItem from "../components/packageItem";
 import { SkeletonPackageList } from "../components/SkeletonLoader";
-import { MDBListGroup } from "mdbreact";
+import ListGroup from "react-bootstrap/ListGroup";
 import Pagination from "../components/pagination";
 import Dropdown from "react-bootstrap/Dropdown";
 import DropdownButton from "react-bootstrap/DropdownButton";
@@ -134,7 +134,7 @@ const EmptySearchState = ({ query }) => (
 // Package list with animation
 const ListView = ({ packages, currentPage, totalPages }) => {
   return (
-    <MDBListGroup style={{ alignItems: "center" }}>
+    <ListGroup style={{ alignItems: "center" }} variant="flush">
       {packages.map((packageEntity, index) => (
         <div 
           key={packageEntity.name + packageEntity.namespace}
@@ -149,7 +149,7 @@ const ListView = ({ packages, currentPage, totalPages }) => {
       <div className="mt-4">
         <Pagination currentPage={currentPage} totalPages={totalPages} />
       </div>
-    </MDBListGroup>
+    </ListGroup>
   );
 };
 
