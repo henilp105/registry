@@ -130,11 +130,15 @@ const Dashboard = () => {
   );
 
   function Packages() {
-    return packages.length === 0 ? (
-      <div className="alert alert-secondary" role="alert">
-        You are not a maintainer of any package yet.
-      </div>
-    ) : (
+    if (!packages || packages.length === 0) {
+      return (
+        <div className="alert alert-secondary" role="alert">
+          You are not a maintainer of any package yet.
+        </div>
+      );
+    }
+
+    return (
       <Row>
         {packages.map((element, index) => (
           <Col key={element.id} xs={12} md={4}>
