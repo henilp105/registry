@@ -263,8 +263,9 @@ const Dashboard = () => {
                     className="border border-success rounded-pill chip-action text-success"
                     onClick={() => handleGenerateTokenDialog(element.id, true)}
                     type="button"
+                    title="Generate an upload token for this namespace"
                   >
-                    <i className="fas fa-key me-1" /> Token
+                    <i className="fas fa-key me-1" /> Generate Token
                   </button>
                   {element.isNamespaceAdmin && (
                     <>
@@ -272,15 +273,17 @@ const Dashboard = () => {
                         className="border border-success rounded-pill chip-action text-success"
                         onClick={() => handleAddNamespaceAdminDialog(element.id, true)}
                         type="button"
+                        title="Add a new admin to this namespace"
                       >
-                        <i className="fas fa-user-plus me-1" /> Admin
+                        <i className="fas fa-user-plus me-1" /> Add Admin
                       </button>
                       <button
                         className="border border-danger rounded-pill chip-action text-danger"
                         onClick={() => handleRemoveNamespaceAdminDialog(element.id, true)}
                         type="button"
+                        title="Remove an admin from this namespace"
                       >
-                        <i className="fas fa-user-minus me-1" /> Admin
+                        <i className="fas fa-user-minus me-1" /> Remove Admin
                       </button>
                     </>
                   )}
@@ -288,16 +291,18 @@ const Dashboard = () => {
                     className="border border-success rounded-pill chip-action text-success"
                     onClick={() => handleAddMaintainerDialog(element.id, true)}
                     type="button"
+                    title="Add a new maintainer to this namespace"
                   >
-                    <i className="fas fa-user-plus me-1" /> Maintainer
+                    <i className="fas fa-user-plus me-1" /> Add Maintainer
                   </button>
                   {element.isNamespaceAdmin && (
                     <button
                       className="border border-danger rounded-pill chip-action text-danger"
                       onClick={() => handleRemoveMaintainerDialog(element.id, true)}
                       type="button"
+                      title="Remove a maintainer from this namespace"
                     >
-                      <i className="fas fa-user-minus me-1" /> Maintainer
+                      <i className="fas fa-user-minus me-1" /> Remove Maintainer
                     </button>
                   )}
                 </div>

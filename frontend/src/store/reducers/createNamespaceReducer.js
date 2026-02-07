@@ -3,7 +3,6 @@ import {
   CREATE_NAMESPACE_SUCCESS,
   CREATE_NAMESPACE_FAILURE,
 } from "../actions/createNamespaceActions";
-import { handleRequest, handleSuccess, handleFailure } from "../utils";
 
 const initialState = {
   statuscode: 0,
@@ -21,18 +20,31 @@ const initialState = {
 const createNamespaceReducer = (state = initialState, action) => {
   switch (action.type) {
     case CREATE_NAMESPACE_REQUEST:
-      return handleRequest(state, { statuscode: 0, message: "" });
+      return {
+        ...state,
+        isLoading: true,
+        error: null,
+        message: "",
+        statuscode: 0,
+      };
 
     case CREATE_NAMESPACE_SUCCESS:
-      return handleSuccess(state, {
+      return {
+        ...state,
+        isLoading: false,
         message: action.payload.message,
         statuscode: action.payload.statuscode,
-      });
+        error: null,
+      };
 
     case CREATE_NAMESPACE_FAILURE:
-      return handleFailure(state, action.payload.message, {
+      return {
+        ...state,
+        isLoading: false,
+        message: action.payload.message,
         statuscode: action.payload.statuscode,
-      });
+        error: action.payload.message,
+      };
 
     default:
       return state;

@@ -510,10 +510,6 @@ const NamespaceForm = () => {
                       <CheckCircleFill size={12} style={{ color: "#10b981", marginTop: "2px" }} />
                       <span>You can add maintainers to help manage packages</span>
                     </li>
-                    <li style={styles.infoListItem}>
-                      <CheckCircleFill size={12} style={{ color: "#10b981", marginTop: "2px" }} />
-                      <span>Upload packages using fpm or the web interface</span>
-                    </li>
                   </ul>
                 </div>
               </div>
@@ -531,21 +527,6 @@ const NamespaceForm = () => {
                 A namespace is a container for your Fortran packages. It helps organize 
                 related packages and prevents naming conflicts with other packages in the registry.
               </p>
-            </div>
-
-            <div style={styles.sideCard}>
-              <div style={styles.sideCardTitle}>
-                <BoxSeam size={20} style={{ color: "#10b981" }} />
-                Ready to Upload?
-              </div>
-              <p style={styles.sideCardText}>
-                After creating your namespace, you can start uploading packages right away 
-                using the fpm CLI or our web upload interface.
-              </p>
-              <Link to="/upload" style={styles.linkButton}>
-                Learn about uploading
-                <ArrowRight size={16} />
-              </Link>
             </div>
           </Col>
         </Row>
