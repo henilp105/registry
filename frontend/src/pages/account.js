@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -11,15 +11,23 @@ import {
 import Row from "react-bootstrap/Row";
 import Modal from "react-bootstrap/Modal";
 import Col from "react-bootstrap/Col";
-import Image from "react-bootstrap/Image";
-import Table from "react-bootstrap/Table";
 import Spinner from "react-bootstrap/Spinner";
 import Container from "react-bootstrap/Container";
 import Form from "react-bootstrap/Form";
 import Button from "react-bootstrap/Button";
 import Alert from "react-bootstrap/Alert";
+import { 
+  PersonCircle, 
+  CalendarEvent, 
+  Envelope, 
+  Key, 
+  PencilSquare,
+  ShieldLock,
+  At
+} from "react-bootstrap-icons";
 
 import "bootstrap/dist/css/bootstrap.min.css";
+import "./account.css";
 
 const Account = () => {
   const dispatch = useDispatch();
@@ -47,6 +55,16 @@ const Account = () => {
   // Modal state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+
+  // Format date
+  const formattedDate = useMemo(() => {
+    if (!dateJoined) return null;
+    return new Date(dateJoined).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }, [dateJoined]);
 
   // Redirect if not logged in, fetch account data on mount
   useEffect(() => {
@@ -138,210 +156,269 @@ const Account = () => {
   // Loading state
   if (isLoading) {
     return (
-      <div className="d-flex justify-content-center">
-        <Spinner className="spinner-border m-5" animation="border" role="status">
+      <Container className="account-loading">
+        <Spinner animation="border" role="status">
           <span className="visually-hidden">Loading...</span>
         </Spinner>
-      </div>
+        <p className="account-loading-text">Loading account settings...</p>
+      </Container>
     );
   }
 
   return (
-    <Container fluid="md" style={{ paddingTop: 25 }}>
-      <h3 className="mb-4">Account Settings</h3>
-      
-      <Table responsive>
-        <tbody>
-          <tr>
-            <td colSpan="2">
-              <h5 className="mb-3">Profile picture</h5>
-            </td>
-          </tr>
-          <tr>
-            <td style={{ width: "200px" }}>
-              <Image
-                src={`https://www.gravatar.com/avatar/${username}`}
-                alt={`Avatar for ${username} from gravatar.com`}
-                title={`Avatar for ${username} from gravatar.com`}
+    <Container className="account-container">
+      <Row className="g-4">
+        {/* Sidebar - Profile Card */}
+        <Col lg={4} md={5}>
+          <div className="account-sidebar">
+            <div className="account-card">
+              <img
+                className="account-avatar"
+                alt={`Avatar for ${username}`}
+                src={`https://www.gravatar.com/avatar/${username}?d=identicon&s=200`}
               />
-              <br />
-              <br />
-              <a href={`/users/${username}`} style={{ textDecoration: "none" }}>
-                @{username}
-              </a>
-            </td>
-            <td>
-              We use <a href="https://gravatar.com">gravatar.com</a> to generate
-              your profile picture based on your primary email address —
-              <code className="break"> {email} </code>.<br />
-              <br />
-              <div className="d-flex gap-2">
-                <Button variant="outline-primary" onClick={handleOpenPasswordModal}>
-                  Change Password
-                </Button>
-                <Button variant="outline-secondary" onClick={handleOpenEmailModal}>
-                  Change Email
-                </Button>
+              
+              <h1 className="account-username">@{username}</h1>
+              
+              <p className="account-gravatar-note">
+                Profile picture powered by{" "}
+                <a href="https://gravatar.com" target="_blank" rel="noopener noreferrer">
+                  Gravatar
+                </a>
+              </p>
+
+              <div className="account-quick-actions">
+                <button 
+                  className="account-action-btn"
+                  onClick={handleOpenPasswordModal}
+                >
+                  <Key className="action-icon" />
+                  <span>Change Password</span>
+                </button>
+                <button 
+                  className="account-action-btn"
+                  onClick={handleOpenEmailModal}
+                >
+                  <PencilSquare className="action-icon" />
+                  <span>Change Email</span>
+                </button>
               </div>
-            </td>
-          </tr>
-          <tr>
-            <td colSpan="2">
-              <h5 className="mb-3 mt-3">Account details</h5>
-            </td>
-          </tr>
-          <tr>
-            <td>
-              <h6>Username</h6>
-            </td>
-            <td>@{username}</td>
-          </tr>
-          <tr>
-            <td>
-              <h6>Date Joined</h6>
-            </td>
-            <td>{dateJoined}</td>
-          </tr>
-          <tr>
-            <td>
-              <h6>Primary Email</h6>
-            </td>
-            <td>{email}</td>
-          </tr>
-        </tbody>
-      </Table>
+            </div>
+          </div>
+        </Col>
+
+        {/* Main Content - Account Details */}
+        <Col lg={8} md={7}>
+          <div className="account-details-section">
+            <div className="account-section-header">
+              <h2 className="account-section-title">Account Settings</h2>
+              <span className="account-badge">
+                <ShieldLock size={14} />
+                Verified Account
+              </span>
+            </div>
+
+            <div className="account-info-grid">
+              <div className="account-info-card">
+                <div className="account-info-icon-wrapper">
+                  <At size={24} />
+                </div>
+                <div className="account-info-content">
+                  <span className="account-info-label">Username</span>
+                  <span className="account-info-value">@{username}</span>
+                </div>
+              </div>
+
+              <div className="account-info-card">
+                <div className="account-info-icon-wrapper">
+                  <CalendarEvent size={24} />
+                </div>
+                <div className="account-info-content">
+                  <span className="account-info-label">Member Since</span>
+                  <span className="account-info-value">{formattedDate || dateJoined}</span>
+                </div>
+              </div>
+
+              <div className="account-info-card account-info-card-full">
+                <div className="account-info-icon-wrapper">
+                  <Envelope size={24} />
+                </div>
+                <div className="account-info-content">
+                  <span className="account-info-label">Primary Email</span>
+                  <span className="account-info-value account-email">{email}</span>
+                </div>
+                <button 
+                  className="account-edit-btn"
+                  onClick={handleOpenEmailModal}
+                  title="Edit email"
+                >
+                  <PencilSquare size={16} />
+                </button>
+              </div>
+
+              <div className="account-info-card account-info-card-full">
+                <div className="account-info-icon-wrapper">
+                  <Key size={24} />
+                </div>
+                <div className="account-info-content">
+                  <span className="account-info-label">Password</span>
+                  <span className="account-info-value">••••••••••</span>
+                </div>
+                <button 
+                  className="account-edit-btn"
+                  onClick={handleOpenPasswordModal}
+                  title="Change password"
+                >
+                  <PencilSquare size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="account-profile-link">
+              <PersonCircle size={20} />
+              <span>View your public profile at</span>
+              <a href={`/users/${username}`}>
+                /users/{username}
+              </a>
+            </div>
+          </div>
+        </Col>
+      </Row>
 
       {/* Password Reset Modal */}
-      <Modal show={showPasswordModal} onHide={handleClosePasswordModal}>
+      <Modal show={showPasswordModal} onHide={handleClosePasswordModal} centered className="account-modal">
         <Modal.Header closeButton>
-          <Modal.Title>Change Password</Modal.Title>
+          <Modal.Title>
+            <Key className="me-2" />
+            Change Password
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handlePasswordSubmit}>
-            <Form.Group as={Row} className="mb-3">
-              <Form.Label column sm="4">
-                Current Password
-              </Form.Label>
-              <Col sm="8">
-                <Form.Control
-                  type="password"
-                  placeholder="Enter current password"
-                  name="oldPassword"
-                  value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
-                  isInvalid={!!formErrors.oldPassword}
-                />
-                <Form.Control.Feedback type="invalid">
-                  {formErrors.oldPassword}
-                </Form.Control.Feedback>
-              </Col>
+            <Form.Group className="mb-4">
+              <Form.Label className="account-form-label">Current Password</Form.Label>
+              <Form.Control
+                type="password"
+                placeholder="Enter your current password"
+                name="oldPassword"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                isInvalid={!!formErrors.oldPassword}
+                className="account-form-input"
+              />
+              <Form.Control.Feedback type="invalid">
+                {formErrors.oldPassword}
+              </Form.Control.Feedback>
             </Form.Group>
-            <Form.Group as={Row} className="mb-3">
-              <Form.Label column sm="4">
-                New Password
-              </Form.Label>
-              <Col sm="8">
-                <Form.Control
-                  type="password"
-                  placeholder="Enter new password"
-                  name="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  isInvalid={!!formErrors.newPassword}
-                />
-                <Form.Control.Feedback type="invalid">
-                  {formErrors.newPassword}
-                </Form.Control.Feedback>
-              </Col>
+            <Form.Group className="mb-3">
+              <Form.Label className="account-form-label">New Password</Form.Label>
+              <Form.Control
+                type="password"
+                placeholder="Enter your new password"
+                name="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                isInvalid={!!formErrors.newPassword}
+                className="account-form-input"
+              />
+              <Form.Control.Feedback type="invalid">
+                {formErrors.newPassword}
+              </Form.Control.Feedback>
+              <Form.Text className="text-muted">
+                Password must be at least 8 characters long
+              </Form.Text>
             </Form.Group>
 
             {error && (
-              <Alert variant="danger" className="mt-3">
+              <Alert variant="danger" className="mt-3 account-alert">
                 {error}
               </Alert>
             )}
             {message && (
-              <Alert variant="success" className="mt-3">
+              <Alert variant="success" className="mt-3 account-alert">
                 {message}
               </Alert>
             )}
           </Form>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleClosePasswordModal}>
+        <Modal.Footer className="account-modal-footer">
+          <Button variant="outline-secondary" onClick={handleClosePasswordModal}>
             Cancel
           </Button>
           <Button 
-            variant="primary" 
+            className="account-submit-btn"
             onClick={handlePasswordSubmit}
             disabled={isLoadingPassword}
           >
             {isLoadingPassword ? (
               <>
                 <Spinner size="sm" animation="border" className="me-2" />
-                Saving...
+                Updating...
               </>
             ) : (
-              "Save Changes"
+              "Update Password"
             )}
           </Button>
         </Modal.Footer>
       </Modal>
 
       {/* Change Email Modal */}
-      <Modal show={showEmailModal} onHide={handleCloseEmailModal}>
+      <Modal show={showEmailModal} onHide={handleCloseEmailModal} centered className="account-modal">
         <Modal.Header closeButton>
-          <Modal.Title>Change Email</Modal.Title>
+          <Modal.Title>
+            <Envelope className="me-2" />
+            Change Email
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handleEmailSubmit}>
-            <Form.Group as={Row} className="mb-3">
-              <Form.Label column sm="4">
-                New Email
-              </Form.Label>
-              <Col sm="8">
-                <Form.Control
-                  type="email"
-                  placeholder="Enter new email address"
-                  name="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  isInvalid={!!formErrors.email}
-                />
-                <Form.Control.Feedback type="invalid">
-                  {formErrors.email}
-                </Form.Control.Feedback>
-              </Col>
+            <Form.Group className="mb-3">
+              <Form.Label className="account-form-label">New Email Address</Form.Label>
+              <Form.Control
+                type="email"
+                placeholder="Enter your new email address"
+                name="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                isInvalid={!!formErrors.email}
+                className="account-form-input"
+              />
+              <Form.Control.Feedback type="invalid">
+                {formErrors.email}
+              </Form.Control.Feedback>
+              <Form.Text className="text-muted">
+                A verification email will be sent to your new address
+              </Form.Text>
             </Form.Group>
 
             {error && (
-              <Alert variant="danger" className="mt-3">
+              <Alert variant="danger" className="mt-3 account-alert">
                 {error}
               </Alert>
             )}
             {message && (
-              <Alert variant="success" className="mt-3">
+              <Alert variant="success" className="mt-3 account-alert">
                 {message}
               </Alert>
             )}
           </Form>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseEmailModal}>
+        <Modal.Footer className="account-modal-footer">
+          <Button variant="outline-secondary" onClick={handleCloseEmailModal}>
             Cancel
           </Button>
           <Button 
-            variant="primary" 
+            className="account-submit-btn"
             onClick={handleEmailSubmit}
             disabled={isLoadingEmail}
           >
             {isLoadingEmail ? (
               <>
                 <Spinner size="sm" animation="border" className="me-2" />
-                Saving...
+                Updating...
               </>
             ) : (
-              "Save Changes"
+              "Update Email"
             )}
           </Button>
         </Modal.Footer>
