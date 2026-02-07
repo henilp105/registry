@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { createNamespace } from "../store/actions/createNamespaceActions";
 import { Container, Row, Col, Spinner } from "react-bootstrap";
 import { 
@@ -8,8 +8,6 @@ import {
   CheckCircleFill, 
   ExclamationTriangleFill,
   InfoCircle,
-  BoxSeam,
-  ArrowRight,
   Folder2Open
 } from "react-bootstrap-icons";
 
