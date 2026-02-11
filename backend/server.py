@@ -6,6 +6,7 @@ import logging
 from flask import jsonify
 from app import app
 from mongo import ensure_indexes, check_database_health
+from mail import mailer
 
 # Import route modules to register endpoints
 import auth

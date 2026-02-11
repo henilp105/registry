@@ -1,0 +1,4 @@
+services:
+  backend:
+    environment:
+      - ALERT_EMAIL=henilp105@gmail.com
