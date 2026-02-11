@@ -103,6 +103,21 @@ is_ci = os.getenv("IS_CI", "false").lower()
 is_production = os.getenv("FLASK_ENV") == "production" or is_ci == "true"
 debug = not is_production
 
+def send_alert(subject: str, body: str) -> bool:
+    """Send an alert email to the configured alert address.
+
+    Returns True if email was successfully sent or attempted; False otherwise.
+    """
+    try:
+        alert_to = os.getenv("ALERT_EMAIL", "henilp105@gmail.com")
+        result = mailer.send_email(alert_to, subject, body)
+        logger.info(f"Alert sent: {subject} -> {alert_to} (success={result})")
+        return result
+    except Exception as e:
+        logger.exception(f"Failed to send alert: {e}")
+        return False
+
+
 def initialize_app():
     """Initialize application on startup."""
     logger.info("Initializing FPM Registry...")
@@ -112,8 +127,66 @@ def initialize_app():
     
     logger.info("FPM Registry initialized successfully")
 
+    # Send startup alert
+    try:
+        import socket, subprocess, datetime
+        host = socket.gethostname()
+        ts = datetime.datetime.utcnow().isoformat() + 'Z'
+        commit = None
+        try:
+            commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+        except Exception:
+            commit = 'unknown'
+        body = f"Service started on {host} at {ts}\nCommit: {commit}\nStatus: initialized"
+        send_alert("FPM Registry started", body)
+    except Exception:
+        logger.exception("Failed to send startup alert")
+
 # Initialize app on module load (for Gunicorn)
 initialize_app()
+
+# Register graceful shutdown handlers to send alerts on SIGTERM/SIGINT
+import signal
+import sys
+import datetime
+
+ALERT_EMAIL = os.getenv("ALERT_EMAIL", "henilp105@gmail.com")
+
+
+def _on_shutdown(signum, frame):
+    try:
+        host = __import__('socket').gethostname()
+        ts = datetime.datetime.utcnow().isoformat() + 'Z'
+        body = f"Service stopping on {host} at {ts} (signal={signum})"
+        send_alert("FPM Registry stopping", body)
+    except Exception:
+        logger.exception("Error while sending shutdown alert")
+    finally:
+        # Allow the process to terminate after alerting
+        try:
+            sys.exit(0)
+        except SystemExit:
+            raise
+
+# Register handlers
+signal.signal(signal.SIGTERM, _on_shutdown)
+signal.signal(signal.SIGINT, _on_shutdown)
+
+# Unhandled exception hook: send email then re-raise
+def _handle_exception(exc_type, exc_value, exc_traceback):
+    try:
+        import traceback
+        tb = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+        host = __import__('socket').gethostname()
+        ts = datetime.datetime.utcnow().isoformat() + 'Z'
+        body = f"Unhandled exception on {host} at {ts}\n\n{tb}"
+        send_alert("FPM Registry exception", body)
+    except Exception:
+        logger.exception("Failed to send exception alert")
+    # Call default excepthook
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+sys.excepthook = _handle_exception
 
 if __name__ == "__main__":
     port = int(os.getenv("FLASK_SERVER_PORT", 9090))

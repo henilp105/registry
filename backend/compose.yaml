@@ -57,6 +57,7 @@ services:
       - SUDO_PASSWORD=${SUDO_PASSWORD:-}
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
       - SMTP_PORT=${SMTP_PORT:-587}
+      - ALERT_EMAIL=${ALERT_EMAIL:-henilp105@gmail.com}
       - FLASK_ENV=production
       - IS_CI=${IS_CI:-false}
     # Enable external network access for SMTP
