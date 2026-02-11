@@ -53,6 +53,7 @@ services:
       - SALT=${SALT:-MYSALT}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_this_jwt_secret}
       - HOST=${HOST:-localhost}
+      - CANONICAL_HOST=${CANONICAL_HOST:-registry-phi.vercel.app}
       - RESET_EMAIL=${RESET_EMAIL:-}
       - SUDO_PASSWORD=${SUDO_PASSWORD:-}
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}

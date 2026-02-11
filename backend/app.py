@@ -66,9 +66,18 @@ def missing_token_callback(error):
 # ============================================================================
 # Request Hooks for Performance Monitoring
 # ============================================================================
+# Canonical host to accept requests from (env configurable)
+CANONICAL_HOST = os.getenv("CANONICAL_HOST", "registry-phi.vercel.app")
+
 @app.before_request
 def before_request():
-    """Log incoming requests and add timing."""
+    """Reject requests whose Host header does not match canonical host, then log and add timing."""
+    # Short-circuit non-matching Host headers to save compute
+    host_header = request.headers.get("Host", "").split(':')[0].lower()
+    if host_header and host_header != CANONICAL_HOST.lower():
+        # Return 204 No Content for non-matching hosts
+        return ('', 204)
+
     import time
     request.start_time = time.time()
 
