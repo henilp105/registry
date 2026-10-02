@@ -306,7 +306,7 @@ const Account = () => {
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handlePasswordSubmit}>
-            <Form.Group className="mb-4">
+            <Form.Group className="mb-4" controlId="account-old-password">
               <Form.Label className="account-form-label">Current Password</Form.Label>
               <Form.Control
                 type="password"
@@ -321,7 +321,7 @@ const Account = () => {
                 {formErrors.oldPassword}
               </Form.Control.Feedback>
             </Form.Group>
-            <Form.Group className="mb-3">
+            <Form.Group className="mb-3" controlId="account-new-password">
               <Form.Label className="account-form-label">New Password</Form.Label>
               <Form.Control
                 type="password"
@@ -383,7 +383,7 @@ const Account = () => {
         </Modal.Header>
         <Modal.Body>
           <Form onSubmit={handleEmailSubmit}>
-            <Form.Group className="mb-3">
+            <Form.Group className="mb-3" controlId="account-new-email">
               <Form.Label className="account-form-label">New Email Address</Form.Label>
               <Form.Control
                 type="email"

@@ -50,7 +50,7 @@ const VerifyEmail = () => {
             <div className="verify-success-icon">
               <CheckCircleFill />
             </div>
-            <div className="auth-alert auth-alert-success">
+            <div className="auth-alert auth-alert-success" role="status">
               <CheckCircleFill className="auth-alert-icon" />
               <span>{displayMessage || "Your email has been verified successfully!"}</span>
             </div>
@@ -71,7 +71,7 @@ const VerifyEmail = () => {
             <div className="verify-error-icon">
               <ExclamationCircleFill />
             </div>
-            <div className="auth-alert auth-alert-error">
+            <div className="auth-alert auth-alert-error" role="alert">
               <ExclamationCircleFill className="auth-alert-icon" />
               <span>{displayMessage || "Verification failed. Please try again."}</span>
             </div>

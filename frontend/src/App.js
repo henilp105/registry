@@ -112,6 +112,7 @@ function App() {
         />
         <Route path="/namespaces/:namespace" element={<NamespacePage />} />
         <Route path="/admin" element={<AdminSection />} />
+        <Route path="/404" element={<NoPage />} />
         <Route path="*" element={<NoPage />} />
         </Routes>
       </main>

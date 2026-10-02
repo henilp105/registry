@@ -80,7 +80,7 @@ const ForgotPassword = () => {
         </div>
 
         {message && (
-          <div className={`auth-alert ${isSuccess ? 'auth-alert-success' : 'auth-alert-error'}`}>
+          <div className={`auth-alert ${isSuccess ? 'auth-alert-success' : 'auth-alert-error'}`} role={isSuccess ? "status" : "alert"}>
             {isSuccess ? (
               <CheckCircleFill className="auth-alert-icon" />
             ) : (

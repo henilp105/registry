@@ -177,14 +177,14 @@ const Register = () => {
         </div>
 
         {errorMessage && (
-          <div className="auth-alert auth-alert-error">
+          <div className="auth-alert auth-alert-error" role="alert">
             <ExclamationCircleFill className="auth-alert-icon" />
             <span>{errorMessage}</span>
           </div>
         )}
         
         {message && (
-          <div className="auth-alert auth-alert-success">
+          <div className="auth-alert auth-alert-success" role="status">
             <CheckCircleFill className="auth-alert-icon" />
             <span>{message}</span>
           </div>
@@ -279,12 +279,11 @@ const Register = () => {
                     style={{ width: `${passwordStrength.strength * 20}%` }}
                   />
                 </div>
-                {/* The strength is a security-relevant fact about what the user
-                    just typed, and it changes on every keystroke, so it is
-                    announced rather than only coloured. */}
+                {/* The strength updates on every keystroke, so role="status"
+                    here announced a new strength per character typed. It is
+                    plain text alongside the bar now (D84). */}
                 <span
                   className={`password-strength-label password-strength-label--${passwordStrength.strength}`}
-                  role="status"
                 >
                   Password strength: {passwordStrength.label}
                 </span>

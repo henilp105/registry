@@ -29,10 +29,13 @@
 
 .namespace-card__header {
   padding: var(--space-10) var(--space-8);
+  /* D84: --primary-400 renders #9797ff in light mode; white text on it is
+     2.06:1, so the title washed out. Span to --primary-600/--color-brand-solid,
+     which clears 4.5:1 in both themes. */
   background: linear-gradient(
     135deg,
-    var(--primary-600),
-    var(--primary-400)
+    var(--color-brand-solid),
+    var(--primary-600)
   );
   color: var(--color-text-inverse);
   text-align: center;

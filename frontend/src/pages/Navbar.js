@@ -235,6 +235,10 @@ const SearchBar = () => {
     if (event.key === "Escape") {
       typedByUser.current = false;
       setLocalQuery("");
+      // The store keeps the old term otherwise, so navigating away and back
+      // shows the stale query in the box while /search still shows old
+      // results under an empty-looking input (D84).
+      dispatch(setQuery(""));
     }
   };
 
