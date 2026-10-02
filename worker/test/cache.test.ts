@@ -143,7 +143,9 @@ describe("planSearch (defect D18)", () => {
   });
 
   it("caps the query length so an enormous body cannot reach the matcher", () => {
-    expect(planSearch("x".repeat(5000)).term.length).toBeLessThanOrEqual(200);
+    const plan = planSearch("x".repeat(5000));
+    expect(plan.kind).toBe("text");
+    expect("term" in plan ? plan.term.length : 0).toBe(200);
   });
 
   it("builds a $text match when the plan is text", () => {

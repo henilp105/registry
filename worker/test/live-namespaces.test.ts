@@ -11,9 +11,27 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MongoClient, ObjectId, type Db, type IndexDescription, type MongoClientOptions } from "mongodb";
+import {
+  MongoClient,
+  ObjectId,
+  type Db,
+  type Document,
+  type IndexDescription,
+  type MongoClientOptions,
+  type UpdateFilter,
+} from "mongodb";
 import { INDEX_SPEC, EXPECTED_COLLECTIONS } from "../src/db/indexes";
 import { randomId } from "../src/lib/tokens";
+/**
+ * `UpdateFilter<Document>` resolves `$pull` to the driver's `PullOperator`,
+ * which becomes `NotAcceptedFields` and rejects every key whenever the schema
+ * carries an index signature. These fixtures are free-form documents with a few
+ * known fields, so the update is cast at the boundary rather than contorting
+ * the fixtures into a nominal type they do not have.
+ */
+type LooseUpdate = UpdateFilter<Document>;
+
+
 
 const URI = process.env.MONGODB_TEST_URI;
 const TEST_DB = `fpmregistry_ns_${randomId(6)}`;
@@ -85,7 +103,12 @@ describeLive("namespace cascade delete", () => {
     await db.collection("packages").deleteMany({ namespace: nsId });
     await db.collection("users").updateMany(
       {},
-      { $pull: { authorOf: { $in: [pkgA, pkgB] }, maintainerOf: { $in: [pkgA, pkgB] } } },
+      {
+          $pull: {
+            authorOf: { $in: [pkgA, pkgB] },
+            maintainerOf: { $in: [pkgA, pkgB] },
+          },
+        } as unknown as LooseUpdate,
     );
     await db.collection("upload_tokens").updateMany(
       { namespace_id: nsId.toHexString() },

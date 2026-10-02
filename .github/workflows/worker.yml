@@ -47,21 +47,27 @@ jobs:
       - name: Bundle check
         run: npx wrangler deploy --dry-run --outdir=dist
 
-      # Guards against a config typo that would only otherwise surface at
-      # deploy time — this caught an R2 binding that used `name` instead of
-      # `binding`, which wrangler rejects only at publish time.
+      # Regenerates worker-configuration.d.ts from wrangler.jsonc, which
+      # validates every binding reference in the config. No `|| true`: a
+      # malformed binding must fail here rather than at publish time.
       - name: Wrangler config check
-        run: npx wrangler types --dry-run || true
+        run: npx wrangler types
 
   contract:
     name: API contract is frozen
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # The workflow default puts every job in worker/; these assertions are about
+    # repo-root docs, so this job must run from the root.
+    defaults:
+      run:
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
-      - name: Assert the contract document still exists and is non-trivial
+      - name: Assert the contract documents still exist and are non-trivial
         run: |
-          test -s docs/API_CONTRACT.md
-          test -s docs/SERVERLESS_MIGRATION_PLAN.md
-          test -s docs/BASELINE_AUDIT.md
-          echo "contract docs present"
+          set -euo pipefail
+          for f in docs/API_CONTRACT.md docs/SERVERLESS_MIGRATION_PLAN.md docs/BASELINE_AUDIT.md; do
+            if [ ! -s "$f" ]; then echo "missing or empty: $f"; exit 1; fi
+            echo "ok: $f ($(wc -l < "$f") lines)"
+          done

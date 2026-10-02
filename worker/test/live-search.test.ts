@@ -136,7 +136,7 @@ describeLive("package search", () => {
       .collection("packages")
       .find({ is_deprecated: false, $text: { $search: "json" } })
       .toArray();
-    expect(rows.some((r: { name?: string }) => r.name === "oldjson")).toBe(false);
+    expect(rows.some((r) => (r as { name?: string }).name === "oldjson")).toBe(false);
   }, 30_000);
 
   it("orders version_history numerically, not lexicographically", async () => {

@@ -12,9 +12,27 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { MongoClient, ObjectId, type Db, type IndexDescription, type MongoClientOptions } from "mongodb";
+import {
+  MongoClient,
+  ObjectId,
+  type Db,
+  type Document,
+  type IndexDescription,
+  type MongoClientOptions,
+  type UpdateFilter,
+} from "mongodb";
 import { INDEX_SPEC, EXPECTED_COLLECTIONS } from "../src/db/indexes";
 import { randomId } from "../src/lib/tokens";
+/**
+ * `UpdateFilter<Document>` resolves `$pull` to the driver's `PullOperator`,
+ * which becomes `NotAcceptedFields` and rejects every key whenever the schema
+ * carries an index signature. These fixtures are free-form documents with a few
+ * known fields, so the update is cast at the boundary rather than contorting
+ * the fixtures into a nominal type they do not have.
+ */
+type LooseUpdate = UpdateFilter<Document>;
+
+
 
 const URI = process.env.MONGODB_TEST_URI;
 const TEST_DB = `fpmregistry_mem_${randomId(6)}`;
@@ -89,7 +107,7 @@ describeLive("namespace membership mutations", () => {
 
     const removed = await db
       .collection("namespaces")
-      .updateOne({ _id: nsId, maintainers: stranger }, { $pull: { maintainers: stranger } });
+      .updateOne({ _id: nsId, maintainers: stranger }, { $pull: { maintainers: stranger } } as unknown as LooseUpdate);
 
     expect(removed.modifiedCount).toBe(0);
   }, 30_000);
@@ -163,8 +181,12 @@ describeLive("namespace membership mutations", () => {
       maintainerOf: [pkgId],
     });
 
-    await db.collection("packages").updateOne({ _id: pkgId }, { $pull: { maintainers: member } });
-    await db.collection("users").updateOne({ _id: userId }, { $pull: { maintainerOf: pkgId } });
+    await db
+      .collection("packages")
+      .updateOne({ _id: pkgId }, { $pull: { maintainers: member } } as unknown as LooseUpdate);
+    await db
+      .collection("users")
+      .updateOne({ _id: userId }, { $pull: { maintainerOf: pkgId } } as unknown as LooseUpdate);
 
     const pkg = await db.collection("packages").findOne({ _id: pkgId });
     const user = await db.collection("users").findOne({ _id: userId });
