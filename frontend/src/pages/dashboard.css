@@ -1,0 +1,48 @@
+/* Dashboard: the user's namespaces and the packages they maintain. */
+
+.dashboard {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-12);
+}
+
+.dashboard__greeting {
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-xl);
+}
+
+.dashboard__section {
+  margin-bottom: var(--space-6);
+}
+
+.dashboard__section:last-child {
+  margin-bottom: 0;
+}
+
+.dashboard__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.dashboard__section-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+/* Role chip on a namespace card. The label already says the role, so this is
+   a colour reinforcement rather than the only signal. */
+.dashboard__role {
+  flex-shrink: 0;
+  margin-left: var(--space-2);
+}
+
+.dashboard__empty {
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.dashboard__empty-icon {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-subtle);
+}

@@ -17,6 +17,7 @@ import AddNamespaceAdminFormDialog from "./addNamespaceAdminForm";
 import RemoveNamespaceAdminFormDialog from "./removeNamespaceAdminForm";
 import GeneratePackageTokenDialogForm from "./generatePackageTokenDialogForm";
 import Icon from "../components/Icon";
+import "./dashboard.css";
 
 const Dashboard = () => {
   const [addMaintainerDialogState, setAddMaintainerDialogState] = useState({});
@@ -81,50 +82,57 @@ const Dashboard = () => {
   }, []);
 
   // Skeleton loader for loading state
-  const DashboardSkeleton = useMemo(() => (
-    <Container style={{ paddingTop: 25 }}>
-      <h5 className="mb-3 text-muted">Loading your dashboard...</h5>
-      <p className="text-start mb-2" style={{ fontSize: 18 }}>Namespaces</p>
-      <Row>
-        {[1, 2, 3].map((i) => (
-          <Col key={i} xs={12} md={4}>
-            <SkeletonDashboardCard />
-          </Col>
-        ))}
-      </Row>
-      <p className="text-start mb-2 mt-4" style={{ fontSize: 18 }}>Packages</p>
-      <Row>
-        {[1, 2, 3].map((i) => (
-          <Col key={i} xs={12} md={4}>
-            <SkeletonDashboardCard />
-          </Col>
-        ))}
-      </Row>
-    </Container>
-  ), []);
+  const DashboardSkeleton = useMemo(
+    () => (
+      <Container className="dashboard">
+        <p className="text-muted mb-3" role="status">
+          Loading your dashboard&hellip;
+        </p>
+        <p className="dashboard__section-title mb-2">Namespaces</p>
+        <Row>
+          {[1, 2, 3].map((i) => (
+            <Col key={i} xs={12} md={4}>
+              <SkeletonDashboardCard />
+            </Col>
+          ))}
+        </Row>
+        <p className="dashboard__section-title mb-2 mt-4">Packages</p>
+        <Row>
+          {[1, 2, 3].map((i) => (
+            <Col key={i} xs={12} md={4}>
+              <SkeletonDashboardCard />
+            </Col>
+          ))}
+        </Row>
+      </Container>
+    ),
+    []
+  );
 
   if (isLoading) {
     return DashboardSkeleton;
   }
 
   return (
-    <Container style={{ paddingTop: 25 }}>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h4 className="mb-0">Welcome back, {username}!</h4>
-      </div>
-      
-      <section className="mb-4">
-        <div className="d-flex justify-content-between align-items-center mb-2">
-          <h5 className="mb-0">Namespaces</h5>
+    <Container className="dashboard">
+      <h1 className="dashboard__greeting">Welcome back, {username}!</h1>
+
+      <section className="dashboard__section" aria-labelledby="dashboard-namespaces">
+        <div className="dashboard__section-header">
+          <h2 className="dashboard__section-title" id="dashboard-namespaces">
+            Namespaces
+          </h2>
           <Link to="/namespace/create" className="btn btn-sm btn-outline-primary">
-            <Icon name="plus" className="me-1" /> Create Namespace
+            <Icon name="plus" className="me-1" size={13} /> Create Namespace
           </Link>
         </div>
         {Namespaces()}
       </section>
-      
-      <section>
-        <h5 className="mb-2">Packages</h5>
+
+      <section className="dashboard__section" aria-labelledby="dashboard-packages">
+        <h2 className="dashboard__section-title mb-3" id="dashboard-packages">
+          Packages
+        </h2>
         {Packages()}
       </section>
     </Container>
@@ -147,18 +155,24 @@ const Dashboard = () => {
               <Card.Body>
                 <Card.Title>
                   <div className="d-flex justify-content-between">
-                    <a
-                      href={`/packages/${element.namespace}/${element.name}`}
+                    {/* A router Link, not an <a href>: this is an in-app
+                        route, and a plain anchor reloads the whole SPA. */}
+                    <Link
+                      to={`/packages/${element.namespace}/${element.name}`}
                       className="dashboard-title"
                     >
                       {element.name}
-                    </a>
+                    </Link>
                     {element.isNamespaceAdmin ? (
-                      <label className="chip">Namespace Admin</label>
+                      <span className="chip dashboard__role">Namespace Admin</span>
                     ) : element.isNamespaceMaintainer ? (
-                      <label className="chip">Namespace Maintainer</label>
+                      <span className="chip dashboard__role">
+                        Namespace Maintainer
+                      </span>
                     ) : element.isPackageMaintainer ? (
-                      <label className="chip">Package Maintainer</label>
+                      <span className="chip dashboard__role">
+                        Package Maintainer
+                      </span>
                     ) : null}
                   </div>
                 </Card.Title>
@@ -166,33 +180,43 @@ const Dashboard = () => {
                   {element.namespace}
                 </Card.Subtitle>
                 <Card.Text id="card-text">{element.description}</Card.Text>
+                {/*
+                  These were <div onClick>, which are not focusable and have
+                  no keyboard activation at all - the package card's three
+                  primary actions were unreachable without a mouse. Real
+                  <button>s now; the visual is unchanged because .chip-action
+                  already carried the pill styling.
+                */}
                 <div className="chip-container">
-                  <div
-                    className="border border-success rounded-pill chip-action"
+                  <button
+                    type="button"
+                    className="border border-success rounded-pill chip-action text-success"
                     onClick={() => handleAddMaintainerDialog(element.id, true)}
                   >
                     Add Maintainers
-                  </div>
+                  </button>
                   {element.isNamespaceMaintainer || element.isNamespaceAdmin ? (
-                    <div
-                      className="border border-danger rounded-pill chip-action"
+                    <button
+                      type="button"
+                      className="border border-danger rounded-pill chip-action text-danger"
                       onClick={() =>
                         handleRemoveMaintainerDialog(element.id, true)
                       }
                     >
                       Remove Maintainers
-                    </div>
+                    </button>
                   ) : null}
                 </div>
                 {element.isPackageMaintainer &&
                 !element.isNamespaceAdmin &&
                 !element.isNamespaceMaintainer ? (
-                  <div
-                    className="border border-success rounded-pill chip-action"
+                  <button
+                    type="button"
+                    className="border border-success rounded-pill chip-action text-success mt-2"
                     onClick={() => handleGenerateTokenDialog(element.id, true)}
                   >
                     Generate Token
-                  </div>
+                  </button>
                 ) : null}
 
                 <AddMaintainerFormDialog
@@ -224,9 +248,9 @@ const Dashboard = () => {
   function Namespaces() {
     if (!namespaces || namespaces.length === 0) {
       return (
-        <div className="alert alert-light border text-center py-4" role="alert">
-          <Icon name="folder-open" size="2x" className="text-muted mb-2" />
-          <p className="mb-2">You haven't created any namespaces yet.</p>
+        <div className="alert alert-light border dashboard__empty">
+          <Icon name="folder-open" size={32} className="dashboard__empty-icon" />
+          <p className="mb-2">You haven&rsquo;t created any namespaces yet.</p>
           <Link to="/namespace/create" className="btn btn-primary btn-sm">
             Create your first namespace
           </Link>
@@ -246,14 +270,14 @@ const Dashboard = () => {
                       to={`/namespaces/${element.name}`}
                       className="dashboard-title fw-semibold"
                     >
-                      <Icon name="folder" className="me-2 text-primary" />
+                      <Icon name="folder" className="me-2 text-primary" size={16} />
                       {element.name}
                     </Link>
                   </Card.Title>
                   {element.isNamespaceAdmin ? (
-                    <span className="chip bg-primary text-white">Admin</span>
+                    <span className="chip dashboard__role">Admin</span>
                   ) : element.isNamespaceMaintainer ? (
-                    <span className="chip">Maintainer</span>
+                    <span className="chip dashboard__role">Maintainer</span>
                   ) : null}
                 </div>
                 <Card.Text id="card-text" className="text-muted small flex-grow-1">
