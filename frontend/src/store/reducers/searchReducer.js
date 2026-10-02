@@ -35,7 +35,9 @@ const searchReducer = (state = initialState, action) => {
         ...state,
         isLoading: false,
         packages: asList(action.payload.packages),
-        totalPages: action.payload.totalPages,
+        // D84: an API response missing total_pages used to produce 'Page 1 of
+        // undefined' and a NaN tile range; clamp to at least one page.
+        totalPages: Number.isFinite(action.payload.totalPages) ? action.payload.totalPages : 1,
         currentPage: action.payload.currentPage,
         error: null,
       };

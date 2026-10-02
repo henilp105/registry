@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { Container, InputGroup, FormControl, Button } from "react-bootstrap";
 import { searchPackage, setQuery } from "../store/actions/searchActions";
@@ -145,8 +145,6 @@ function SearchSuggestion({ query }) {
 
 // Quick links section
 function QuickLinks() {
-  const navigate = useNavigate();
-
   const links = [
     { icon: "book", label: "Documentation", path: "/help" },
     { icon: "archive", label: "Browse Archives", path: "/archives" },
@@ -156,15 +154,17 @@ function QuickLinks() {
   return (
     <div className="quick-links">
       {links.map(({ icon, label, path }) => (
-        <button
+        // D84: these were <button onClick={navigate}>, so middle-click,
+        // ctrl-click and 'copy link address' did nothing and they announced
+        // as buttons rather than links.
+        <Link
           key={path}
+          to={path}
           className="quick-link"
-          onClick={() => navigate(path)}
-          type="button"
         >
           <Icon name={icon} />
           <span>{label}</span>
-        </button>
+        </Link>
       ))}
     </div>
   );
