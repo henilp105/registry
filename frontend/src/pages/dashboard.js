@@ -32,6 +32,7 @@ const Dashboard = () => {
   const packages = useSelector((state) => state.dashboard.packages);
   const namespaces = useSelector((state) => state.dashboard.namespaces);
   const isLoading = useSelector((state) => state.dashboard.isLoading || state.auth.isLoading);
+  const error = useSelector((state) => state.dashboard.error);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -139,6 +140,24 @@ const Dashboard = () => {
   );
 
   function Packages() {
+    // Defect D82: before, a failed fetch left packages null and the UI
+    // claimed "You are not a maintainer of any package yet" -- a user with
+    // fourteen packages got told they own nothing, and the page would not
+    // retry because the null guard kept firing.
+    if (error && (!packages || packages.length === 0)) {
+      return (
+        <div className="alert alert-danger" role="alert">
+          Could not load your packages: {error}.{" "}
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-danger ms-2"
+            onClick={() => dispatch(fetchPackages(username))}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
     if (!packages || packages.length === 0) {
       return (
         <div className="alert alert-secondary" role="alert">
@@ -246,6 +265,20 @@ const Dashboard = () => {
   }
 
   function Namespaces() {
+    if (error && (!namespaces || namespaces.length === 0)) {
+      return (
+        <div className="alert alert-danger" role="alert">
+          Could not load your namespaces: {error}.{" "}
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-danger ms-2"
+            onClick={() => dispatch(fetchPackages(username))}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
     if (!namespaces || namespaces.length === 0) {
       return (
         <div className="alert alert-light border dashboard__empty">
