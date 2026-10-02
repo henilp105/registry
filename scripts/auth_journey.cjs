@@ -101,10 +101,35 @@ const readToken = (page) =>
   });
 
   const text = () => page.evaluate(() => document.body.innerText.replace(/\s+/g, " "));
-  /** Submits the form. Deliberately not a text match: the navbar also says "Register". */
+  /**
+   * Submits the form and waits for the request to actually finish.
+   *
+   * Deliberately not a text match for the button -- the navbar also says
+   * "Register", and matching `.first()` navigated instead of submitting.
+   *
+   * The wait is on the button leaving its loading state rather than on a fixed
+   * sleep. A 1400 ms sleep was shorter than the measured ~1000-1330 ms signup
+   * latency plus render, which made registration fail intermittently and be
+   * misread as an application bug.
+   */
   const submit = async () => {
-    await page.locator("form button[type=submit]").first().click();
-    await page.waitForTimeout(1400);
+    const btn = page.locator("form button[type=submit]").first();
+    await btn.click();
+    // The button is `disabled` while `isLoading`, so this is the app telling us
+    // the round trip is in flight rather than a timer guessing at it.
+    try {
+      await page.waitForFunction(
+        () => {
+          const b = document.querySelector("form button[type=submit]");
+          return b && !b.disabled;
+        },
+        { timeout: 20000 },
+      );
+    } catch {
+      // Left disabled past 20 s: leave the failure to the assertions below, which
+      // will report the state rather than this helper swallowing it.
+    }
+    await page.waitForTimeout(400);
   };
   const fill = async (name, v) => {
     const el = page.locator(`[name='${name}']`).first();
@@ -330,8 +355,15 @@ const readToken = (page) =>
   }
   if ((await signOut.count()) > 0) {
     await signOut.click();
-    await page.waitForTimeout(1400);
-    const left = await readToken(page);
+    // Wait for the token to actually go, rather than assuming a round trip's
+    // duration. `logout` tears down locally whether or not the server answers, so
+    // this settles quickly, but "quickly" is not a number to hard-code.
+    let left = null;
+    for (let i = 0; i < 30; i++) {
+      left = await readToken(page);
+      if (left === null) break;
+      await page.waitForTimeout(300);
+    }
     check("signing out clears the persisted token", left === null,
       left ? `${left.slice(0, 20)}… still present` : "");
     check("signing out restores the anonymous nav",

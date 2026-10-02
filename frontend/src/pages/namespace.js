@@ -23,7 +23,7 @@ const NamespacePage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { dateJoined, projects, notFound, isLoading } = useSelector(
+  const { dateJoined, description, projects, notFound, isLoading } = useSelector(
     (state) => state.namespace
   );
 
@@ -89,6 +89,16 @@ const NamespacePage = () => {
               />
               
               <h1 className="namespace-title">{namespace}</h1>
+
+              {/* Defect D67. The create form asks for a description, the API stored
+                  it, and nothing ever showed it -- so the field was write-only and
+                  a namespace owner who wrote a real description saw nothing at all
+                  when they came back. Rendered only when non-empty, so the
+                  namespaces created before this existed (and those left blank)
+                  look exactly as they did. */}
+              {description ? (
+                <p className="namespace-description">{description}</p>
+              ) : null}
               
               <ul className="namespace-info-list">
                 <li className="namespace-info-item">

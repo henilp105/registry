@@ -7,6 +7,9 @@ import { asList } from "./shape";
 
 const initialState = {
   dateJoined: "",
+  // D67. Defaults to "" so the view can test it for emptiness rather than
+  // guarding against undefined at three call sites.
+  description: "",
   projects: [],
   isLoading: false,
   notFound: false,
@@ -27,6 +30,7 @@ const namespaceReducer = (state = initialState, action) => {
       return {
         ...state,
         dateJoined: action.payload.dateJoined,
+        description: action.payload.description ?? "",
         // The reducer is the shape boundary: every consumer reads `projects`
         // without checking, and `namespace.js` does `projects.length` to render
         // the count. So a response whose `packages` is not an array used to throw

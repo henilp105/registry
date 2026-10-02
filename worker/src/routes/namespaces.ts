@@ -283,6 +283,11 @@ async function namespacePackages(env: Env, namespaceName: string): Promise<Respo
       {
         $project: {
           createdAt: 1,
+          // Defect D67: `description` was collected on create, validated, stored --
+          // and then never returned, so a namespace description was write-only.
+          // The create form asks for one and the namespace page has no way to show
+          // it. Additive: an existing client ignores a field it does not read.
+          description: 1,
           packageDocs: {
             name: 1,
             namespace_name: 1,
@@ -304,6 +309,10 @@ async function namespacePackages(env: Env, namespaceName: string): Promise<Respo
   // (`.slice(4,16)`). toJsonSafe converts the BSON Date.
   return jsonOk({
     createdAt: toJsonSafe(row.createdAt),
+    // D67. Coerced to a string because the stored value is free text written by a
+    // form: `undefined` for the namespaces created before this field existed, and
+    // the page must be able to render "no description" rather than crash.
+    description: typeof row.description === "string" ? row.description : "",
     packages: docs.map((doc) => ({
       namespace: doc.namespace_name,
       name: doc.name,

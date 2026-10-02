@@ -24,6 +24,11 @@ export const fetchNamespaceData = (namespace) => async (dispatch) => {
       payload: {
         projects: result.data.packages,
         dateJoined: result.data.createdAt,
+        // Defect D67: the API stored this from the moment the namespace was
+        // created but never returned it, so it reached no reader. Coerced here as
+        // well as in the Worker, because the shape boundary is the reducer and a
+        // missing field must not become `undefined` flowing into the view.
+        description: typeof result.data.description === "string" ? result.data.description : "",
       },
     });
   } catch (error) {

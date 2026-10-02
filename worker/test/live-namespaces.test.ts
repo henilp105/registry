@@ -178,3 +178,71 @@ describeLive("namespace cascade delete", () => {
     expect(serialised).toContain("token_hash");
   }, 30_000);
 });
+/**
+ * Defect D67 — a namespace description was write-only.
+ *
+ * `createNamespace` accepted a description, validated it and stored it, and
+ * `GET /namespace/{ns}` then projected only `createdAt` and `packageDocs`, so the
+ * field reached no reader at all. The create form asks for one and the namespace
+ * page had nothing to show, which is why the omission survived: both endpoints
+ * work, and only driving the form end to end exposes it.
+ *
+ * This asserts the aggregation's *projection* carries the field, because the
+ * response body alone would also pass if the value came from somewhere else.
+ */
+describe("namespace description is readable (D67)", () => {
+  /**
+   * `GET /namespace/{ns}` projected only `createdAt` and `packageDocs`, so the
+   * description that `POST /namespaces` had accepted, validated and stored reached
+   * no reader. Both endpoints worked; only driving the form end to end showed it.
+   *
+   * This asserts the *pipeline* rather than a response body. Calling the route
+   * would be the stronger test, but `src/routes/namespaces.ts` reaches
+   * `src/db/mongo-pool.ts`, which imports `cloudflare:workers` -- a specifier
+   * Vite cannot resolve, so `routes/*` is untestable under Vitest by construction.
+   *
+   * The end-to-end half lives in `scripts/write_journey.cjs`, which creates a
+   * namespace through the browser form and asserts the description reappears on
+   * the namespace page. Between the two, the omission cannot come back quietly.
+   */
+  it("the namespace aggregation projects description", async () => {
+    const fs = await import("node:fs");
+    const src = fs.readFileSync(
+      new URL("../src/routes/namespaces.ts", import.meta.url),
+      "utf8",
+    );
+    const start = src.indexOf("async function namespacePackages");
+    expect(start).toBeGreaterThan(-1);
+
+    // Window measured from the projection itself. An earlier version sliced from
+    // the projection offset to `start + 1200`, which lands *before* the offset
+    // (the function body is longer than 1200 chars), so the window was inverted,
+    // `slice` returned "", and the assertion failed for a reason that had nothing
+    // to do with the code under test.
+    const proj = src.indexOf("$project: {", start);
+    expect(proj).toBeGreaterThan(-1);
+    const window = src.slice(proj, proj + 1200);
+
+    // Anchored on `packageDocs`, not on a bare substring.
+    //
+    // The `packageDocs` sub-projection *also* contains `description: 1` -- for
+    // packages. A plain `toContain` therefore passed even with the namespace's own
+    // `description: 1` deleted, which was verified by mutation: the test reported
+    // 2 passed while the defect was present. So the field must appear at the
+    // namespace level, i.e. *before* `packageDocs`.
+    const nested = window.indexOf("packageDocs");
+    expect(nested).toBeGreaterThan(-1);
+    expect(window.slice(0, nested)).toContain("description: 1");
+  });
+
+  it("the response coerces a missing description to an empty string", async () => {
+    // Namespaces created before this field existed have no `description`, and the
+    // page tests it for emptiness -- so it must be "" rather than undefined.
+    const fs = await import("node:fs");
+    const src = fs.readFileSync(
+      new URL("../src/routes/namespaces.ts", import.meta.url),
+      "utf8",
+    );
+    expect(src).toContain('typeof row.description === "string" ? row.description : ""');
+  });
+});

@@ -39,6 +39,22 @@
   box-shadow: var(--shadow-sm);
 }
 
+.namespace-description {
+  /* Sits directly under .namespace-title, so it inherits that block's rhythm and
+     only adds what a description needs: room to breathe, a measure short enough
+     to stay readable, and muted ink so the name still wins. */
+  margin: 0.5rem 0 0;
+  color: var(--bs-secondary-color, #6c757d);
+  max-width: 65ch;
+  /* Descriptions are free text typed into a form, so they may contain runs of
+     whitespace and very long unbroken tokens. `pre-wrap` keeps deliberate line
+     breaks; `overflow-wrap` stops a long token from forcing a horizontal
+     scrollbar on a phone, which is the same failure D64 fixed on two other
+     pages. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .namespace-title {
   margin-bottom: var(--space-2);
   color: var(--color-text);

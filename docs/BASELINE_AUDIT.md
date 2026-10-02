@@ -893,3 +893,134 @@ tab stops now:
 ```
 skip-link, d-flex, dropdown-toggle, theme-toggle, form-control
 ```
+
+---
+
+## D67 — a namespace description was write-only
+
+**Severity: minor (data loss of user effort, not of data). Found by driving the
+namespace form through the browser, which nothing had ever done.**
+
+### What it looked like
+
+Create a namespace. Type a description into the second field — the form requires
+it, so it cannot be skipped. Land on the namespace page. The name is there, the
+date, Admins, Maintainers, Packages. **No description.**
+
+Come back a week later and write it again, because there is nowhere to see the one
+you already wrote.
+
+### Why
+
+Two independent omissions, either of which alone would have hidden it:
+
+1. `worker/src/routes/namespaces.ts` — `POST /namespaces` accepted `description`,
+   validated it and stored it. `GET /namespace/{ns}` then ran an aggregation whose
+   `$project` carried **only** `createdAt` and `packageDocs`. The field was never
+   selected, so it could not reach a response.
+2. `frontend/src/pages/namespace.js` — no reference to `description` anywhere. The
+   action did not read it, the reducer did not hold it, the view did not render it.
+
+There is no namespace *list* endpoint (`POST /namespaces/{ns}/admins` and
+`/maintainers` are member lists), so the description was surfaced **nowhere** in the
+product.
+
+### Why nothing caught it
+
+`write_path_audit.mjs` exercises every write at the API level and passes 69/69. It
+asserts the document lands in MongoDB — which it did. The description *was*
+stored, correctly, with a validated value. Every existing check looked at the
+write and never at the read-back through the UI.
+
+Same gap as D65, one layer over: the browser boundary.
+
+### The fix
+
+- `worker/src/routes/namespaces.ts`: `description: 1` added to the projection, and
+  the response coerces it with `typeof row.description === "string" ? … : ""` so
+  namespaces predating the field yield `""` rather than `undefined`.
+- `store/actions/namespaceActions.js`, `store/reducers/namespaceReducer.js`:
+  carried through, defaulting to `""` at the shape boundary.
+- `pages/namespace.js` + `namespace.css`: rendered beneath the title, and **only
+  when non-empty**, so the namespaces created before this existed look unchanged.
+  `overflow-wrap: anywhere` because the text is free-form from a form and a long
+  unbroken token would otherwise force a horizontal scrollbar on a phone — the same
+  failure D64 fixed on two other pages.
+
+Additive, so `scripts/check_api_compat.py` is unchanged.
+
+### Guards, and a weak guard caught in the act
+
+- `worker/test/live-namespaces.test.ts` asserts the aggregation projects
+  `description` at the **namespace** level, and that the response coerces a missing
+  value to `""`.
+
+Two things went wrong writing that test, both recorded because both produced a
+green run that meant nothing:
+
+- The window was sliced from the projection offset to `start + 1200`. The function
+  body is longer than 1200 characters, so the end preceded the start, `slice`
+  returned `""`, and the assertion failed for a reason unrelated to the code under
+  test.
+- The assertion was then `toContain("description: 1")` — and the nested
+  `packageDocs` sub-projection **also** contains `description: 1`, for packages.
+  Deleting the namespace's own field left the test passing. Found by mutation:
+  the test reported `2 passed` with the defect reintroduced.
+
+It is now anchored on `packageDocs`, requiring the field to appear *before* it, and
+re-verified: reintroducing the deletion fails the test.
+
+The end-to-end half is `scripts/write_journey.cjs`, 14/14 — it creates a namespace
+through the form and asserts the description reappears on the namespace page.
+
+### Also fixed while in the file
+
+The five navigation items in the signed-in dropdown were `<a>` with no `href`,
+performing navigation via `onClick`, while the signed-out nav beside them had been
+converted to real `<Link>`s earlier. Middle-click, ctrl-click, status-bar preview
+and "copy link address" all did nothing. They are now `as={Link} to=`, verified by
+clicking through each and checking the path. `Logout` is deliberately left as an
+`onClick` item: it is an action, not a destination, and giving it an `href` would
+imply a page to open in a new tab. The now-unused `handleNavigation` callback was
+removed rather than left as dead code.
+
+---
+
+## Harness finding — the intermittent signup failure was my own sleep
+
+Recorded because it was reported as an unresolved application defect last round and
+it was not one.
+
+Registration failed intermittently, roughly one run in three, with the harness able
+to say only "no document". Two wrong guesses were made before the response body was
+simply read. The button state at the moment of failure gave it away — the page said
+**"Creating account…"**, so the request was still in flight.
+
+Measured over four consecutive runs:
+
+| run | `POST /auth/signup` | document visible in MongoDB |
+|---|---|---|
+| 1 | 1010 ms | ~1600 ms |
+| 2 | 1186 ms | ~1610 ms |
+| 3 | 1185 ms | ~1631 ms |
+| 4 | 1321 ms | ~1649 ms |
+
+Both harnesses slept a fixed 1400 ms and 1500 ms respectively. **The sleeps were
+shorter than the real latency**, so the assertion raced the request. Nothing in the
+application was wrong.
+
+A fixed sleep is a race that passes on a fast machine and fails on a loaded one, so
+all three were replaced with a wait on a condition:
+
+- `_signed_in.cjs` polls for the account document.
+- `auth_journey.cjs` waits for the submit button to leave its `disabled` state,
+  which is the app reporting the round trip rather than a timer guessing at it.
+- sign-out polls for the token to actually clear.
+
+Three consecutive journeys after the change: 27/27 each.
+
+Worth noting for the eventual production deploy: ~1.0–1.3 s for signup is the
+PBKDF2 key derivation (176 ms of CPU, which is why it runs in the Durable Object
+rather than the Worker, where the Free plan allows 10 ms) plus a Durable Object
+round trip and an Atlas write. It is not a defect, but it is the number a user
+waits through, and the button correctly shows "Creating account…" throughout.

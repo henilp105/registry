@@ -34,10 +34,6 @@ const NavbarComponent = () => {
     navigate("/");
   }, [dispatch, accessToken, navigate]);
 
-  const handleNavigation = useCallback((path) => {
-    navigate(path);
-  }, [navigate]);
-
   return (
     <Navbar expand="md" sticky="top" className="app-navbar">
       <Container id="navbar-container">
@@ -70,7 +66,6 @@ const NavbarComponent = () => {
               <AuthenticatedNav
                 username={username}
                 isAdmin={isAdmin}
-                onNavigate={handleNavigation}
                 onSignOut={signOut}
               />
             )}
@@ -113,40 +108,53 @@ const UnauthenticatedNav = () => (
   </>
 );
 
-// Authenticated navigation items
-const AuthenticatedNav = ({ username, isAdmin, onNavigate, onSignOut }) => (
-  <NavDropdown 
-    title={<span className="fw-medium">{username}</span>} 
+// Authenticated navigation items.
+//
+// The navigation items are real `<Link>`s, matching the signed-out nav beside them
+// and the Register link that already did it this way. As `<NavDropdown.Item>` with
+// only an `onClick`, react-bootstrap renders an `<a>` with no `href`, so the browser
+// reports "link" with no destination: middle-click and ctrl-click do nothing, there
+// is no status-bar preview, and "copy link address" copies nothing.
+//
+// The dropdown *toggle* stays a disclosure widget rather than a link, which is
+// what it is: it opens a menu, it does not go anywhere.
+//
+// Logout is deliberately left as an `onClick` item. It is an action, not a
+// destination, so a button is the honest element -- giving it an href would imply
+// there is a page to open in a new tab.
+const AuthenticatedNav = ({ username, isAdmin, onSignOut }) => (
+  <NavDropdown
+    title={<span className="fw-medium">{username}</span>}
     id="user-nav-dropdown"
     align="end"
   >
-    <NavDropdown.Item onClick={() => onNavigate("/namespace/create")}>
+    <NavDropdown.Item as={Link} to="/namespace/create">
       <Icon name="plus-circle" className="me-2" /> Create Namespace
     </NavDropdown.Item>
-    <NavDropdown.Item onClick={() => onNavigate("/manage/projects")}>
+    <NavDropdown.Item as={Link} to="/manage/projects">
       <Icon name="th-large" className="me-2" /> Dashboard
     </NavDropdown.Item>
-    <NavDropdown.Item onClick={() => onNavigate("/manage/account")}>
+    <NavDropdown.Item as={Link} to="/manage/account">
       <Icon name="user-cog" className="me-2" /> Account
     </NavDropdown.Item>
-    
+
     {isAdmin && (
-      <NavDropdown.Item onClick={() => onNavigate("/admin")}>
+      <NavDropdown.Item as={Link} to="/admin">
         <Icon name="shield-alt" className="me-2" /> Admin
       </NavDropdown.Item>
     )}
-    
+
     <NavDropdown.Divider />
-    
-    <NavDropdown.Item onClick={() => onNavigate("/help")}>
+
+    <NavDropdown.Item as={Link} to="/help">
       <Icon name="question-circle" className="me-2" /> Help
     </NavDropdown.Item>
-    <NavDropdown.Item onClick={() => onNavigate("/archives")}>
+    <NavDropdown.Item as={Link} to="/archives">
       <Icon name="archive" className="me-2" /> Archives
     </NavDropdown.Item>
-    
+
     <NavDropdown.Divider />
-    
+
     <NavDropdown.Item onClick={onSignOut} className="text-danger">
       <Icon name="sign-out-alt" className="me-2" /> Logout
     </NavDropdown.Item>
