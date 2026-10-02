@@ -4,6 +4,7 @@ import { Card, Modal, Spinner, Alert } from "react-bootstrap";
 import { fetchUserListData } from "../store/actions/userListActions";
 import { Person } from "react-bootstrap-icons";
 import { Link } from "react-router-dom";
+import Icon from "../components/Icon";
 
 const ShowUserListDialog = ({
   show,
@@ -58,14 +59,14 @@ const ShowUserListDialog = ({
 
         {error && (
           <Alert variant="danger">
-            <i className="fas fa-exclamation-circle me-2" />
+            <Icon name="exclamation-circle" className="me-2" />
             {error}
           </Alert>
         )}
 
         {!isLoading && users && users.length === 0 && (
           <div className="text-center text-muted py-3">
-            <i className="fas fa-users fa-2x mb-2 d-block" />
+            <Icon name="users" size="2x" className="mb-2 d-block" />
             No users found
           </div>
         )}

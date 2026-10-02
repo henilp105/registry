@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { searchPackage, setQuery } from "../store/actions/searchActions";
 import { useDispatch } from "react-redux";
 import React, { useCallback, useState } from "react";
+import Icon from "./Icon";
 
 const PackageItem = ({ packageEntity }) => {
   const dispatch = useDispatch();
@@ -132,7 +133,7 @@ const PackageItem = ({ packageEntity }) => {
                 className="text-decoration-none"
                 style={{ color: "#9ca3af", fontSize: "0.85rem" }}
               >
-                <i className="fas fa-folder-open me-1" style={{ fontSize: "0.75rem" }} />
+                <Icon name="folder-open" className="me-1" size={12} />
                 {packageEntity.namespace}
               </Link>
             </div>
@@ -144,7 +145,7 @@ const PackageItem = ({ packageEntity }) => {
                 alignItems: "center",
                 gap: "4px"
               }}>
-                <i className="fas fa-clock" style={{ fontSize: "0.75rem" }} />
+                <Icon name="clock" size={12} />
                 {formatDate(packageEntity.updated_at)}
               </span>
             </div>

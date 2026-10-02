@@ -16,6 +16,7 @@ import RemoveNamespaceMaintainerFormDialog from "./removeNamespaceMaintainerDial
 import AddNamespaceAdminFormDialog from "./addNamespaceAdminForm";
 import RemoveNamespaceAdminFormDialog from "./removeNamespaceAdminForm";
 import GeneratePackageTokenDialogForm from "./generatePackageTokenDialogForm";
+import Icon from "../components/Icon";
 
 const Dashboard = () => {
   const [addMaintainerDialogState, setAddMaintainerDialogState] = useState({});
@@ -116,7 +117,7 @@ const Dashboard = () => {
         <div className="d-flex justify-content-between align-items-center mb-2">
           <h5 className="mb-0">Namespaces</h5>
           <Link to="/namespace/create" className="btn btn-sm btn-outline-primary">
-            <i className="fas fa-plus me-1" /> Create Namespace
+            <Icon name="plus" className="me-1" /> Create Namespace
           </Link>
         </div>
         {Namespaces()}
@@ -224,7 +225,7 @@ const Dashboard = () => {
     if (!namespaces || namespaces.length === 0) {
       return (
         <div className="alert alert-light border text-center py-4" role="alert">
-          <i className="fas fa-folder-open fa-2x text-muted mb-2" />
+          <Icon name="folder-open" size="2x" className="text-muted mb-2" />
           <p className="mb-2">You haven't created any namespaces yet.</p>
           <Link to="/namespace/create" className="btn btn-primary btn-sm">
             Create your first namespace
@@ -245,7 +246,7 @@ const Dashboard = () => {
                       to={`/namespaces/${element.name}`}
                       className="dashboard-title fw-semibold"
                     >
-                      <i className="fas fa-folder me-2 text-primary" />
+                      <Icon name="folder" className="me-2 text-primary" />
                       {element.name}
                     </Link>
                   </Card.Title>
@@ -265,7 +266,7 @@ const Dashboard = () => {
                     type="button"
                     title="Generate an upload token for this namespace"
                   >
-                    <i className="fas fa-key me-1" /> Generate Token
+                    <Icon name="key" className="me-1" /> Generate Token
                   </button>
                   {element.isNamespaceAdmin && (
                     <>
@@ -275,7 +276,7 @@ const Dashboard = () => {
                         type="button"
                         title="Add a new admin to this namespace"
                       >
-                        <i className="fas fa-user-plus me-1" /> Add Admin
+                        <Icon name="user-plus" className="me-1" /> Add Admin
                       </button>
                       <button
                         className="border border-danger rounded-pill chip-action text-danger"
@@ -283,7 +284,7 @@ const Dashboard = () => {
                         type="button"
                         title="Remove an admin from this namespace"
                       >
-                        <i className="fas fa-user-minus me-1" /> Remove Admin
+                        <Icon name="user-minus" className="me-1" /> Remove Admin
                       </button>
                     </>
                   )}
@@ -293,7 +294,7 @@ const Dashboard = () => {
                     type="button"
                     title="Add a new maintainer to this namespace"
                   >
-                    <i className="fas fa-user-plus me-1" /> Add Maintainer
+                    <Icon name="user-plus" className="me-1" /> Add Maintainer
                   </button>
                   {element.isNamespaceAdmin && (
                     <button
@@ -302,7 +303,7 @@ const Dashboard = () => {
                       type="button"
                       title="Remove a maintainer from this namespace"
                     >
-                      <i className="fas fa-user-minus me-1" /> Remove Maintainer
+                      <Icon name="user-minus" className="me-1" /> Remove Maintainer
                     </button>
                   )}
                 </div>

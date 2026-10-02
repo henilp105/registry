@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import Image from "react-bootstrap/Image";
 import Container from "react-bootstrap/Container";
@@ -10,6 +10,8 @@ import { logout } from "../store/actions/authActions";
 import { searchPackage, setQuery } from "../store/actions/searchActions";
 import { adminAuth } from "../store/actions/adminActions";
 import { useDebounce } from "../hooks/useDebounce";
+import ThemeToggle from "../theme/ThemeToggle";
+import Icon from "../components/Icon";
 
 const NavbarComponent = () => {
   const dispatch = useDispatch();
@@ -37,29 +39,31 @@ const NavbarComponent = () => {
   }, [navigate]);
 
   return (
-    <Navbar bg="light" expand="md" sticky="top" className="shadow-sm">
+    <Navbar expand="md" sticky="top" className="app-navbar">
       <Container id="navbar-container">
-        <Navbar.Brand
-          onClick={() => handleNavigation("/")}
-          style={{ cursor: "pointer" }}
-          role="button"
-          aria-label="Go to homepage"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === 'Enter' && handleNavigation("/")}
-        >
+        {/*
+          Rendered as a real link, not a clickable <div>: it gives us correct
+          middle-click, open-in-new-tab and screen-reader behaviour for free.
+          The mark is vendored in public/brand/ rather than hot-linked from
+          fortran-lang.org, so the shell renders with no third-party request.
+        */}
+        <Navbar.Brand as={Link} to="/" className="d-flex align-items-center gap-2">
           <Image
-            src="https://fortran-lang.org/_static/fortran-logo-256x256.png"
-            fluid
-            width={60}
-            height={60}
-            alt="FPM Registry - Fortran Package Manager"
+            src={`${process.env.PUBLIC_URL}/brand/fortran-logo-256.png`}
+            width={36}
+            height={36}
+            alt=""
+            aria-hidden="true"
           />
+          <span className="app-navbar__wordmark">
+            fpm <span className="app-navbar__wordmark-accent">registry</span>
+          </span>
         </Navbar.Brand>
         <Navbar.Toggle aria-controls="responsive-navbar-nav" aria-label="Toggle navigation" />
         <Navbar.Collapse id="responsive-navbar-nav">
           {location.pathname !== "/" && <SearchBar />}
-          
-          <Nav className="ms-auto align-items-center">
+
+          <Nav className="ms-auto align-items-center gap-lg-1">
             {!isAuthenticated ? (
               <UnauthenticatedNav onNavigate={handleNavigation} />
             ) : (
@@ -70,6 +74,7 @@ const NavbarComponent = () => {
                 onSignOut={signOut}
               />
             )}
+            <ThemeToggle />
           </Nav>
         </Navbar.Collapse>
       </Container>
@@ -89,16 +94,10 @@ const UnauthenticatedNav = ({ onNavigate }) => (
     <Nav.Link onClick={() => onNavigate("/account/login")} className="nav-link-hover">
       Login
     </Nav.Link>
-    <Nav.Link 
-      onClick={() => onNavigate("/account/register")} 
-      className="ms-2 px-3"
-      style={{
-        backgroundColor: '#0d6efd',
-        color: '#ffffff',
-        borderRadius: '4px',
-        fontWeight: '500',
-        textDecoration: 'none'
-      }}
+    <Nav.Link
+      as={Link}
+      to="/account/register"
+      className="ms-2 px-3 nav-cta btn btn-primary btn-sm"
     >
       Register
     </Nav.Link>
@@ -113,34 +112,34 @@ const AuthenticatedNav = ({ username, isAdmin, onNavigate, onSignOut }) => (
     align="end"
   >
     <NavDropdown.Item onClick={() => onNavigate("/namespace/create")}>
-      <i className="fas fa-plus-circle me-2" /> Create Namespace
+      <Icon name="plus-circle" className="me-2" /> Create Namespace
     </NavDropdown.Item>
     <NavDropdown.Item onClick={() => onNavigate("/manage/projects")}>
-      <i className="fas fa-th-large me-2" /> Dashboard
+      <Icon name="th-large" className="me-2" /> Dashboard
     </NavDropdown.Item>
     <NavDropdown.Item onClick={() => onNavigate("/manage/account")}>
-      <i className="fas fa-user-cog me-2" /> Account
+      <Icon name="user-cog" className="me-2" /> Account
     </NavDropdown.Item>
     
     {isAdmin && (
       <NavDropdown.Item onClick={() => onNavigate("/admin")}>
-        <i className="fas fa-shield-alt me-2" /> Admin
+        <Icon name="shield-alt" className="me-2" /> Admin
       </NavDropdown.Item>
     )}
     
     <NavDropdown.Divider />
     
     <NavDropdown.Item onClick={() => onNavigate("/help")}>
-      <i className="fas fa-question-circle me-2" /> Help
+      <Icon name="question-circle" className="me-2" /> Help
     </NavDropdown.Item>
     <NavDropdown.Item onClick={() => onNavigate("/archives")}>
-      <i className="fas fa-archive me-2" /> Archives
+      <Icon name="archive" className="me-2" /> Archives
     </NavDropdown.Item>
     
     <NavDropdown.Divider />
     
     <NavDropdown.Item onClick={onSignOut} className="text-danger">
-      <i className="fas fa-sign-out-alt me-2" /> Logout
+      <Icon name="sign-out-alt" className="me-2" /> Logout
     </NavDropdown.Item>
   </NavDropdown>
 );
@@ -216,7 +215,7 @@ const SearchBar = () => {
           {isLoading ? (
             <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
           ) : (
-            <i className="fas fa-search" />
+            <Icon name="search" />
           )}
         </button>
       </div>

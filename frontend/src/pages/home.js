@@ -5,6 +5,7 @@ import { Container, InputGroup, FormControl, Button } from "react-bootstrap";
 import { searchPackage, setQuery } from "../store/actions/searchActions";
 
 import "../home.css";
+import Icon from "../components/Icon";
 
 const Home = () => {
   return (
@@ -92,7 +93,7 @@ function HomeSearchField() {
           {isLoading ? (
             <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
           ) : (
-            <i className="fas fa-search" aria-hidden="true" />
+            <Icon name="search" />
           )}
         </Button>
       </InputGroup>
@@ -136,9 +137,9 @@ function QuickLinks() {
   const navigate = useNavigate();
 
   const links = [
-    { icon: "fa-book", label: "Documentation", path: "/help" },
-    { icon: "fa-archive", label: "Browse Archives", path: "/archives" },
-    { icon: "fa-user-plus", label: "Get Started", path: "/account/register" }
+    { icon: "book", label: "Documentation", path: "/help" },
+    { icon: "archive", label: "Browse Archives", path: "/archives" },
+    { icon: "user-plus", label: "Get Started", path: "/account/register" }
   ];
 
   return (
@@ -150,7 +151,7 @@ function QuickLinks() {
           onClick={() => navigate(path)}
           type="button"
         >
-          <i className={`fas ${icon}`} aria-hidden="true" />
+          <Icon name={icon} />
           <span>{label}</span>
         </button>
       ))}

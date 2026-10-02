@@ -8,6 +8,7 @@ import Button from "react-bootstrap/Button";
 import Alert from "react-bootstrap/Alert";
 import Spinner from "react-bootstrap/Spinner";
 import InputGroup from "react-bootstrap/InputGroup";
+import Icon from "../components/Icon";
 
 const ResetPassword = () => {
   const { uuid } = useParams();
@@ -81,8 +82,8 @@ const ResetPassword = () => {
 
         {message && (
           <Alert variant={isSuccess ? "success" : "danger"} className="mb-3">
-            {isSuccess && <i className="fas fa-check-circle me-2" />}
-            {!isSuccess && <i className="fas fa-exclamation-circle me-2" />}
+            {isSuccess && <Icon name="check-circle" className="me-2" />}
+            {!isSuccess && <Icon name="exclamation-circle" className="me-2" />}
             {message}
           </Alert>
         )}
@@ -105,7 +106,7 @@ const ResetPassword = () => {
                 onClick={() => setShowPassword(!showPassword)}
                 tabIndex={-1}
               >
-                <i className={`fas fa-eye${showPassword ? "-slash" : ""}`} />
+                <Icon name={showPassword ? "eye-slash" : "eye"} />
               </Button>
               <Form.Control.Feedback type="invalid">
                 {formErrors.password}
@@ -149,7 +150,7 @@ const ResetPassword = () => {
               </>
             ) : isSuccess ? (
               <>
-                <i className="fas fa-check me-2" />
+                <Icon name="check" className="me-2" />
                 Password Reset
               </>
             ) : (

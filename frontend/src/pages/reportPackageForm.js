@@ -5,6 +5,7 @@ import {
   reportPackage,
   resetErrorMessage,
 } from "../store/actions/reportPackageActions";
+import Icon from "../components/Icon";
 
 const ReportPackageForm = ({ namespace, package: packageName, show, onHide }) => {
   const dispatch = useDispatch();
@@ -80,7 +81,7 @@ const ReportPackageForm = ({ namespace, package: packageName, show, onHide }) =>
         </Modal.Header>
         <Modal.Body>
           <Alert variant="warning" className="mb-3">
-            <i className="fas fa-exclamation-triangle me-2" />
+            <Icon name="exclamation-triangle" className="me-2" />
             You are about to report <strong>{namespace}/{packageName}</strong>.
             Please provide a detailed reason.
           </Alert>
@@ -107,8 +108,8 @@ const ReportPackageForm = ({ namespace, package: packageName, show, onHide }) =>
 
           {message && (
             <Alert variant={isSuccess ? "success" : "danger"} className="mb-0">
-              {isSuccess && <i className="fas fa-check-circle me-2" />}
-              {!isSuccess && <i className="fas fa-exclamation-circle me-2" />}
+              {isSuccess && <Icon name="check-circle" className="me-2" />}
+              {!isSuccess && <Icon name="exclamation-circle" className="me-2" />}
               {message}
             </Alert>
           )}
@@ -129,12 +130,12 @@ const ReportPackageForm = ({ namespace, package: packageName, show, onHide }) =>
               </>
             ) : isSuccess ? (
               <>
-                <i className="fas fa-check me-2" />
+                <Icon name="check" className="me-2" />
                 Reported
               </>
             ) : (
               <>
-                <i className="fas fa-flag me-2" />
+                <Icon name="flag" className="me-2" />
                 Submit Report
               </>
             )}

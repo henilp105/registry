@@ -1,11 +1,8 @@
 import { useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  MDBPagination,
-  MDBPaginationItem,
-  MDBPaginationLink,
-} from "mdb-react-ui-kit";
 import { searchPackage } from "../store/actions/searchActions";
+import Icon from "./Icon";
+import "./pagination.css";
 
 const Pagination = ({ currentPage, totalPages }) => {
   const dispatch = useDispatch();
@@ -33,8 +30,7 @@ const Pagination = ({ currentPage, totalPages }) => {
   }, [displayPage, totalPages, maxVisibleItems]);
 
   const handlePageChange = useCallback((page) => {
-    // Scroll to top for better UX
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
     dispatch(searchPackage(query, page, orderBy));
   }, [dispatch, query, orderBy]);
 
@@ -47,98 +43,94 @@ const Pagination = ({ currentPage, totalPages }) => {
   const isLastPage = displayPage === totalPages;
 
   return (
-    <nav aria-label="Package search results pagination" className="d-flex justify-content-center mt-4">
-      <MDBPagination className="mb-0">
-        {/* First page button */}
+    <nav aria-label="Package search results pagination" className="pagination">
+      <ul className="pagination__list">
+        {/* First page */}
         {startPage > 1 && (
           <>
-            <MDBPaginationItem>
-              <MDBPaginationLink
-                onClick={() => handlePageChange(0)}
-                aria-label="Go to first page"
-                style={{ cursor: 'pointer' }}
-              >
-                <i className="fas fa-angle-double-left" aria-hidden="true"></i>
-                <span className="visually-hidden">First</span>
-              </MDBPaginationLink>
-            </MDBPaginationItem>
+            <li>
+              <button type="button" className="pagination__link" onClick={() => handlePageChange(0)}>
+                <Icon name="angle-double-left" />
+                <span className="visually-hidden">First page</span>
+              </button>
+            </li>
             {startPage > 2 && (
-              <MDBPaginationItem disabled>
-                <MDBPaginationLink>…</MDBPaginationLink>
-              </MDBPaginationItem>
+              <li>
+                <span className="pagination__gap" aria-hidden="true">…</span>
+              </li>
             )}
           </>
         )}
 
-        {/* Previous button */}
-        <MDBPaginationItem disabled={isFirstPage}>
-          <MDBPaginationLink
-            onClick={isFirstPage ? undefined : () => handlePageChange(currentPage - 1)}
-            aria-label="Go to previous page"
-            aria-disabled={isFirstPage}
-            style={{ cursor: isFirstPage ? 'not-allowed' : 'pointer' }}
+        {/* Previous */}
+        <li>
+          <button
+            type="button"
+            className="pagination__link"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={isFirstPage}
           >
-            <i className="fas fa-chevron-left me-1" aria-hidden="true"></i>
+            <Icon name="chevron-left" className="me-1" />
             <span className="d-none d-sm-inline">Previous</span>
-          </MDBPaginationLink>
-        </MDBPaginationItem>
+            <span className="visually-hidden d-sm-none">Previous page</span>
+          </button>
+        </li>
 
         {/* Page numbers */}
         {pageTiles.map((page) => {
           const isActive = displayPage === page;
           return (
-            <MDBPaginationItem key={page} active={isActive}>
-              <MDBPaginationLink
-                onClick={isActive ? undefined : () => handlePageChange(page - 1)}
-                aria-label={isActive ? `Current page, page ${page}` : `Go to page ${page}`}
-                aria-current={isActive ? 'page' : undefined}
-                style={{ cursor: isActive ? 'default' : 'pointer' }}
+            <li key={page}>
+              <button
+                type="button"
+                className={`pagination__link${isActive ? " pagination__link--active" : ""}`}
+                onClick={() => handlePageChange(page - 1)}
+                aria-current={isActive ? "page" : undefined}
+                aria-label={`Page ${page}`}
               >
                 {page}
-              </MDBPaginationLink>
-            </MDBPaginationItem>
+              </button>
+            </li>
           );
         })}
 
-        {/* Next button */}
-        <MDBPaginationItem disabled={isLastPage}>
-          <MDBPaginationLink
-            onClick={isLastPage ? undefined : () => handlePageChange(currentPage + 1)}
-            aria-label="Go to next page"
-            aria-disabled={isLastPage}
-            style={{ cursor: isLastPage ? 'not-allowed' : 'pointer' }}
+        {/* Next */}
+        <li>
+          <button
+            type="button"
+            className="pagination__link"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={isLastPage}
           >
             <span className="d-none d-sm-inline">Next</span>
-            <i className="fas fa-chevron-right ms-1" aria-hidden="true"></i>
-          </MDBPaginationLink>
-        </MDBPaginationItem>
+            <span className="visually-hidden d-sm-none">Next page</span>
+            <Icon name="chevron-right" className="ms-1" />
+          </button>
+        </li>
 
-        {/* Last page button */}
+        {/* Last page */}
         {endPage < totalPages && (
           <>
             {endPage < totalPages - 1 && (
-              <MDBPaginationItem disabled>
-                <MDBPaginationLink>…</MDBPaginationLink>
-              </MDBPaginationItem>
+              <li>
+                <span className="pagination__gap" aria-hidden="true">…</span>
+              </li>
             )}
-            <MDBPaginationItem>
-              <MDBPaginationLink
-                onClick={() => handlePageChange(totalPages - 1)}
-                aria-label="Go to last page"
-                style={{ cursor: 'pointer' }}
-              >
-                <i className="fas fa-angle-double-right" aria-hidden="true"></i>
-                <span className="visually-hidden">Last</span>
-              </MDBPaginationLink>
-            </MDBPaginationItem>
+            <li>
+              <button type="button" className="pagination__link" onClick={() => handlePageChange(totalPages - 1)}>
+                <Icon name="angle-double-right" />
+                <span className="visually-hidden">Last page</span>
+              </button>
+            </li>
           </>
         )}
-      </MDBPagination>
-      
-      {/* Page info for screen readers and mobile */}
-      <span className="ms-3 align-self-center text-muted small d-none d-md-inline">
+      </ul>
+
+      {/* Position readout. Announced on every page change, which is the point:
+          the buttons alone give no sense of how far through the results you are. */}
+      <p className="pagination__status" aria-live="polite">
         Page {displayPage} of {totalPages}
-      </span>
+      </p>
     </nav>
   );
 };

@@ -9,6 +9,7 @@ import {
   addNamespaceMaintainer,
   resetMessages,
 } from "../store/actions/namespaceMaintainersActions";
+import Icon from "../components/Icon";
 
 const AddNamespaceMaintainerFormDialog = ({ namespace, show, onHide }) => {
   const [username, setUsername] = useState("");
@@ -104,13 +105,13 @@ const AddNamespaceMaintainerFormDialog = ({ namespace, show, onHide }) => {
 
           {successMessage && (
             <Alert variant="success" className="mb-0">
-              <i className="fas fa-check-circle me-2" />
+              <Icon name="check-circle" className="me-2" />
               {successMessage}
             </Alert>
           )}
           {errorMessage && (
             <Alert variant="danger" className="mb-0">
-              <i className="fas fa-exclamation-circle me-2" />
+              <Icon name="exclamation-circle" className="me-2" />
               {errorMessage}
             </Alert>
           )}
@@ -127,7 +128,7 @@ const AddNamespaceMaintainerFormDialog = ({ namespace, show, onHide }) => {
               </>
             ) : (
               <>
-                <i className="fas fa-user-plus me-2" />
+                <Icon name="user-plus" className="me-2" />
                 Add Maintainer
               </>
             )}

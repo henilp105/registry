@@ -5,6 +5,7 @@ import {
   fetchMalicousReports,
   resetData,
 } from "../store/actions/viewMalicousReportActions";
+import Icon from "../components/Icon";
 
 const ViewMalicousReports = ({ show, onHide }) => {
   const dispatch = useDispatch();
@@ -35,7 +36,7 @@ const ViewMalicousReports = ({ show, onHide }) => {
     if (error) {
       return (
         <Alert variant="danger">
-          <i className="fas fa-exclamation-circle me-2" />
+          <Icon name="exclamation-circle" className="me-2" />
           {error}
         </Alert>
       );
@@ -44,7 +45,7 @@ const ViewMalicousReports = ({ show, onHide }) => {
     if (reports.length === 0) {
       return (
         <Alert variant="info">
-          <i className="fas fa-info-circle me-2" />
+          <Icon name="info-circle" className="me-2" />
           No malicious reports found.
         </Alert>
       );
@@ -54,7 +55,7 @@ const ViewMalicousReports = ({ show, onHide }) => {
       <Card key={index} className="mb-3">
         <Card.Body>
           <Card.Title className="h6">
-            <i className="fas fa-folder me-2" />
+            <Icon name="folder" className="me-2" />
             {report.namespace}/{report.package}
           </Card.Title>
           <Card.Text className="text-muted">
@@ -75,7 +76,7 @@ const ViewMalicousReports = ({ show, onHide }) => {
     >
       <Modal.Header closeButton>
         <Modal.Title>
-          <i className="fas fa-flag me-2" />
+          <Icon name="flag" className="me-2" />
           Malicious Reports
         </Modal.Title>
       </Modal.Header>

@@ -8,6 +8,7 @@ import DropdownButton from "react-bootstrap/DropdownButton";
 import Alert from "react-bootstrap/Alert";
 import { searchPackage, setOrderBy } from "../store/actions/searchActions";
 import { useNavigate } from "react-router-dom";
+import Icon from "../components/Icon";
 
 const Search = () => {
   const dispatch = useDispatch();
@@ -57,7 +58,7 @@ const Search = () => {
     return (
       <div className="container" style={{ paddingTop: "1rem" }}>
         <Alert variant="danger" className="d-flex align-items-center">
-          <i className="fas fa-exclamation-triangle me-2" />
+          <Icon name="exclamation-triangle" className="me-2" />
           {error}
         </Alert>
       </div>
@@ -112,7 +113,7 @@ const EmptySearchState = ({ query }) => (
     aria-live="polite"
   >
     <div className="mb-4">
-      <i className="fas fa-search fa-3x text-muted" />
+      <Icon name="search" size="3x" className="text-muted" />
     </div>
     <h4 className="mb-3">No packages found</h4>
     <p className="text-muted mb-4">
