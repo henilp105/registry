@@ -19,7 +19,6 @@ const AddMaintainerFormDialog = ({ namespace, package: packageName, show, onHide
   const dispatch = useDispatch();
   
   const currUsername = useSelector((state) => state.auth.username);
-  const uuid = useSelector((state) => state.auth.uuid);
   const { successMessage, errorMessage, isLoading } = useSelector(
     (state) => state.addRemoveMaintainer
   );
@@ -51,15 +50,14 @@ const AddMaintainerFormDialog = ({ namespace, package: packageName, show, onHide
     dispatch(
       addMaintainer(
         {
-          uuid,
-          namespace,
+            namespace,
           username_to_be_added: username,
           package: packageName,
         },
         currUsername
       )
     );
-  }, [dispatch, uuid, namespace, packageName, username, currUsername, validateForm]);
+  }, [dispatch, namespace, packageName, username, currUsername, validateForm]);
 
   const resetData = useCallback(() => {
     setUsername("");

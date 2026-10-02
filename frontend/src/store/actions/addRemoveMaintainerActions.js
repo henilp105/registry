@@ -17,7 +17,6 @@ export const RESET_MESSAGE = RESET_MAINTAINER_MESSAGES;
 /**
  * Add a maintainer to a package
  * @param {Object} data - Maintainer data
- * @param {string} data.uuid - User UUID
  * @param {string} data.username_to_be_added - Username to add as maintainer
  * @param {string} data.namespace - Package namespace
  * @param {string} data.package - Package name
@@ -28,7 +27,6 @@ export const addMaintainer = (data, username) => async (dispatch) => {
 
   try {
     const result = await post(`/${username}/maintainer`, {
-      uuid: data.uuid,
       username: data.username_to_be_added,
       namespace: data.namespace,
       package: data.package,
@@ -56,7 +54,6 @@ export const addMaintainer = (data, username) => async (dispatch) => {
 /**
  * Remove a maintainer from a package
  * @param {Object} data - Maintainer data
- * @param {string} data.uuid - User UUID
  * @param {string} data.username_to_be_removed - Username to remove as maintainer
  * @param {string} data.namespace - Package namespace
  * @param {string} data.package - Package name
@@ -67,7 +64,6 @@ export const removeMaintainer = (data, username) => async (dispatch) => {
 
   try {
     const result = await post(`/${username}/maintainer/remove`, {
-      uuid: data.uuid,
       username: data.username_to_be_removed,
       namespace: data.namespace,
       package: data.package,

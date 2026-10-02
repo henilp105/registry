@@ -17,7 +17,6 @@ export const RESET_ERROR_MESSAGE = RESET_NAMESPACE_MAINTAINER_MESSAGES;
 /**
  * Add a maintainer to a namespace
  * @param {Object} data - Maintainer data
- * @param {string} data.uuid - User UUID
  * @param {string} data.username_to_be_added - Username to add
  * @param {string} data.namespace - Namespace name
  * @param {string} username - Current user's username
@@ -27,7 +26,6 @@ export const addNamespaceMaintainer = (data, username) => async (dispatch) => {
 
   try {
     const result = await post(`/${username}/namespace/maintainer`, {
-      uuid: data.uuid,
       username: data.username_to_be_added,
       namespace: data.namespace,
     });
@@ -54,7 +52,6 @@ export const addNamespaceMaintainer = (data, username) => async (dispatch) => {
 /**
  * Remove a maintainer from a namespace
  * @param {Object} data - Maintainer data
- * @param {string} data.uuid - User UUID
  * @param {string} data.username_to_be_removed - Username to remove
  * @param {string} data.namespace - Namespace name
  * @param {string} username - Current user's username
@@ -64,7 +61,6 @@ export const removeNamespaceMaintainer = (data, username) => async (dispatch) =>
 
   try {
     const result = await post(`/${username}/namespace/maintainer/remove`, {
-      uuid: data.uuid,
       username: data.username_to_be_removed,
       namespace: data.namespace,
     });

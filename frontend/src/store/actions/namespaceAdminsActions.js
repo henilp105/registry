@@ -17,7 +17,6 @@ export const RESET_ERROR_MESSAGE = RESET_NAMESPACE_ADMIN_MESSAGES;
 /**
  * Add an admin to a namespace
  * @param {Object} data - Admin data
- * @param {string} data.uuid - User UUID
  * @param {string} data.username_to_be_added - Username to add as admin
  * @param {string} data.namespace - Namespace name
  * @param {string} username - Current user's username
@@ -27,7 +26,6 @@ export const addNamespaceAdmin = (data, username) => async (dispatch) => {
 
   try {
     const result = await post(`/${username}/namespace/admin`, {
-      uuid: data.uuid,
       username: data.username_to_be_added,
       namespace: data.namespace,
     });
@@ -54,7 +52,6 @@ export const addNamespaceAdmin = (data, username) => async (dispatch) => {
 /**
  * Remove an admin from a namespace
  * @param {Object} data - Admin data
- * @param {string} data.uuid - User UUID
  * @param {string} data.username_to_be_removed - Username to remove as admin
  * @param {string} data.namespace - Namespace name
  * @param {string} username - Current user's username
@@ -64,7 +61,6 @@ export const removeNamespaceAdmin = (data, username) => async (dispatch) => {
 
   try {
     const result = await post(`/${username}/namespace/admin/remove`, {
-      uuid: data.uuid,
       username: data.username_to_be_removed,
       namespace: data.namespace,
     });

@@ -18,7 +18,6 @@ const ShowUserListDialog = ({
   const dispatch = useDispatch();
   
   const { users, error, isLoading } = useSelector((state) => state.userList);
-  const uuid = useSelector((state) => state.auth.uuid);
 
   // Compute title based on dialog type
   const title = useMemo(() => {
@@ -37,10 +36,9 @@ const ShowUserListDialog = ({
         packageMaintainers: packagemaintainers,
         namespace,
         packageName,
-        uuid,
       })
     );
-  }, [show, dispatch, admins, maintainers, packagemaintainers, namespace, packageName, uuid]);
+  }, [show, dispatch, admins, maintainers, packagemaintainers, namespace, packageName]);
 
   return (
     // aria-labelledby + an id on the title. Without the pair, the dialog has

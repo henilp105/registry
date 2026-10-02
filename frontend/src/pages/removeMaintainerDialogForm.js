@@ -19,7 +19,6 @@ const RemoveMaintainerFormDialog = ({ namespace, package: packageName, show, onH
   const dispatch = useDispatch();
   
   const currUsername = useSelector((state) => state.auth.username);
-  const uuid = useSelector((state) => state.auth.uuid);
   const { successMessage, errorMessage, isLoading } = useSelector(
     (state) => state.addRemoveMaintainer
   );
@@ -51,15 +50,14 @@ const RemoveMaintainerFormDialog = ({ namespace, package: packageName, show, onH
     dispatch(
       removeMaintainer(
         {
-          uuid,
-          namespace,
+            namespace,
           username_to_be_removed: username,
           package: packageName,
         },
         currUsername
       )
     );
-  }, [dispatch, uuid, namespace, packageName, username, currUsername, validateForm]);
+  }, [dispatch, namespace, packageName, username, currUsername, validateForm]);
 
   const resetData = useCallback(() => {
     setUsername("");

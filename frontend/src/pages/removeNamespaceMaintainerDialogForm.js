@@ -19,7 +19,6 @@ const RemoveNamespaceMaintainerFormDialog = ({ namespace, show, onHide }) => {
   const dispatch = useDispatch();
 
   const currUsername = useSelector((state) => state.auth.username);
-  const uuid = useSelector((state) => state.auth.uuid);
   const { successMessage, errorMessage, isLoading } = useSelector(
     (state) => state.addRemoveNamespaceMaintainer
   );
@@ -51,14 +50,13 @@ const RemoveNamespaceMaintainerFormDialog = ({ namespace, show, onHide }) => {
     dispatch(
       removeNamespaceMaintainer(
         {
-          uuid,
-          namespace,
+            namespace,
           username_to_be_removed: username,
         },
         currUsername
       )
     );
-  }, [dispatch, uuid, namespace, username, currUsername, validateForm]);
+  }, [dispatch, namespace, username, currUsername, validateForm]);
 
   const resetData = useCallback(() => {
     setUsername("");

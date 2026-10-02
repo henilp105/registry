@@ -17,7 +17,6 @@ import Icon from "../components/Icon";
 const AdminSection = () => {
   const dispatch = useDispatch();
   
-  const uuid = useSelector((state) => state.auth.uuid);
   const accessToken = useSelector((state) => state.auth.accessToken);
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
   const { message, statuscode, isAdmin, isLoading } = useSelector((state) => state.admin);
@@ -104,11 +103,11 @@ const AdminSection = () => {
       "Delete Package",
       `You will not be able to recover ${formData.namespaceName}/${formData.packageName} package after you delete it.`,
       () => {
-        dispatch(deletePackage(formData.namespaceName, formData.packageName, uuid));
+        dispatch(deletePackage(formData.namespaceName, formData.packageName));
         setFormData(prev => ({ ...prev, namespaceName: "", packageName: "" }));
       }
     );
-  }, [formData.namespaceName, formData.packageName, uuid, dispatch, openModal, validateFields]);
+  }, [formData.namespaceName, formData.packageName, dispatch, openModal, validateFields]);
 
   const handleDeleteRelease = useCallback(() => {
     if (!validateFields(formData.namespaceName, formData.packageName, formData.releaseName)) return;
@@ -117,11 +116,11 @@ const AdminSection = () => {
       "Delete Release",
       `You will not be able to recover ${formData.namespaceName}/${formData.packageName}/${formData.releaseName} release after you delete it.`,
       () => {
-        dispatch(deleteRelease(formData.namespaceName, formData.packageName, formData.releaseName, uuid));
+        dispatch(deleteRelease(formData.namespaceName, formData.packageName, formData.releaseName));
         setFormData(prev => ({ ...prev, namespaceName: "", packageName: "", releaseName: "" }));
       }
     );
-  }, [formData.namespaceName, formData.packageName, formData.releaseName, uuid, dispatch, openModal, validateFields]);
+  }, [formData.namespaceName, formData.packageName, formData.releaseName, dispatch, openModal, validateFields]);
 
   const handleDeleteUser = useCallback(() => {
     if (!validateFields(formData.userName)) return;
@@ -130,11 +129,11 @@ const AdminSection = () => {
       "Delete User",
       `You will not be able to recover ${formData.userName} user after you delete it.`,
       () => {
-        dispatch(deleteUser(formData.userName, uuid));
+        dispatch(deleteUser(formData.userName));
         setFormData(prev => ({ ...prev, userName: "" }));
       }
     );
-  }, [formData.userName, uuid, dispatch, openModal, validateFields]);
+  }, [formData.userName, dispatch, openModal, validateFields]);
 
   const handleDeleteNamespace = useCallback(() => {
     if (!validateFields(formData.namespaceName)) return;
@@ -143,11 +142,11 @@ const AdminSection = () => {
       "Delete Namespace",
       `You will not be able to recover ${formData.namespaceName} namespace after you delete it.`,
       () => {
-        dispatch(deleteNamespace(formData.namespaceName, uuid));
+        dispatch(deleteNamespace(formData.namespaceName));
         setFormData(prev => ({ ...prev, namespaceName: "" }));
       }
     );
-  }, [formData.namespaceName, uuid, dispatch, openModal, validateFields]);
+  }, [formData.namespaceName, dispatch, openModal, validateFields]);
 
   const handleDeprecatePackage = useCallback(() => {
     if (!validateFields(formData.namespaceName, formData.packageName)) return;
@@ -156,11 +155,11 @@ const AdminSection = () => {
       "Deprecate Package",
       `Are you sure you want to deprecate ${formData.namespaceName}/${formData.packageName}?`,
       () => {
-        dispatch(deprecatePackage(formData.namespaceName, formData.packageName, uuid));
+        dispatch(deprecatePackage(formData.namespaceName, formData.packageName));
         setFormData(prev => ({ ...prev, namespaceName: "", packageName: "" }));
       }
     );
-  }, [formData.namespaceName, formData.packageName, uuid, dispatch, openModal, validateFields]);
+  }, [formData.namespaceName, formData.packageName, dispatch, openModal, validateFields]);
 
   //   const changePassword = () => {   // TODO: Enable this feature
   //     console.log("Changing password for user:", formData.userName);

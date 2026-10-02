@@ -19,7 +19,6 @@ const RemoveNamespaceAdminFormDialog = ({ namespace, show, onHide }) => {
   const dispatch = useDispatch();
   
   const currUsername = useSelector((state) => state.auth.username);
-  const uuid = useSelector((state) => state.auth.uuid);
   const { successMessage, errorMessage, isLoading } = useSelector(
     (state) => state.addRemoveNamespaceAdmin
   );
@@ -51,14 +50,13 @@ const RemoveNamespaceAdminFormDialog = ({ namespace, show, onHide }) => {
     dispatch(
       removeNamespaceAdmin(
         {
-          uuid,
-          namespace,
+            namespace,
           username_to_be_removed: username,
         },
         currUsername
       )
     );
-  }, [dispatch, uuid, namespace, username, currUsername, validateForm]);
+  }, [dispatch, namespace, username, currUsername, validateForm]);
 
   const resetData = useCallback(() => {
     setUsername("");

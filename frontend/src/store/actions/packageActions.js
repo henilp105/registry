@@ -71,13 +71,12 @@ export const fetchPackageData = (namespaceName, packageName) => async (dispatch)
  * Verify user role for a package
  * @param {string} namespaceName - Namespace name
  * @param {string} packageName - Package name
- * @param {string} uuid - User UUID
  */
-export const verifyUserRole = (namespaceName, packageName, uuid) => async (dispatch) => {
+export const verifyUserRole = (namespaceName, packageName) => async (dispatch) => {
   dispatch({ type: VERIFY_USER_ROLE_REQUEST });
 
   try {
-    const result = await post(`/packages/${namespaceName}/${packageName}/verify`, { uuid });
+    const result = await post(`/packages/${namespaceName}/${packageName}/verify`);
 
     dispatch({
       type: VERIFY_USER_ROLE_SUCCESS,

@@ -89,13 +89,12 @@ export const adminAuth = (accessToken) => async (dispatch) => {
 /**
  * Delete a user (admin action)
  * @param {string} username - Username to delete
- * @param {string} uuid - Admin UUID
  */
-export const deleteUser = (username, uuid) => async (dispatch) => {
+export const deleteUser = (username) => async (dispatch) => {
   dispatch({ type: DELETE_USER_REQUEST });
 
   try {
-    const result = await post("/users/delete", { uuid, username });
+    const result = await post("/users/delete", { username });
 
     if (isSuccessResponse(result)) {
       dispatch({
@@ -119,13 +118,12 @@ export const deleteUser = (username, uuid) => async (dispatch) => {
 /**
  * Delete a namespace (admin action)
  * @param {string} namespace - Namespace to delete
- * @param {string} uuid - Admin UUID
  */
-export const deleteNamespace = (namespace, uuid) => async (dispatch) => {
+export const deleteNamespace = (namespace) => async (dispatch) => {
   dispatch({ type: DELETE_NAMESPACE_REQUEST });
 
   try {
-    const result = await post(`/namespace/${namespace}/delete`, { uuid });
+    const result = await post(`/namespace/${namespace}/delete`);
 
     if (isSuccessResponse(result)) {
       dispatch({
@@ -150,13 +148,12 @@ export const deleteNamespace = (namespace, uuid) => async (dispatch) => {
  * Delete a package (admin action)
  * @param {string} namespaceName - Namespace name
  * @param {string} packageName - Package name
- * @param {string} uuid - Admin UUID
  */
-export const deletePackage = (namespaceName, packageName, uuid) => async (dispatch) => {
+export const deletePackage = (namespaceName, packageName) => async (dispatch) => {
   dispatch({ type: DELETE_PACKAGE_REQUEST });
 
   try {
-    const result = await post(`/packages/${namespaceName}/${packageName}/delete`, { uuid });
+    const result = await post(`/packages/${namespaceName}/${packageName}/delete`);
 
     if (isSuccessResponse(result)) {
       dispatch({
@@ -182,13 +179,12 @@ export const deletePackage = (namespaceName, packageName, uuid) => async (dispat
  * @param {string} namespaceName - Namespace name
  * @param {string} packageName - Package name
  * @param {string} version - Version to delete
- * @param {string} uuid - Admin UUID
  */
-export const deleteRelease = (namespaceName, packageName, version, uuid) => async (dispatch) => {
+export const deleteRelease = (namespaceName, packageName, version) => async (dispatch) => {
   dispatch({ type: DELETE_RELEASE_REQUEST });
 
   try {
-    const result = await post(`/packages/${namespaceName}/${packageName}/${version}/delete`, { uuid });
+    const result = await post(`/packages/${namespaceName}/${packageName}/${version}/delete`);
 
     // POST /packages/{ns}/{pkg}/{ver}/delete answers 200 with a bare
     // `{ message }` and no `code` key, so `isSuccessResponse` would report a
@@ -218,14 +214,12 @@ export const deleteRelease = (namespaceName, packageName, version, uuid) => asyn
  * Deprecate a package (admin action)
  * @param {string} namespaceName - Namespace name
  * @param {string} packageName - Package name
- * @param {string} uuid - Admin UUID
  */
-export const deprecatePackage = (namespaceName, packageName, uuid) => async (dispatch) => {
+export const deprecatePackage = (namespaceName, packageName) => async (dispatch) => {
   dispatch({ type: DEPRECATE_PACKAGE_REQUEST });
 
   try {
     const formData = new FormData();
-    formData.append("uuid", uuid);
     formData.append("name", packageName);
     formData.append("namespace", namespaceName);
     formData.append("isDeprecated", "true");

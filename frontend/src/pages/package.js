@@ -394,13 +394,12 @@ const ViewPackageMaintainersButton = ({
   onShowMaintainers,
 }) => {
   const dispatch = useDispatch();
-  const uuid = useSelector((state) => state.auth.uuid);
 
   useEffect(() => {
-    if (uuid) {
-      dispatch(verifyUserRole(namespace_name, package_name, uuid));
+    if (namespace_name && package_name) {
+      dispatch(verifyUserRole(namespace_name, package_name));
     }
-  }, [dispatch, uuid, namespace_name, package_name]);
+  }, [dispatch, namespace_name, package_name]);
 
   return (
     <button
