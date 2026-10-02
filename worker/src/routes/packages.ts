@@ -62,7 +62,8 @@ import { consumeUploadToken, tokenAllows } from "../lib/upload-tokens";
 import {
   MAX_TARBALL_BYTES,
   TarballTooLarge,
-  putTarball,
+  hashTarball,
+  putTarballBytes,
   tarballKey,
   type StoredTarball,
 } from "../lib/storage";
@@ -148,7 +149,9 @@ async function searchPackages(env: Env, url: URL): Promise<Response> {
   const page = clampInt(url.searchParams.get("page"), 0, 0, MAX_SKIP);
   const sortedBy = (url.searchParams.get("sorted_by") ?? "").toLowerCase();
   const limit = clampInt(url.searchParams.get("limit"), DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
-  const skip = page * limit;
+  // Defect D77: MAX_SKIP used to clamp the *page number*, so the actual skip
+  // could reach 10_000 * 50 = 500_000 -- a collection scan behind every request.
+  const skip = Math.min(page * limit, MAX_SKIP);
 
   // Public sort names map onto the fields that actually exist on the document.
   // v2.0.1 accepted `updatedat` but the field is `updated_at`, and accepted
@@ -282,7 +285,8 @@ async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
   // every other page calculation in this codebase.
   const page = clampInt(url.searchParams.get("page"), 1, 1, MAX_SKIP) - 1;
   const limit = clampInt(url.searchParams.get("limit"), DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
-  const skip = page * limit;
+  // See searchPackages: MAX_SKIP bounds the skip, not the page number.
+  const skip = Math.min(page * limit, MAX_SKIP);
   const sortedBy = (url.searchParams.get("sorted_by") ?? "name").toLowerCase();
   const sortField = SORT_MAP[sortedBy] ?? "name";
   const direction = sortDirection(url.searchParams.get("sort"));
@@ -890,23 +894,40 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
     }
   }
 
-  // Stream to R2 with an incremental digest. This is the first time an artifact
-  // checksum has ever been recorded for this registry.
-  let stored: StoredTarball;
+  // Hash the artifact *before* touching the database or R2, so the digest can
+  // go into the version document. The R2 write is deferred until after the
+  // atomic append below has won: the object key is derivable, so writing first
+  // would let a racing duplicate publish clobber the winner's object while the
+  // database records the winner's sha256 (D77).
+  let bytes: Uint8Array;
+  let total: number;
+  let sha256: string;
   try {
-    stored = await putTarball(
-      env,
-      tarballKey(namespace.namespace, packageName, version),
-      tarball.stream(),
-      tarball.size,
-    );
+    ({ bytes, total, sha256 } = await hashTarball(tarball.stream(), tarball.size));
   } catch (err) {
     if (err instanceof TarballTooLarge) {
       return jsonError(413, "Tarball exceeds the maximum upload size");
     }
-    logger.error("r2 put failed", { message: err instanceof Error ? err.message : String(err) });
+    logger.error("tarball hash failed", { message: err instanceof Error ? err.message : String(err) });
     return jsonError(400, "Invalid tarball file");
   }
+  const stored: StoredTarball = {
+    key: tarballKey(namespace.namespace, packageName, version),
+    size: total,
+    sha256,
+  };
+
+  // Write the artifact to R2, and on failure roll back whatever the atomic
+  // guard above added, so a version can never be advertised without its bytes.
+  const persistTarball = async (): Promise<Response | null> => {
+    try {
+      await putTarballBytes(env, stored.key, bytes, stored.sha256);
+      return null;
+    } catch (err) {
+      logger.error("r2 put failed", { message: err instanceof Error ? err.message : String(err) });
+      return jsonError(400, "Invalid tarball file");
+    }
+  };
 
   const now = new Date();
   const versionDoc = {
@@ -955,6 +976,18 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
   if (existing) {
     if (!(await appendVersion(existing._id))) {
       return jsonError(400, `Version ${version} of ${packageName} already exists`);
+    }
+    const fail = await persistTarball();
+    if (fail) {
+      // Roll back the version we just appended: without its R2 object the
+      // version is unusable and its sha256 would never be reproducible.
+      await db(env, {
+        kind: "updateOne",
+        collection: "packages",
+        filter: { _id: existing._id },
+        update: { $pull: { versions: { version } } },
+      });
+      return fail;
     }
   } else {
     const uploader = await db<(Record<string, unknown> & { _id: unknown }) | null>(env, {
@@ -1029,12 +1062,36 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
       if (!(await appendVersion(now_._id))) {
         return jsonError(400, `Version ${version} of ${packageName} already exists`);
       }
+      {
+        const fail = await persistTarball();
+        if (fail) {
+          await db(env, {
+            kind: "updateOne",
+            collection: "packages",
+            filter: { _id: now_._id },
+            update: { $pull: { versions: { version } } },
+          });
+          return fail;
+        }
+      }
       await invalidate(
         env,
         ENTITY.package(namespace.namespace, packageName),
         ENTITY.namespacePackages(namespace.namespace),
       );
       return jsonOk({ message: "Package Uploaded Successfully." });
+    }
+
+    {
+      const fail = await persistTarball();
+      if (fail) {
+        await db(env, {
+          kind: "deleteOne",
+          collection: "packages",
+          filter: { _id: inserted.insertedId },
+        });
+        return fail;
+      }
     }
 
     await db(env, {

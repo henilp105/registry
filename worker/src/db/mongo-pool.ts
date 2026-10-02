@@ -535,7 +535,10 @@ export class MongoPool extends DurableObject<PoolEnv> {
         return await cursor.toArray();
       }
       case "count":
-        return await c.countDocuments(op.filter as Filter<Document>);
+        // Defect D77: this used op.filter directly, bypassing toBsonQueries.
+        // Every other op uses the converted filter, so a count over an ObjectId
+        // filter would have silently returned 0 -- the same D55 zero-match shape.
+        return await c.countDocuments(filter as Filter<Document>);
       case "insertOne": {
         // The document goes through the same hex -> ObjectId conversion as the
         // filters do. Without this, the app writes id *references* as strings.

@@ -97,20 +97,18 @@ function assertSafeSegment(value: string, label: string): void {
 }
 
 /**
- * Stream a tarball into R2 and return its digest.
+ * Stream a tarball into memory and return its digest and bytes.
  *
  * The body is read in chunks and hashed incrementally, so a 50 MB artifact
- * never exists as one 50 MB buffer — the Worker has 128 MB of memory and is
+ * never exists as one 50 MB buffer -- the Worker has 128 MB of memory and is
  * billed per request, so holding the whole thing would be both slow and
  * wasteful. `crypto.subtle.digest` has no streaming API, so the incremental
  * hash is computed over the chunks directly.
  */
-export async function putTarball(
-  env: Env,
-  key: string,
+export async function hashTarball(
   body: ReadableStream<Uint8Array>,
   declaredSize: number,
-): Promise<StoredTarball> {
+): Promise<{ bytes: Uint8Array; total: number; sha256: string }> {
   const reader = body.getReader();
 
   // Two accumulators: the bytes for R2, and a running hash for the digest.
@@ -141,12 +139,16 @@ export async function putTarball(
 
   // Reassemble only for the R2 put. R2 has no streaming put from a Worker, so
   // this is the one unavoidable copy; the size ceiling keeps it bounded.
+  // Release `parts` before proceeding so the chunk table can be GC'd rather
+  // than sitting live alongside the reassembled buffer (D77: the two together
+  // peaked near 100 MB against the 128 MB Worker limit).
   const bytes = new Uint8Array(total);
   let offset = 0;
   for (const part of parts) {
     bytes.set(part, offset);
     offset += part.byteLength;
   }
+  parts.length = 0;
 
   if (total === 0) throw new Error("tarball is empty");
   if (declaredSize > 0 && Math.abs(declaredSize - total) > SIZE_TOLERANCE_BYTES) {
@@ -155,8 +157,24 @@ export async function putTarball(
     throw new Error("tarball size does not match the declared length");
   }
 
-  const sha256 = hasher.hex();
+  return { bytes, total, sha256: hasher.hex() };
+}
 
+/**
+ * Write already-hashed bytes to R2.
+ *
+ * Split out from `putTarball` (D77) so the upload handler can decide whether
+ * to store *after* the database has accepted the version: the atomic
+ * `versions.version: { $ne }` append must win before any bytes are written,
+ * otherwise a racing duplicate publish clobbers the winner's object at the
+ * same key and the stored `sha256` no longer matches the stored bytes.
+ */
+export async function putTarballBytes(
+  env: Env,
+  key: string,
+  bytes: Uint8Array,
+  sha256: string,
+): Promise<StoredTarball> {
   await env.TARBALLS.put(key, bytes, {
     httpMetadata: {
       contentType: "application/gzip",
@@ -170,8 +188,23 @@ export async function putTarball(
     },
   });
 
-  return { key, size: total, sha256 };
+  return { key, size: bytes.byteLength, sha256 };
 }
+
+/**
+ * Hash a tarball stream and write it to R2 in one call.
+ */
+export async function putTarball(
+  env: Env,
+  key: string,
+  body: ReadableStream<Uint8Array>,
+  declaredSize: number,
+): Promise<StoredTarball> {
+  const { bytes, total, sha256 } = await hashTarball(body, declaredSize);
+  const stored = await putTarballBytes(env, key, bytes, sha256);
+  return { ...stored, size: total };
+}
+
 
 export class TarballTooLarge extends Error {
   constructor() {
