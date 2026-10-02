@@ -1,10 +1,16 @@
 name: Run Tests for Backend
 
 on:
+  # `"**"`, not `"*"`. GitHub's glob `*` does not cross a `/`, so `"*"` silently
+  # matched no branch containing a slash -- `integration/serverless-and-frontend`
+  # ran zero backend tests when this migration merged both halves. The same
+  # pattern in worker.yml skipped every integration branch for the same reason.
+  # A filter that quietly matches nothing looks exactly like a filter that
+  # matches everything, which is why this went unnoticed.
   push:
-    branches: ["*"]
+    branches: ["**"]
   pull_request:
-    branches: ["*"]
+    branches: ["**"]
   workflow_dispatch:
 
 env:
