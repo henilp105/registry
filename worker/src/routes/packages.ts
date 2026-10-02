@@ -62,6 +62,8 @@ import { consumeUploadToken, tokenAllows } from "../lib/upload-tokens";
 import {
   MAX_TARBALL_BYTES,
   TarballTooLarge,
+  deletePackageTarballs,
+  deleteTarball,
   hashTarball,
   putTarballBytes,
   tarballKey,
@@ -612,6 +614,10 @@ async function deleteVersion(
     });
   }
 
+  // D78: the R2 object used to be left behind. The key is derivable from the
+  // same three segments that just identified the version document.
+  ctx.waitUntil(deleteTarball(env, tarballKey(namespaceName, packageName, version)));
+
   await invalidate(env, ENTITY.package(namespaceName, packageName), ENTITY.namespacePackages(namespaceName));
   ctx.waitUntil(Promise.resolve(logger.info("version deleted", { namespaceName, packageName, version })));
 
@@ -635,9 +641,9 @@ async function deletePackage(
   const target = await resolvePackageTarget(env, namespaceName, packageName);
   if (!target.ok) return target.response;
 
-  const tarballOids = ((target.package.versions ?? []) as Record<string, unknown>[])
-    .map((v) => (v.oid ? strId(v.oid) : null))
-    .filter((v): v is string => !!v);
+  const versions = ((target.package.versions ?? []) as Record<string, unknown>[])
+    .map((v) => String(v.version))
+    .filter((v) => v.length > 0);
 
   // Defect D12: v0.0.1 deleted only the package document, leaving
   // namespaces.packages[], users.authorOf and users.maintainerOf dangling —
@@ -661,8 +667,13 @@ async function deletePackage(
     ],
   });
 
+  // D78: delete the R2 objects, not just metadata. The previous code collected
+  // legacy GridFS `oid`s -- always empty in this architecture -- and logged
+  // them, so every package tarball was orphaned forever.
+  ctx.waitUntil(deletePackageTarballs(env, namespaceName, packageName, versions));
+
   await invalidate(env, ENTITY.package(namespaceName, packageName), ENTITY.namespacePackages(namespaceName));
-  ctx.waitUntil(Promise.resolve(logger.info("package deleted", { namespaceName, packageName, tarballs: tarballOids.length })));
+  ctx.waitUntil(Promise.resolve(logger.info("package deleted", { namespaceName, packageName, tarballs: versions.length })));
 
   return jsonOk({ message: "Package deleted successfully" });
 }

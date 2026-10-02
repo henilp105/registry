@@ -38,6 +38,7 @@ import type { AuthContext } from "../lib/auth";
 import { validateNamespaceName } from "../lib/validators";
 import { issueUploadToken, revokeUploadToken, DEFAULT_TTL_DAYS } from "../lib/upload-tokens";
 import { logger } from "../lib/logger";
+import { deletePackageTarballs } from "../lib/storage";
 // ── deduplicated (defect D73) ─────────────────────────────────────────────────
 //
 // `readBody` and `findUser` used to be defined here *and* exported from
@@ -374,9 +375,11 @@ async function deleteNamespace(
   const namespaceId = namespace._id;
   const packageIds = (namespace.packages ?? []) as unknown[];
 
-  // Collect the tarball ids before deleting the packages, so Phase 6 can prune
-  // the corresponding R2 objects. Doing it after the delete would be too late.
-  const tarballOids = await collectTarballOids(env, packageIds);
+  // Collect the (package, version) pairs before deleting the documents, so the
+  // corresponding R2 objects can be pruned. Doing it after the delete would be
+  // too late -- the objects would be unreachable but still stored, counting
+  // against the 10 GB free-tier ceiling (defect D78).
+  const packageVersions = await collectPackageVersions(env, packageIds);
 
   await db(env, {
     kind: "transaction",
@@ -404,32 +407,44 @@ async function deleteNamespace(
 
   logger.info("namespace deleted", { namespace: namespaceName, packages: packageIds.length });
 
-  // R2 cleanup is Phase 6 work; schedule it rather than blocking the response.
+  // R2 cleanup is scheduled rather than blocking the response.
   ctx.waitUntil(
-    Promise.resolve(tarballOids).then((oids) => {
-      logger.info("namespace tarballs to prune", { namespace: namespaceName, count: oids.length });
-    }),
+    (async () => {
+      for (const pv of packageVersions) {
+        await deletePackageTarballs(env, namespaceName, pv.packageName, pv.versions);
+      }
+      logger.info("namespace tarballs pruned", { namespace: namespaceName, packages: packageVersions.length });
+    })(),
   );
 
   return jsonOk({ message: "Namespace deleted successfully" });
 }
 
-async function collectTarballOids(env: Env, packageIds: unknown[]): Promise<string[]> {
+/**
+ * Defect D78: this used to collect legacy GridFS `oid`s, which never exist in
+ * this architecture -- so the count it returned was always 0 and no object was
+ * ever pruned. Now it collects what the R2 key actually derives from.
+ */
+async function collectPackageVersions(
+  env: Env,
+  packageIds: unknown[],
+): Promise<{ packageName: string; versions: string[] }[]> {
   if (packageIds.length === 0) return [];
   const packages = (await db<unknown[]>(env, {
     kind: "find",
     collection: "packages",
     filter: { _id: { $in: packageIds } },
-    projection: { versions: 1 },
+    projection: { name: 1, versions: 1 },
   })) as Record<string, unknown>[];
 
-  const oids: string[] = [];
-  for (const pkg of packages ?? []) {
-    for (const version of (pkg.versions ?? []) as Record<string, unknown>[]) {
-      if (version.oid) oids.push(strId(version.oid));
-    }
-  }
-  return oids;
+  return (packages ?? [])
+    .map((pkg) => ({
+      packageName: String(pkg.name ?? ""),
+      versions: ((pkg.versions ?? []) as Record<string, unknown>[])
+        .map((v) => String(v.version ?? ""))
+        .filter((v) => v.length > 0),
+    }))
+    .filter((p) => p.packageName.length > 0 && p.versions.length > 0);
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

@@ -43,6 +43,7 @@ import {
   type UserLike,
 } from "../lib/permissions";
 import { logger } from "../lib/logger";
+import { deletePackageTarballs } from "../lib/storage";
 import { readBody } from "./namespaces";
 
 export async function handleUserRoutes(
@@ -309,7 +310,9 @@ async function deleteUser(
     kind: "find",
     collection: "packages",
     filter: { author: target._id },
-    projection: { _id: 1 },
+    // name/namespace_name/versions are needed to prune the R2 objects after the
+    // cascade delete (D78).
+    projection: { _id: 1, name: 1, namespace_name: 1, versions: 1, namespace: 1 },
   })) as Record<string, unknown>[];
 
   const ownedIds = ownedPackages.map((p) => p._id);
@@ -357,6 +360,39 @@ async function deleteUser(
       { kind: "deleteOne", collection: "users", filter: { _id: target._id } },
     ],
   });
+
+  // D78: prune the R2 objects belonging to the packages just deleted. Map
+  // each package to its namespace name (legacy docs may lack namespace_name).
+  const namespaceNames = new Map<string, string>();
+  if (ownedPackages.length > 0) {
+    const nsIds = ownedPackages.map((p) => p.namespace).filter((n) => n !== undefined && n !== null);
+    if (nsIds.length > 0) {
+      const namespaces = (await db<unknown[]>(env, {
+        kind: "find",
+        collection: "namespaces",
+        filter: { _id: { $in: nsIds } },
+        projection: { namespace: 1 },
+      })) as Record<string, unknown>[];
+      for (const ns of namespaces ?? []) namespaceNames.set(strId(ns._id), String(ns.namespace ?? ""));
+    }
+
+    ctx.waitUntil(
+      (async () => {
+        for (const pkg of ownedPackages) {
+          const nsName =
+            typeof pkg.namespace_name === "string" && pkg.namespace_name.length > 0
+              ? pkg.namespace_name
+              : namespaceNames.get(strId(pkg.namespace)) ?? "";
+          if (!nsName) continue;
+          const versions = ((pkg.versions ?? []) as Record<string, unknown>[])
+            .map((v) => String(v.version ?? ""))
+            .filter((v) => v.length > 0);
+          await deletePackageTarballs(env, nsName, String(pkg.name ?? ""), versions);
+        }
+        logger.info("user tarballs pruned", { username, packages: ownedPackages.length });
+      })(),
+    );
+  }
 
   logger.info("user deleted", { username, packagesRemoved: ownedIds.length });
   void ctx;
