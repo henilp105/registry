@@ -1,0 +1,19 @@
+# Copy to .dev.vars for `wrangler dev`. NEVER commit .dev.vars.
+
+# Target cluster: MongoDB 8.0.34, ap-south-1 (verified).
+MONGO_URI=mongodb+srv://USER:PASSWORD@cluster0.kdreahb.mongodb.net/?appName=Cluster0
+MONGO_DB_NAME=fpmregistry
+
+# Signing key for HS256 JWTs. Generate with:
+#   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+JWT_SECRET_KEY=
+
+# Only the legacy sha256(password + SALT) verifier reads SALT. New passwords
+# use PBKDF2-SHA256 with a per-user salt.
+SALT=
+
+# Password reset + email verification via Brevo HTTPS API (see backend/mail.py).
+# Free tier: 300 emails/day. Leave blank to disable sending.
+BREVO_API_KEY=
+BREVO_SENDER_EMAIL=
+BREVO_SENDER_NAME=FPM Registry
