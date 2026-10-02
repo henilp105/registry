@@ -685,6 +685,42 @@ X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 1612345678
 ```
 
+A refused request also carries `Retry-After`, in seconds.
+
+### How the caller is identified
+
+Authenticated requests are counted **per account**, using the `sub` claim of the
+access token. Anonymous requests are counted **per source address**.
+
+Per-account rather than per-address is deliberate: a NAT, a corporate proxy or a
+shared CI runner puts many distinct users behind one address, and counting those
+together would let one user deny service to everyone else behind the same IP.
+
+### What is not counted
+
+Requests served from the edge cache do not reach the limiter, because they do not
+reach the database either. That is the intended outcome rather than a gap:
+flooding cached reads is the cheap way to load this registry — Cloudflare serves
+them and the Atlas operations/second cap is untouched. What the limiter exists to
+prevent is pressure on the database, and every request that touches MongoDB is
+accounted for.
+
+`/health`, `/`, `/apidocs` and `/apidocs/openapi.json` are never limited, so a
+monitoring check cannot be starved by client traffic.
+
+Counters live in a Durable Object and reset if it is evicted. A fixed window is
+used, so a client can send up to twice the limit either side of a window boundary.
+
+If the counter store is unreachable the limiter **fails open** and requests
+proceed. A limiter that takes the API down when it breaks would add availability
+risk rather than reduce it.
+
+### Previously documented but not implemented
+
+This section described a scheme that did not exist anywhere in the code, with a
+429 handler that nothing raised. See `docs/BASELINE_AUDIT.md` defect D41. It is
+now implemented and verified by `scripts/rate_limit_probe.cjs`.
+
 ---
 
 ## Interactive Documentation

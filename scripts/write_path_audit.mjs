@@ -53,8 +53,22 @@ const bad = (name, detail) => {
 };
 const check = (name, cond, detail = "") => (cond ? ok(name, detail) : bad(name, detail || "assertion failed"));
 
+/**
+ * A stable source address for this run.
+ *
+ * Rate limiting keys on `cf-connecting-ip` for anonymous callers and on the
+ * authenticated identity otherwise, so two harness runs would otherwise share one
+ * budget and the second would be refused by the first's traffic. Cloudflare sets
+ * this header in production; locally there is no such header, so the middleware
+ * falls back to reading it, which is what makes this work.
+ *
+ * A distinct address per run is also what a real CI fleet looks like, so this
+ * matches production rather than working around the limiter.
+ */
+const RUN_IP = `198.18.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}`;
+
 async function req(path, { method = "GET", form, bearer, headers = {} } = {}) {
-  const init = { method, headers: { ...headers } };
+  const init = { method, headers: { "cf-connecting-ip": RUN_IP, ...headers } };
   if (bearer) init.headers.Authorization = `Bearer ${bearer}`;
   if (form) init.body = form;
   const res = await fetch(`${API}${path}`, init);

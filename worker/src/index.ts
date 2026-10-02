@@ -19,6 +19,8 @@ import { pruneOrphanedTarballs } from "./routes/tarballs";
 import { db } from "./db/client";
 import { corsHeaders, handlePreflight } from "./lib/cors";
 import { logger } from "./lib/logger";
+import { isExempt, rateLimitHeaders, rateLimitedResponse } from "./lib/rate-limit-middleware";
+import { authenticate } from "./lib/auth";
 import { json, jsonError, jsonOk, ok, securityHeaders } from "./lib/responses";
 import { route } from "./router";
 
@@ -47,11 +49,39 @@ export default {
         return healthResponse(env, cors);
       }
 
+      // Rate limiting, in front of the router rather than inside handlers.
+      //
+      // The documented scheme is a property of the *endpoint*, so enforcing it
+      // per route would mean remembering to add it to each of 43 routes — and the
+      // first one forgotten is the one an attacker finds. This chokepoint cannot
+      // be forgotten that way.
+      //
+      // `authenticate` is called here as well as inside the handlers. That is one
+      // extra HMAC verification: no database round trip and no KDF, so a fraction
+      // of a millisecond, in exchange for counting per account rather than per
+      // address. Counting per address would let one user behind a shared NAT deny
+      // service to everyone else on it.
+      let rateHeaders: Record<string, string> = {};
+      if (!isExempt(url.pathname)) {
+        const identity = await authenticate(request, env);
+        rateHeaders = await rateLimitHeaders(request, env, url, identity?.uuid ?? null);
+
+        if (rateHeaders["retry-after"]) {
+          return rateLimitedResponse(url, { ...rateHeaders, ...cors });
+        }
+      }
+
       const response = await route(request, env, ctx, url);
       if (response) {
         // Copy the CORS headers on without rebuilding the body.
         const merged = new Headers(response.headers);
         for (const [k, v] of Object.entries(cors)) merged.set(k, v);
+        // Advertise the budget so a client can pace itself rather than
+        // discovering the limit by being refused. `docs/api-reference.md`
+        // documents these headers; before this they were promised and absent.
+        for (const [k, v] of Object.entries(rateHeaders)) {
+          if (k !== "retry-after") merged.set(k, v);
+        }
         return new Response(response.body, {
           status: response.status,
           statusText: response.statusText,
@@ -59,7 +89,10 @@ export default {
         });
       }
 
-      return jsonError(404, "Page not found", cors);
+      // `extra` is body fields; headers go in the fourth argument. Passing
+      // `rateHeaders` as `extra` would serialise X-RateLimit-* keys into the JSON
+      // body of every 404.
+      return jsonError(404, "Page not found", {}, { ...cors, ...rateHeaders });
     } catch (err) {
       // Defect S20/D8: never echo an internal message or stack to the client.
       console.error("unhandled", url.pathname, err instanceof Error ? err.message : err);

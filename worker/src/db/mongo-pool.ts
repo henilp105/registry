@@ -33,6 +33,7 @@
 
 import { DurableObject } from "cloudflare:workers";
 import { toBsonQueries, toRpcSafe } from "./bson";
+import { LIMITS, consume, type LimitKind } from "../lib/rate-limit";
 import { hashPassword, parseIterations, verifyPassword } from "../lib/password";
 import {
   MongoClient,
@@ -47,6 +48,7 @@ import {
 /** Operations a Worker can ask the pool to perform. */
 export type MongoOp =
   | { kind: "ping" }
+  | { kind: "rateLimit"; key: string; bucket: string; nowMs: number }
   | { kind: "findOne"; collection: string; filter: Document; projection?: Document }
   | {
       kind: "find";
@@ -133,6 +135,28 @@ export class MongoPool extends DurableObject<PoolEnv> {
   #db: Db | null = null;
   #lastError: string | null = null;
   #opsServed = 0;
+
+  /**
+   * Rate-limit counters, in memory on the Durable Object.
+   *
+   * In memory rather than in MongoDB on purpose: this is a hot path, and putting
+   * it in the database would add a write per request to the 100 ops/second M0
+   * cap -- the limiter would itself become the load it exists to prevent. A DO
+   * instance is single-threaded, so no locking is needed.
+   *
+   * Consequence of holding them here: counters reset when the DO is evicted.
+   * That is fail-open, which is the right direction for a limiter protecting a
+   * free tier -- see `failOpen` in lib/rate-limit.ts. It also means the guarantee
+   * is per-isolate rather than global, which for an abuse control is the correct
+   * trade.
+   *
+   * Bounded by the number of distinct keys seen rather than by request volume: a
+   * key is overwritten on its next request, so a client that stops calling leaves
+   * at most one stale entry. Pruned when it grows past `MAX_TRACKED_KEYS`, oldest
+   * first, so a spray of spoofed addresses cannot grow it without limit.
+   */
+  #rateCounters = new Map<string, { count: number; expiresAtMs: number }>();
+  static readonly MAX_TRACKED_KEYS = 50_000;
 
   constructor(ctx: DurableObjectState, env: PoolEnv) {
     super(ctx, env);
@@ -378,6 +402,41 @@ export class MongoPool extends DurableObject<PoolEnv> {
     }
   }
 
+  /**
+   * Count one request against a key and return the decision.
+   *
+   * The bucket is resolved here rather than trusted from the Worker: the limits
+   * are policy, and policy belongs next to the state it governs.
+   */
+  #countRate(key: string, bucket: string, nowMs: number): {
+    allowed: boolean; limit: number; remaining: number; resetAt: number;
+  } {
+    const kind = bucket in LIMITS ? (bucket as LimitKind) : "general";
+
+    // The counter key must include the bucket.
+    //
+    // Keyed by client alone, all three budgets collide on a single counter, so
+    // auth traffic eats the upload allowance and vice versa. Measured: a fresh
+    // client that had signed up and logged in — two auth requests — then saw
+    // `X-RateLimit-Remaining: 2` on its *first* upload, against a budget of 5,
+    // because the upload counter was reporting the count the auth requests had
+    // accumulated. Every bucket effectively shared the tightest limit.
+    //
+    // The earlier live check missed this because each probe used a distinct
+    // address and made requests of only one kind, so the collision never arose.
+    const slot = `${key}|${kind}`;
+
+    if (this.#rateCounters.size > MongoPool.MAX_TRACKED_KEYS) {
+      // Drop the oldest insertion first; Map preserves insertion order.
+      const oldest = this.#rateCounters.keys().next();
+      if (!oldest.done) this.#rateCounters.delete(oldest.value);
+    }
+
+    const { counter, decision } = consume(this.#rateCounters.get(slot), kind, nowMs);
+    this.#rateCounters.set(slot, counter);
+    return decision;
+  }
+
   // ── internals ────────────────────────────────────────────────────────────
 
   /**
@@ -428,6 +487,9 @@ export class MongoPool extends DurableObject<PoolEnv> {
     if (op.kind === "ping") {
       await client.db("admin").command({ ping: 1 });
       return { ok: 1 };
+    }
+    if (op.kind === "rateLimit") {
+      return this.#countRate(op.key, op.bucket, op.nowMs);
     }
     if (op.kind === "transaction") {
       return this.#transaction(op.steps);
