@@ -38,7 +38,11 @@
     "MONGO_DB_NAME": "fpmregistry",
     "PBKDF2_ITERATIONS": "210000",
     "HOST": "http://localhost:5173",
-    "ALLOWED_ORIGINS": "http://localhost:5173"
+    "ALLOWED_ORIGINS": "http://localhost:5173",
+    // Secrets are NOT in this file. Set with:
+    //   wrangler secret put JWT_SECRET_KEY
+    //   wrangler secret put VALIDATION_SECRET
+    //   wrangler secret put BREVO_API_KEY
   },
 
   "durable_objects": {

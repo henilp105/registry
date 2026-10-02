@@ -34,6 +34,13 @@ export type Env = PoolEnv & {
    */
   SUDO_PASSWORD?: string;
   // Optional — only needed in production. See src/lib/mail.ts.
+  /**
+   * Shared secret for the GitHub Actions validation callback. Deliberately a
+   * separate credential from JWT_SECRET_KEY: this endpoint can mark any package
+   * as verified, so it must not be reachable with a token ordinary maintainers
+   * hold. Fails closed when unset.
+   */
+  VALIDATION_SECRET?: string;
   BREVO_API_KEY?: string;
   BREVO_SENDER_EMAIL?: string;
   BREVO_SENDER_NAME?: string;

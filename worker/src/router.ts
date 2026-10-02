@@ -27,6 +27,7 @@ import { handleNamespaceRoutes } from "./routes/namespaces";
 import { handlePackageRoutes } from "./routes/packages";
 import { handleRatingReportRoutes } from "./routes/ratings";
 import { handleTarballRoutes } from "./routes/tarballs";
+import { handleValidationRoutes } from "./routes/validation";
 
 export type Ctx = ExecutionContext;
 
@@ -63,6 +64,12 @@ export async function route(
   if (seg[0] === "tarballs" || seg[0] === "static" || seg[0] === "download") {
     return handleTarballRoutes(request, env, ctx, seg, url, auth);
   }
+  // The validation callback API. Authenticated by a dedicated secret rather
+  // than a user JWT, because it can mark any package as verified.
+  if (seg[0] === "internal" && seg[1] === "validation") {
+    return handleValidationRoutes(request, env, ctx, seg, url, auth);
+  }
+
   if (seg[0] === "registry") {
     if (seg[1] === "archives") return jsonError(501, "Archive dumps are disabled in the serverless deployment");
     return null;
