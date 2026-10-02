@@ -150,3 +150,47 @@ Severity: 🔴 breaks correctness/security · 🟠 significant · 🟡 cleanup.
   bug.
 - `version_history` gains correct ordering.
 - A `GET /packages/<ns>/<pkg>/deprecate` route is **new** — nothing depended on its absence.
+
+---
+
+## D46 — Archive download links 404 (found during integration, post-migration)
+
+**Severity: high (user-visible, silent).** Found by cross-checking every URL the
+frontend hard-codes against the Worker's router, after merging both branches.
+
+`pages/archives.js` links each archive to `${API}/static/${name}`. That URL was
+always correct in the Docker deployment — but **nginx** served the `static/`
+directory. Flask never saw the request. So no backend route ever existed for it,
+and no test covered it, because there was nothing to test: the path worked.
+
+Removing the web server removed the only thing implementing it.
+`handleTarballRoutes` claims the `static` prefix and has no branch for it, so
+`GET /static/registry-2026-10-02.tar.gz` fell through to 404.
+
+The archives page rendered working-looking links to files that 404'd, and nothing
+in CI, the type checker, the linter or the build noticed. This is the failure mode
+unique to *deleting a layer*: each side is internally consistent and the seam
+between them was implemented by a component that no longer exists.
+
+**Fixed two ways:**
+
+1. `router.ts` routes `/static/{name}` to the archive handler, placed **above**
+   the tarball branch that claims the prefix. Ordering is the whole fix, and the
+   test asserts on ordering rather than mere presence.
+2. The frontend now links `/archives/{name}`, the canonical path. The alias stays
+   so a cached bundle keeps working.
+
+**Regression test:** `worker/test/frontend-contract.test.ts` pins the URLs the
+frontend hard-codes and asserts each is both documented *and* routed — the two
+can disagree, which is precisely how this happened. Verified by reintroducing the
+bug: the ordering assertion fails.
+
+Two rounds of tightening the test were needed before it could actually fail. The
+first version accepted `/archives/{name}` as a substitute for `/static/{name}`,
+and the second checked only the route spec while the router stayed unpatched. A
+test that passes against the bug it exists to catch is worse than no test, because
+it is mistaken for coverage.
+
+**Still open:** `/terms` and `/privacy` are linked in the footer and 404. Left
+deliberate — inventing legal text is not a migration task — but flagged so it is
+a decision rather than an oversight.

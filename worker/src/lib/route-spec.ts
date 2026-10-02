@@ -636,7 +636,22 @@ export const ROUTES: RouteSpec[] = [
     operationId: "downloadArchive",
     summary: "Download a snapshot archive",
     tags: ["meta"],
-    responses: { ...ERR(["404"]), "200": "The archive" },
+    responses: { ...ERR(["400", "404"]), "200": "The archive" },
+    cacheable: true,
+    notes:
+      "Also served at `/static/{name}`, which is the path the frontend links to. In the Docker " +
+      "deployment that resolved through nginx rather than Flask, so removing the web server " +
+      "silently broke it. The name is validated against a strict charset before R2 is touched.",
+  },
+  {
+    path: "/static/{name}",
+    method: "GET",
+    operationId: "downloadArchiveLegacyPath",
+    summary: "Download a snapshot archive, legacy path",
+    tags: ["meta"],
+    responses: { ...ERR(["400", "404"]), "200": "The archive" },
+    cacheable: true,
+    notes: "Byte-identical to `/archives/{name}`. Kept because the frontend hard-codes this path.",
   },
 
   // ── validation callback ────────────────────────────────────────────────────

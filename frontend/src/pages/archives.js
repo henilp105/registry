@@ -83,7 +83,12 @@ const Archives = () => {
               return (
                 <div className="archives__card" key={archive}>
                   <a
-                    href={`${process.env.REACT_APP_REGISTRY_API_URL}/static/${archive}`}
+                    // Served by the API Worker. In the Docker deployment this
+                    // resolved through nginx, so the link was never exercised
+                    // against the backend -- it broke silently when the web
+                    // server was removed. `/archives/{name}` is the canonical
+                    // path; `/static/{name}` is kept as an alias for this href.
+                    href={`${process.env.REACT_APP_REGISTRY_API_URL}/archives/${archive}`}
                     className="archives__link"
                     download
                   >

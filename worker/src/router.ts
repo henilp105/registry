@@ -63,6 +63,17 @@ export async function route(
   if (seg[0] === "ratings" || seg[0] === "report") {
     return handleRatingReportRoutes(request, env, ctx, seg, url, auth);
   }
+  // GET /static/{name} — the legacy archive download path.
+  //
+  // The frontend has always linked archives as `${API}/static/${name}`, and in
+  // the Docker deployment that resolved because **nginx** served the static
+  // directory, not Flask. There is no nginx in the serverless deployment, so
+  // without this branch the archives page renders working links that 404 --
+  // the exact class of bug that only appears once you take the web server away.
+  if (seg[0] === "static" && seg.length === 2) {
+    return downloadArchive(env, seg[1] as string);
+  }
+
   if (seg[0] === "tarballs" || seg[0] === "static" || seg[0] === "download") {
     return handleTarballRoutes(request, env, ctx, seg, url, auth);
   }
