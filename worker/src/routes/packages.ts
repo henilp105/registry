@@ -222,11 +222,13 @@ async function searchPackages(env: Env, url: URL): Promise<Response> {
 export async function handlePackageCliRoute(
   request: Request,
   env: Env,
-  _ctx: ExecutionContext,
+  ctx: ExecutionContext,
   segments: string[],
   url: URL,
-  _auth: AuthContext | null,
+  auth: AuthContext | null,
 ): Promise<Response | null> {
+  void ctx;
+  void auth;
   if (request.method.toUpperCase() === "GET" && segments.length === 1) {
     return searchPackagesCli(env, url);
   }

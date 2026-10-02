@@ -44,18 +44,77 @@ const raw = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
  * tidy input is a liability sitting in a test that exists to catch deploy
  * failures.
  */
-function parseJsonc(source: string): Record<string, any> {
+/** The parts of `wrangler.jsonc` this file asserts on. */
+type EnvBlock = {
+  name?: string;
+  vars?: Record<string, string>;
+  durable_objects?: { bindings?: Binding[] };
+  kv_namespaces?: Binding[];
+  r2_buckets?: Binding[];
+  exports?: Record<string, { type?: string; storage?: string }>;
+};
+
+/**
+ * One entry from a bindings array.
+ *
+ * A single type rather than a union of "Durable Object binding" and "KV
+ * namespace", because wrangler uses different keys for the two -- `name` for
+ * Durable Objects, `binding` for KV and R2 -- and modelling that as a union means
+ * every access needs a narrowing check that TypeScript cannot perform on optional
+ * properties. One honest shape with all three keys optional is simpler and
+ * describes the file accurately.
+ */
+type Binding = { name?: string; binding?: string; class_name?: string; id?: string };
+type WranglerConfig = {
+  vars?: Record<string, string>;
+  migrations?: unknown[];
+  limits?: { cpu_ms?: number };
+  triggers?: { crons?: string[] };
+  durable_objects?: { bindings?: Binding[] };
+  kv_namespaces?: Binding[];
+  r2_buckets?: Binding[];
+  exports?: Record<string, { type?: string; storage?: string }>;
+  env?: Record<string, EnvBlock>;
+};
+
+function parseJsonc(source: string): WranglerConfig {
   return JSON.parse(stripJsonComments(source).replace(/,(\s*[}\]])/g, "$1"));
 }
 
+/**
+ * The name a binding is exposed under in the Worker.
+ *
+ * KV namespaces and R2 buckets key on `binding`; only Durable Object bindings key
+ * on `name`. Collapsing both onto one accessor keeps the difference in one place
+ * rather than at every call site, where getting it wrong makes an assertion fail
+ * for the wrong reason.
+ */
+const boundAs = (entry: Binding): string | undefined => entry.binding ?? entry.name;
+
+/** Environments, resolved so callers do not repeat the optional-chaining dance. */
+const envsOf = (config: WranglerConfig): Record<string, EnvBlock> => config.env ?? {};
+
+/**
+ * One environment's block, or a thrown error.
+ *
+ * A missing block is a real failure, not something to paper over with `!`, so it
+ * is surfaced as a thrown error naming the environment instead of an undefined
+ * dereference three assertions later.
+ */
+const envBlock = (config: WranglerConfig, name: string): EnvBlock => {
+  const block = envsOf(config)[name];
+  if (!block) throw new Error(`wrangler.jsonc has no env.${name} block`);
+  return block;
+};
+
 const config = parseJsonc(raw);
-const environments = Object.keys(config.env ?? {});
+const environments = Object.keys(envsOf(config));
 
 describe("top-level bindings", () => {
   it("binds the Durable Object that owns the MongoDB connection", () => {
-    const binding = config.durable_objects?.bindings?.find((b: any) => b.name === "MONGO_POOL");
+    const binding = config.durable_objects?.bindings?.find((b) => boundAs(b) === "MONGO_POOL");
     expect(binding, "MONGO_POOL is missing from durable_objects.bindings").toBeDefined();
-    expect(binding.class_name).toBe("MongoPool");
+    expect(binding?.class_name).toBe("MongoPool");
   });
 
   it("declares the Durable Object's lifecycle via exports", () => {
@@ -67,8 +126,8 @@ describe("top-level bindings", () => {
   });
 
   it("binds R2 and KV at the top level", () => {
-    expect(config.r2_buckets?.some((b: any) => b.binding === "TARBALLS")).toBe(true);
-    expect(config.kv_namespaces?.some((b: any) => b.binding === "CACHE")).toBe(true);
+    expect(config.r2_buckets?.some((b) => boundAs(b) === "TARBALLS")).toBe(true);
+    expect(config.kv_namespaces?.some((b) => boundAs(b) === "CACHE")).toBe(true);
   });
 });
 
@@ -78,18 +137,18 @@ describe("environment inheritance", () => {
   });
 
   it.each(environments)("%s re-declares durable_objects, which are not inherited", (env) => {
-    const bindings = config.env[env].durable_objects?.bindings ?? [];
+    const bindings = envBlock(config, env).durable_objects?.bindings ?? [];
     expect(
-      bindings.some((b: any) => b.name === "MONGO_POOL"),
+      bindings.some((b) => boundAs(b) === "MONGO_POOL"),
       `env.${env} does not bind MONGO_POOL. Wrangler does not inherit durable_objects, ` +
         `so deploying this environment yields a Worker whose every database route fails.`,
     ).toBe(true);
   });
 
   it.each(environments)("%s re-declares kv_namespaces, which are not inherited", (env) => {
-    const namespaces = config.env[env].kv_namespaces ?? [];
+    const namespaces = envBlock(config, env).kv_namespaces ?? [];
     expect(
-      namespaces.some((b: any) => b.binding === "CACHE"),
+      namespaces.some((b) => boundAs(b) === "CACHE"),
       `env.${env} does not bind CACHE. kv_namespaces are not inherited by environments.`,
     ).toBe(true);
   });
@@ -98,7 +157,7 @@ describe("environment inheritance", () => {
     // `vars` is likewise not inherited. A missing one is silently defaulted by the
     // code, which is worse than an absent binding because it still "works".
     const topLevel = Object.keys(config.vars ?? {});
-    const envVars = config.env[env].vars ?? {};
+    const envVars = envBlock(config, env).vars ?? {};
     const missing = topLevel.filter((k) => !(k in envVars));
     expect(
       missing,
@@ -109,12 +168,12 @@ describe("environment inheritance", () => {
   it.each(environments)("%s does not reuse another environment's KV namespace id", (env) => {
     // A copy-paste slip here is invisible in review: both environments look
     // configured, and one silently shares the other's cache-invalidation tokens.
-    const ids = Object.entries(config.env)
+    const ids = Object.entries(envsOf(config))
       .filter(([name]) => name !== env)
-      .map(([, cfg]: [string, any]) => cfg.kv_namespaces?.find((b: any) => b.binding === "CACHE")?.id)
+      .map(([, cfg]) => cfg.kv_namespaces?.find((b) => boundAs(b) === "CACHE")?.id)
       .filter(Boolean);
 
-    const mine = config.env[env].kv_namespaces?.find((b: any) => b.binding === "CACHE")?.id;
+    const mine = envBlock(config, env).kv_namespaces?.find((b) => boundAs(b) === "CACHE")?.id;
     if (!mine || !mine.startsWith("REPLACE_WITH")) return; // placeholders differ by design
 
     for (const other of ids) {
@@ -127,8 +186,7 @@ describe("deploy-time placeholders", () => {
   it("leaves KV namespace ids as explicit placeholders, never a plausible-looking value", () => {
     // These must be substituted before a real deploy, and they should be obvious
     // enough that nobody mistakes one for a real id.
-    const raw2 = readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
-    const ids = [...raw2.matchAll(/"id":\s*"([^"]+)"/g)].map((m) => m[1]);
+    const ids = [...raw.matchAll(/"id":\s*"([^"]+)"/g)].map((m) => m[1] as string);
     expect(ids.length).toBeGreaterThan(0);
     for (const id of ids) {
       expect(id, `KV id "${id}" is not an obvious placeholder`).toMatch(/^REPLACE_WITH_/);
@@ -137,7 +195,7 @@ describe("deploy-time placeholders", () => {
 
   it("names each placeholder after its environment", () => {
     for (const env of environments) {
-      const id = config.env[env].kv_namespaces?.find((b: any) => b.binding === "CACHE")?.id ?? "";
+      const id = envBlock(config, env).kv_namespaces?.find((b) => boundAs(b) === "CACHE")?.id ?? "";
       if (!id.startsWith("REPLACE_WITH")) continue;
       expect(id.toUpperCase(), `env.${env} KV placeholder should name its environment`).toContain(
         env.toUpperCase(),
