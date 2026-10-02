@@ -137,7 +137,18 @@ export const handleSuccess = (state, arg) => {
  * surface was dropped and `error` fell back to a generic string.
  */
 export const handleFailure = (state, arg, maybeFields) => {
-  const fields = maybeFields ?? payloadOf(arg) ?? {};
+  // Defect D76: the third argument used to *replace* the second, so every
+  // reducer passing both threw away the API's real error message and fell back
+  // to "An error occurred". Worse, when the second argument was a bare string
+  // (the common case: `handleFailure(state, action.payload?.message)`) it was
+  // spread into the state as indexed characters and the message was lost just
+  // the same. Normalise both forms here: a string second argument is the
+  // message; an object contributes its fields.
+  const fromArg =
+    typeof arg === "string"
+      ? { message: arg }
+      : (payloadOf(arg) ?? {});
+  const fields = { ...fromArg, ...(maybeFields ?? {}) };
   return {
     ...state,
     ...fields,

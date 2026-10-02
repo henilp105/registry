@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import Container from "react-bootstrap/Container";
 import { fetchArchiveData } from "../store/actions/archivesActions";
 import Icon from "../components/Icon";
+import { safeUrl } from "../utils/safeUrl";
 import "./archives.css";
 
 /**
@@ -24,6 +25,7 @@ const Archives = () => {
   const archives = useSelector((state) => state.archives.archives);
   const dispatch = useDispatch();
   const isLoading = useSelector((state) => state.archives.isLoading);
+  const error = useSelector((state) => state.archives.error);
 
   useEffect(() => {
     dispatch(fetchArchiveData());
@@ -74,12 +76,26 @@ const Archives = () => {
           to download it.
         </p>
 
-        {archives.length === 0 ? (
+        {error ? (
+          <div className="alert alert-danger" role="alert">
+            Could not load archives: {error}.{" "}
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-danger ms-2"
+              onClick={() => dispatch(fetchArchiveData())}
+            >
+              Try again
+            </button>
+          </div>
+        ) : archives.length === 0 ? (
           <p className="archives__empty">No archives are available yet.</p>
         ) : (
           <div className="archives__list">
             {archives.map((archive) => {
               const { kind, date } = describeArchive(archive);
+              const href = safeUrl(
+                `${process.env.REACT_APP_REGISTRY_API_URL}/archives/${encodeURIComponent(archive)}`,
+              );
               return (
                 <div className="archives__card" key={archive}>
                   <a
@@ -88,7 +104,13 @@ const Archives = () => {
                     // against the backend -- it broke silently when the web
                     // server was removed. `/archives/{name}` is the canonical
                     // path; `/static/{name}` is kept as an alias for this href.
-                    href={`${process.env.REACT_APP_REGISTRY_API_URL}/archives/${archive}`}
+                    //
+                    // The filename comes from the registry's own snapshot job,
+                    // not from package metadata, so this is defence-in-depth:
+                    // encodeURIComponent encodes any path separator or scheme
+                    // fragment, and safeUrl fails closed if the API origin
+                    // itself is ever misconfigured to a non-http scheme.
+                    href={href ?? "#"}
                     className="archives__link"
                     download
                   >

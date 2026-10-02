@@ -19,6 +19,7 @@ import PackageRatingGraph from "./packageRatingGraph";
 import Markdown from "react-markdown";
 import { Skeleton, SkeletonText } from "../components/SkeletonLoader";
 import Icon from "../components/Icon";
+import { safeUrl } from "../utils/safeUrl";
 import "./package.css";
 
 /* The four tabs. `eventKey` doubles as the value the activeTab state holds,
@@ -336,14 +337,18 @@ const PackagePage = () => {
                             )}
                           </td>
                           <td>
-                            <a
-                              href={`${process.env.REACT_APP_REGISTRY_API_URL}${ver.download_url}`}
-                              className="btn btn-sm btn-outline-primary"
-                              download
-                            >
-                              <Icon name="download" className="me-1" size={13} />
-                              Download
-                            </a>
+                            {ver.download_url && safeUrl(`${process.env.REACT_APP_REGISTRY_API_URL}${ver.download_url}`) ? (
+                              <a
+                                href={`${process.env.REACT_APP_REGISTRY_API_URL}${ver.download_url}`}
+                                className="btn btn-sm btn-outline-primary"
+                                download
+                              >
+                                <Icon name="download" className="me-1" size={13} />
+                                Download
+                              </a>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -447,8 +452,9 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
 
       <hr />
 
-      {/* Repository */}
-      {data.repository && (
+      {/* Repository — scheme-checked: package metadata is attacker-controlled,
+          and a `javascript:` URL here would run in the registry's origin. */}
+      {safeUrl(data.repository) && (
         <>
           <div className="mb-3">
             <h6 className="package-sidebar__heading">
@@ -456,7 +462,7 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
               Repository
             </h6>
             <a
-              href={data.repository}
+              href={safeUrl(data.repository)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-break font-mono package-sidebar__value"
@@ -469,7 +475,7 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
       )}
 
       {/* Homepage */}
-      {data.homepage && (
+      {safeUrl(data.homepage) && (
         <>
           <div className="mb-3">
             <h6 className="package-sidebar__heading">
@@ -477,7 +483,7 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
               Homepage
             </h6>
             <a
-              href={data.homepage}
+              href={safeUrl(data.homepage)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-break"

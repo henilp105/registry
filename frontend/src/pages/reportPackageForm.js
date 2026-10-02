@@ -14,7 +14,7 @@ const ReportPackageForm = ({ namespace, package: packageName, show, onHide }) =>
   const [touched, setTouched] = useState(false);
   
   const accessToken = useSelector((state) => state.auth.accessToken);
-  const { isLoading, statuscode, message } = useSelector(
+  const { isLoading, statuscode, message, error } = useSelector(
     (state) => state.reportPackage
   );
 
@@ -106,11 +106,11 @@ const ReportPackageForm = ({ namespace, package: packageName, show, onHide }) =>
             </Form.Text>
           </Form.Group>
 
-          {message && (
+          {(message || error) && (
             <Alert variant={isSuccess ? "success" : "danger"} className="mb-0">
               {isSuccess && <Icon name="check-circle" className="me-2" />}
               {!isSuccess && <Icon name="exclamation-circle" className="me-2" />}
-              {message}
+              {message || error}
             </Alert>
           )}
         </Modal.Body>
