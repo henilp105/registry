@@ -271,3 +271,48 @@ Contract-preserving first. Anything that changes an observable response is addit
 - Cloudflare [TCP Sockets](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/) · [Connecting to databases](https://developers.cloudflare.com/workers/databases/connecting-to-databases/)
 - MongoDB [Free cluster limits](https://www.mongodb.com/docs/atlas/reference/free-shared-limitations/) · [App Services deprecation](https://www.mongodb.com/docs/atlas/app-services/deprecation/) · [Data API deprecation](https://www.mongodb.com/docs/atlas/app-services/data-api/data-api-deprecation/)
 - Measured in-repo: `mongodb` v7.7.0 driver, live `cluster0.kdreahb.mongodb.net` (8.0.34, ap-south-1)
+## 11. Completion Record
+
+Phases 0–9 are implemented, committed and pushed to `serverless-migration`. Phase 10 is a *traffic*
+change, not a code change — it is executed at Cloudflare with `wrangler versions deploy`, per the
+runbook in [`DEPLOYMENT.md`](../DEPLOYMENT.md).
+
+| Phase | Commit | What actually landed |
+|---|---|---|
+| 0 | `contract` | 43 routes frozen; defect register D1–D45 with `file:line` evidence |
+| 1 | Worker skeleton | Router, CORS allowlist replacing the wildcard (D3), health |
+| 2 | `mongo-pool` | Durable Object owns the MongoDB connection; 26 indexes verified live, `explain()` confirms IXSCAN |
+| 2b | correctness sweep | semver ordering (D9), cascade deletes (D11–D13), status/code sync (D14) |
+| 3 | auth | 9 routes incl. new `/auth/refresh`; D1 admin backdoor and D2 token oracle removed |
+| 4/4b | namespace + user | 12 + 12 routes; revocable hashed upload tokens (D4), email PII leak closed (D5) |
+| 5 | packages (read) | 12 routes + edge cache; regex search → `$text` (D18), verify-role fixed (D34) |
+| 6 | R2 | Streaming upload with incremental SHA-256, creating a digest that never existed (D24) |
+| 7 | search | `$text` index actually used; `PUT /packages` deprecation added (D26) |
+| 8 | validation | Moved to GitHub Actions, closing the `shell=True` injection (D7) and zip-bomb (D8) |
+| 9 | docs + ops | Generated OpenAPI 3.1 (46 paths / 48 operations), archives restored, 4 live crons |
+
+### Verification, measured rather than asserted
+
+- **286 tests green**: 207 Worker (186 hermetic + 21 spec-validation) + 53 validator + 26 live-Atlas
+  Worker tests. Typecheck clean across both TS projects, eslint clean.
+- **Bundle** 2056 KiB / 287 KiB gzip, against a 3 MB free-tier compressed limit.
+- **OpenAPI output validated by `@readme/openapi-parser`**, not by eye. That caught a real bug —
+  `schema` must be *nested* inside a Parameter Object, and it had been spread. There is now a test
+  that fails if that regresses.
+- **CPU measured, not guessed**: PBKDF2-SHA256 at 210k iterations is 176 ms, about 18× the Worker's
+  entire 10 ms free-tier budget. That single measurement is why the KDF lives in the Durable Object.
+- **Cluster is MongoDB 8.0.34** in `ap-south-1`. The `fpmregistry` database does not exist, so cutover
+  needs no data migration, no dual-write and no reconciliation window.
+
+### What is honestly not verified
+
+- **No browser-based visual verification.** No browser runs in the migration environment. The frontend
+  dark mode is verified arithmetically (53 measured contrast pairs in `docs/theme-contrast.md`), not
+  by eye. This is the one gap a reviewer should close first.
+- **Cutover traffic steps are documented, not executed.** Phases 10% → 50% → 100% are a Cloudflare
+  console operation. The runbook is written to be followed; it has not been rehearsed end to end.
+- **Brevo email is wired but unsent.** `BREVO_API_KEY` is unset, so verification and reset emails
+  are skipped rather than failing. Worth exercising once before launch.
+
+---
+
