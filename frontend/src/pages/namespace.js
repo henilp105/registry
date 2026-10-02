@@ -116,7 +116,10 @@ const NamespacePage = () => {
                   onClick={() => openDialog('admins')}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && openDialog('admins')}
+                  onKeyDown={(e) => {
+                      // role="button" must respond to Space as well as Enter.
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDialog('admins'); }
+                    }}
                 >
                   <ShieldCheck className="namespace-info-icon" />
                   <span>Admins</span>
@@ -128,7 +131,9 @@ const NamespacePage = () => {
                   onClick={() => openDialog('maintainers')}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && openDialog('maintainers')}
+                  onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDialog('maintainers'); }
+                    }}
                 >
                   <People className="namespace-info-icon" />
                   <span>Maintainers</span>
