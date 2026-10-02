@@ -603,7 +603,7 @@ table {
 /* Defect D84: the accent span had no rule at all, so the wordmark rendered
    as one unbroken colour. It is the brand's Fortran-orange marker. */
 .app-navbar__wordmark-accent {
-  color: var(--color-brand-solid, #e5a323);
+  color: var(--color-brand-solid);
 }
 
 /* Defect D84: ThemeToggle's classes were unstyled -- the control rendered as
@@ -633,7 +633,7 @@ table {
 }
 
 .theme-toggle:focus-visible {
-  outline: 2px solid var(--color-brand-solid, #5b53c0);
+  outline: 2px solid var(--color-brand-solid);
   outline-offset: 2px;
 }
 

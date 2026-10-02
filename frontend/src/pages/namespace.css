@@ -44,7 +44,7 @@
      only adds what a description needs: room to breathe, a measure short enough
      to stay readable, and muted ink so the name still wins. */
   margin: 0.5rem 0 0;
-  color: var(--bs-secondary-color, #6c757d);
+  color: var(--color-text-muted);
   max-width: 65ch;
   /* Descriptions are free text typed into a form, so they may contain runs of
      whitespace and very long unbroken tokens. `pre-wrap` keeps deliberate line
