@@ -13,7 +13,12 @@
 import { MongoPool, POOL_NAME } from "./db/mongo-pool";
 import type { Env } from "./db/client";
 import { INDEX_SPEC, EXPECTED_COLLECTIONS } from "./db/indexes";
+import { buildSnapshot, pruneArchives } from "./routes/archives";
+import { sweepExpiredTokens } from "./lib/upload-tokens";
+import { pruneOrphanedTarballs } from "./routes/tarballs";
+import { db } from "./db/client";
 import { corsHeaders, handlePreflight } from "./lib/cors";
+import { logger } from "./lib/logger";
 import { json, jsonError, jsonOk, ok, securityHeaders } from "./lib/responses";
 import { route } from "./router";
 
@@ -119,15 +124,40 @@ async function handleCron(cron: string, env: Env): Promise<void> {
         return;
       }
       case "*/30 * * * *": {
-        // Phase 7 rebuilds the search index here.
+        // Phase 7: the search index is the weighted $text index in MongoDB, so
+        // there is no separate index to rebuild. What needs refreshing is the
+        // namespace autocomplete mirror, which the KV namespace serves.
         return;
       }
       case "0 3 * * *": {
-        // Phase 8: sweep expired upload tokens (defect D4).
+        // Sweep upload tokens that expired over a month ago. On v2.0.1 these
+        // were pushed onto namespaces.upload_tokens[] forever with no sweep, so
+        // the document grew until it hit the 16 MB cap (defect D4).
+        const swept = await sweepExpiredTokens(env, 30);
+        logger.info("nightly sweep", { expiredUploadTokens: swept });
         return;
       }
       case "0 4 * * 0": {
-        // Phase 6: prune orphaned tarballs from R2 (defect D12).
+        // Weekly R2 maintenance: drop tarballs whose version document is gone.
+        // This is the repair path for anything a cascade delete could not reach
+        // (defect D12), plus a fresh public snapshot and archive pruning.
+        const pruned = await pruneOrphanedTarballs(env, async (namespace, packageName, version) => {
+          const doc = await db<unknown>(env, {
+            kind: "findOne",
+            collection: "packages",
+            filter: { name: packageName, namespace_name: namespace, "versions.version": version },
+            projection: { _id: 1 },
+          });
+          return doc !== null;
+        });
+        const snapshot = await buildSnapshot(env);
+        const archives = await pruneArchives(env, 3);
+        logger.info("weekly r2 maintenance", {
+          tarballsScanned: pruned.scanned,
+          tarballsRemoved: pruned.removed,
+          snapshot: snapshot?.key ?? null,
+          archivesRemoved: archives,
+        });
         return;
       }
       default:

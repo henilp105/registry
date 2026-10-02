@@ -17,7 +17,7 @@
  */
 
 import type { Env } from "./db/client";
-import { jsonError, jsonOk } from "./lib/responses";
+import { jsonOk } from "./lib/responses";
 import type { AuthContext } from "./lib/auth";
 import { authenticate } from "./lib/auth";
 import { handleHealth, handleOpenapi } from "./routes/meta";
@@ -28,6 +28,7 @@ import { handlePackageRoutes } from "./routes/packages";
 import { handleRatingReportRoutes } from "./routes/ratings";
 import { handleTarballRoutes } from "./routes/tarballs";
 import { handleValidationRoutes } from "./routes/validation";
+import { downloadArchive, listArchives } from "./routes/archives";
 
 export type Ctx = ExecutionContext;
 
@@ -43,7 +44,8 @@ export async function route(
   // ── meta ───────────────────────────────────────────────────────────────────
   if (path === "/health" || path === "/healthz") return handleHealth(env);
   if (path === "/" || path === "/apidocs" || path === "/apidocs/openapi.json") {
-    return handleHealth(env).then(() => (path === "/" ? jsonOk({ message: "fpm registry api", version: "3.0.0", code: 200 }) : handleOpenapi(path)));
+    if (path === "/") return jsonOk({ message: "fpm registry api", version: "3.0.0" });
+    return handleOpenapi(path, env);
   }
 
   // Resolve identity once per request. `auth` is `null` for anonymous callers;
@@ -70,9 +72,14 @@ export async function route(
     return handleValidationRoutes(request, env, ctx, seg, url, auth);
   }
 
-  if (seg[0] === "registry") {
-    if (seg[1] === "archives") return jsonError(501, "Archive dumps are disabled in the serverless deployment");
-    return null;
+  // Archives. Previously a 501; now served from R2 under a scoped prefix,
+  // which is what structurally prevents the v0.0.1 leak of database-dump
+  // filenames (defect D5).
+  if (seg[0] === "registry" && seg[1] === "archives" && seg.length === 2) {
+    return listArchives(env);
+  }
+  if (seg[0] === "archives" && seg.length === 2) {
+    return downloadArchive(env, seg[1] as string);
   }
 
   // `/packages` — method dispatch happens inside the handler, per

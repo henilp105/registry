@@ -10,7 +10,7 @@
  */
 
 import type { Env } from "../db/client";
-import { POOL_NAME } from "../db/mongo-pool";
+import { buildOpenApi } from "../lib/openapi";
 import { json } from "../lib/responses";
 
 export function handleHealth(env: Env): Promise<Response> {
@@ -35,55 +35,15 @@ export function handleDocsIndex(): Response {
   });
 }
 
-export function handleOpenapi(path: string): Response {
+export function handleOpenapi(path: string, env: Env): Response {
   if (path.endsWith("openapi.json")) {
-    return json(200, buildOpenapiDocument(), { "cache-control": "public, max-age=3600" });
+    return json(
+      200,
+      buildOpenApi({ version: "3.0.0", environment: env.ENVIRONMENT }),
+      // Cacheable: the document changes only on deploy, and the cache key
+      // carries the deployment so a redeploy retires it automatically.
+      { "cache-control": "public, max-age=3600" },
+    );
   }
   return handleDocsIndex();
 }
-
-/**
- * OpenAPI 3.1 skeleton. Phase 0 replaces this with the full generated
- * document derived from `docs/API_CONTRACT.md`.
- */
-function buildOpenapiDocument(): Record<string, unknown> {
-  return {
-    openapi: "3.1.0",
-    info: {
-      title: "fpm Registry API",
-      version: "3.0.0",
-      description:
-        "Serverless rewrite of the fpm registry backend. Cloudflare Workers + Durable Objects " +
-        "+ MongoDB Atlas + R2. See docs/API_CONTRACT.md for the frozen contract.",
-    },
-    servers: [{ url: "/", description: "this deployment" }],
-    components: {
-      securitySchemes: {
-        bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
-      },
-      schemas: {
-        Envelope: {
-          type: "object",
-          required: ["code", "message"],
-          properties: {
-            code: { type: "integer", description: "Mirrors the HTTP status." },
-            message: { type: "string" },
-          },
-        },
-      },
-    },
-    paths: {
-      "/health": {
-        get: {
-          summary: "Liveness plus MongoDB reachability",
-          responses: { "200": { description: "healthy or degraded" } },
-        },
-      },
-      "/apidocs/openapi.json": {
-        get: { summary: "This document", responses: { "200": { description: "OpenAPI 3.1" } } },
-      },
-    },
-  };
-}
-
-export { POOL_NAME };
