@@ -5,6 +5,7 @@ import {
   SET_QUERY,
   SET_ORDER_BY,
 } from "../actions/searchActions";
+import { asList } from "./shape";
 
 const initialState = {
   packages: null,
@@ -29,7 +30,7 @@ const searchReducer = (state = initialState, action) => {
       return {
         ...state,
         isLoading: false,
-        packages: action.payload.packages,
+        packages: asList(action.payload.packages),
         totalPages: action.payload.totalPages,
         currentPage: action.payload.currentPage,
         error: null,

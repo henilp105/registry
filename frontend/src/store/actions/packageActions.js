@@ -44,10 +44,23 @@ export const fetchPackageData = (namespaceName, packageName) => async (dispatch)
       });
     }
   } catch (error) {
+    // The HTTP status, not the body's `code` field.
+    //
+    // `error.response?.data?.code` reads the body, which for a rate-limited or
+    // proxied response may be absent, malformed, or simply not carry a `code`. It
+    // then falls back to 500, and a 429 becomes indistinguishable from a genuine
+    // server fault. `error.response.status` is the transport's own verdict and is
+    // always present when a response arrived at all; there is no response for a
+    // network failure, which is exactly the case that should read as "offline".
+    const httpStatus = error.response?.status ?? 0;
+
     dispatch({
       type: FETCH_PACKAGE_DATA_FAILURE,
       payload: {
-        statuscode: error.response?.data?.code || 500,
+        statuscode: error.response?.data?.code || httpStatus || 500,
+        httpStatus,
+        // Seconds to wait, from the limiter. Absent on every other failure.
+        retryAfter: error.response?.headers?.["retry-after"],
         message: getErrorMessage(error),
       },
     });

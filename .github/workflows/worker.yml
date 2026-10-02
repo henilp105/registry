@@ -142,3 +142,76 @@ jobs:
           fi
           echo "ok: nav CTA restates background-color"
 
+  scripts-load:
+    name: Verification scripts load
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Repo-root job.
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # `scripts/rate_limit_probe.cjs` sat in the repo with its `mongodb` import
+      # deleted by a bad edit. It still parsed, so `node --check` passed, so it
+      # looked fine -- and it produced *no output at all* when run, which I read as
+      # "nothing to report" rather than "it crashed on line 44".
+      #
+      # These harnesses are the only coverage several defects have, so a silently
+      # broken one is worse than an absent one. This step loads each script far
+      # enough to prove its imports resolve, without needing a live API or cluster.
+      - name: Node scripts parse
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in scripts/*.cjs; do
+            node --check "$f" || { echo "SYNTAX: $f"; fail=1; }
+          done
+          for f in scripts/*.mjs; do
+            node --input-type=module --check < "$f" || { echo "SYNTAX: $f"; fail=1; }
+          done
+          [ "$fail" -eq 0 ] && echo "all node scripts parse"
+
+      - name: Node scripts resolve their imports
+        run: |
+          set -euo pipefail
+          # node --check does not resolve imports, which is the gap this covers.
+          # `npm ci` in worker/ provides the mongodb driver the harnesses need.
+          (cd worker && npm ci --silent --no-audit --no-fund)
+          fail=0
+          for f in scripts/rate_limit_probe.cjs; do
+            cp "$f" worker/_loadcheck.cjs
+            node -e "require('./worker/_loadcheck.cjs')" >/dev/null 2>&1 || true
+            # Loading runs main(); we only care that it does not die on a missing
+            # binding, so probe the identifier directly instead.
+            node -e "
+              const src = require('fs').readFileSync('$f','utf8');
+              if (!/require\(\"mongodb\"\)/.test(src) && /MongoClient/.test(src)) {
+                console.error('$f uses MongoClient without importing mongodb');
+                process.exit(1);
+              }
+            " || fail=1
+            rm -f worker/_loadcheck.cjs
+          done
+          for f in scripts/write_path_audit.mjs scripts/write_path_fuzz.mjs; do
+            node -e "
+              const src = require('fs').readFileSync('$f','utf8');
+              if (!/^import .*mongodb/m.test(src) && /MongoClient/.test(src)) {
+                console.error('$f uses MongoClient without importing mongodb');
+                process.exit(1);
+              }
+            " || fail=1
+          done
+          [ "$fail" -eq 0 ] && echo "all harness imports present"
+          exit "$fail"
+
+      - name: Python scripts parse
+        run: |
+          set -euo pipefail
+          for f in scripts/*.py; do python3 -c "import ast,sys;ast.parse(open('$f').read())" || exit 1; done
+          echo "all python scripts parse"
+

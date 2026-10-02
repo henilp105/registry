@@ -4,6 +4,7 @@ import {
   FETCH_ARCHIVES_DATA_FAILURE,
 } from "../actions/archivesActions";
 import { handleRequest, handleSuccess, handleFailure } from "../utils";
+import { asList } from "./shape";
 
 const initialState = {
   archives: [],
@@ -25,7 +26,7 @@ const archivesReducer = (state = initialState, action) => {
 
     case FETCH_ARCHIVES_DATA_SUCCESS:
       return handleSuccess(state, {
-        archives: action.payload.archives,
+        archives: asList(action.payload.archives),
         message: action.payload.message,
       });
 

@@ -40,6 +40,10 @@ const packageReducer = (state = initialState, action) => {
         ...state,
         isLoading: false,
         statuscode: action.payload.statuscode,
+        // The transport status, kept separately so the view can tell "gone"
+        // from "slow down" from "broken" without re-parsing the message.
+        httpStatus: action.payload.httpStatus ?? 0,
+        retryAfter: action.payload.retryAfter ?? null,
         data: null,
         error: action.payload.message,
       };

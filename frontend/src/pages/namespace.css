@@ -325,7 +325,23 @@
 
 @media (max-width: 36em) {
   .namespace-container {
-    padding: var(--space-4) var(--space-2);
+    /* The horizontal padding must be at least half of the row gutter.
+     *
+     * Bootstrap's `.row` pulls itself out by half a gutter on each side:
+     * `margin-inline: calc(-.5 * var(--bs-gutter-x))`, and the `g-4` used by
+     * the layout here sets that gutter to 1.5rem, so -0.75rem (-12px) per side.
+     * The container's padding is what absorbs it.
+     *
+     * At `--space-2` (8px) the padding was smaller than the 12px pull, so 4px
+     * escaped on each side and the document gained a horizontal scrollbar:
+     * measured `scrollWidth 394 > clientWidth 390` at a 390px viewport, on both
+     * /users/:user and /namespaces/:namespace. `--space-3` is 0.75rem — exactly
+     * the value that cancels.
+     *
+     * Reducing this padding again reintroduces the overflow, so the pairing of
+     * this value with `g-4` is deliberate rather than incidental.
+     */
+    padding: var(--space-4) var(--space-3);
   }
 
   .namespace-card {

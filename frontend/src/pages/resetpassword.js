@@ -86,7 +86,12 @@ const ResetPassword = () => {
         )}
 
         <Form onSubmit={handleSubmit}>
-          <Form.Group className="mb-3">
+          {/* `controlId` is what associates the label with the control.
+              react-bootstrap's Form.Label renders a bare <label>, and without a
+              controlId on the group it has no `for`, so a screen reader announces
+              an unlabelled password field. This is the only form in the app with
+              the omission, which is why it survived the earlier a11y pass. */}
+          <Form.Group className="mb-3" controlId="reset-password">
             <Form.Label>New Password</Form.Label>
             <InputGroup>
               <Form.Control
@@ -98,10 +103,16 @@ const ResetPassword = () => {
                 isInvalid={touched.password && !!formErrors.password}
                 disabled={isLoading}
               />
+              {/* An icon-only button announced simply as "button", and
+                  `tabIndex={-1}` put it beyond the reach of a keyboard user
+                  entirely. It is now labelled, exposes its pressed state, and is
+                  focusable: saving a keystroke in the tab order is not worth
+                  making a control unreachable. */}
               <Button
                 variant="outline-secondary"
-                onClick={() => setShowPassword(!showPassword)}
-                tabIndex={-1}
+                onClick={() => setShowPassword((shown) => !shown)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
               >
                 <Icon name={showPassword ? "eye-slash" : "eye"} />
               </Button>
@@ -111,7 +122,7 @@ const ResetPassword = () => {
             </InputGroup>
           </Form.Group>
 
-          <Form.Group className="mb-3">
+          <Form.Group className="mb-3" controlId="reset-password-confirm">
             <Form.Label>Confirm Password</Form.Label>
             <Form.Control
               type={showPassword ? "text" : "password"}

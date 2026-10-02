@@ -4,6 +4,7 @@ import {
   FETCH_USER_DATA_FAILURE,
 } from "../actions/userActions";
 import { handleRequest, handleSuccess, handleFailure } from "../utils";
+import { asList } from "./shape";
 
 const initialState = {
   email: "",
@@ -29,7 +30,7 @@ const userReducer = (state = initialState, action) => {
       return handleSuccess(state, {
         email: action.payload.email,
         dateJoined: action.payload.dateJoined,
-        projects: action.payload.projects,
+        projects: asList(action.payload.projects),
         notFound: false,
       });
 

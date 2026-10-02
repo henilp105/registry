@@ -3,6 +3,7 @@ import {
   FETCH_USERS_LIST_SUCCESS,
   FETCH_USERS_LIST_FAILURE,
 } from "../actions/userListActions";
+import { asList } from "./shape";
 
 const initialState = {
   users: null,
@@ -30,7 +31,7 @@ const userListReducer = (state = initialState, action) => {
       return {
         ...state,
         isLoading: false,
-        users: action.payload.users,
+        users: asList(action.payload.users),
         error: null,
       };
 

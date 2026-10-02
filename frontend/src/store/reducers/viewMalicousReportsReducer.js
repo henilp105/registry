@@ -5,6 +5,7 @@ import {
   RESET_MALICIOUS_REPORTS_DATA,
 } from "../actions/viewMalicousReportActions";
 import { handleRequest, handleSuccess, handleFailure } from "../utils";
+import { asList } from "./shape";
 
 const initialState = {
   reports: [],
@@ -25,7 +26,7 @@ const viewMalicousReportsReducer = (state = initialState, action) => {
 
     case FETCH_MALICIOUS_REPORTS_SUCCESS:
       return handleSuccess(state, {
-        reports: action.payload.reports,
+        reports: asList(action.payload.reports),
       });
 
     case FETCH_MALICIOUS_REPORTS_FAILURE:

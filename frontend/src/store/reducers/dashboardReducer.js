@@ -3,6 +3,7 @@ import {
   REQUEST_PACKAGES_SUCCESS,
   REQUEST_PACKAGES_FAILURE,
 } from "../actions/dashboardActions";
+import { asList } from "./shape";
 
 const initialState = {
   packages: null,
@@ -24,7 +25,7 @@ const dashboardReducer = (state = initialState, action) => {
       return {
         ...state,
         isLoading: false,
-        packages: action.payload.packages,
+        packages: asList(action.payload.packages),
         namespaces: action.payload.namespaces,
         error: null,
       };

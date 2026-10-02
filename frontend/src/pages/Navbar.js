@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import Image from "react-bootstrap/Image";
@@ -65,7 +65,7 @@ const NavbarComponent = () => {
 
           <Nav className="ms-auto align-items-center gap-lg-1">
             {!isAuthenticated ? (
-              <UnauthenticatedNav onNavigate={handleNavigation} />
+              <UnauthenticatedNav />
             ) : (
               <AuthenticatedNav
                 username={username}
@@ -83,15 +83,24 @@ const NavbarComponent = () => {
 };
 
 // Unauthenticated navigation items
-const UnauthenticatedNav = ({ onNavigate }) => (
+const UnauthenticatedNav = () => (
   <>
-    <Nav.Link onClick={() => onNavigate("/archives")} className="nav-link-hover">
+    {/* Real `href`s, not `onClick` navigation on an `href="#"`.
+        The Register link below already did it this way, so this is a consistency
+        fix as much as a correctness one.
+
+        An `<a href="#">` that navigates via JavaScript is announced as a link
+        pointing at "#", and ctrl-click, middle-click and "open in new tab" all
+        resolve to "#" instead of the destination -- so the affordance a link is
+        supposed to carry is quietly removed. `as={Link}` keeps the Bootstrap
+        styling and gets a genuine href. */}
+    <Nav.Link as={Link} to="/archives" className="nav-link-hover">
       Archives
     </Nav.Link>
-    <Nav.Link onClick={() => onNavigate("/help")} className="nav-link-hover">
+    <Nav.Link as={Link} to="/help" className="nav-link-hover">
       Help
     </Nav.Link>
-    <Nav.Link onClick={() => onNavigate("/account/login")} className="nav-link-hover">
+    <Nav.Link as={Link} to="/account/login" className="nav-link-hover">
       Login
     </Nav.Link>
     <Nav.Link
@@ -152,16 +161,48 @@ const SearchBar = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  // Sync local state with redux state
-  useEffect(() => {
-    setLocalQuery(query);
-  }, [query]);
-
   // Debounce search input
   const debouncedQuery = useDebounce(localQuery, 300);
 
-  // Auto-search when debounced value changes (only if on search page)
+  /**
+   * Whether the current value in the box was typed by the user, rather than
+   * mirrored down from redux.
+   *
+   * The navbar's type-ahead fires when the debounced value changes. Without this
+   * flag, every search ran **twice**:
+   *
+   *   1. The user searches from the home page or presses Enter -> one request,
+   *      and the route changes to /search.
+   *   2. That dispatch updates `state.search.query`, the sync effect below copies
+   *      it into `localQuery`, the debounce fires 300 ms later, the pathname is
+   *      now `/search`, and the type-ahead effect issues the *same* search again.
+   *
+   * Measured on a production build, for all three entry points -- the home field,
+   * the navbar field and a suggestion chip -- every one produced exactly two
+   * identical requests to `/packages?query=…`.
+   *
+   * It matters more than a cosmetic duplicate: `/packages` is the hottest read in
+   * the system, the whole architecture is built to protect a 100 ops/second Atlas
+   * cap and a 100,000 requests/day Worker budget, and this doubled the load on
+   * precisely the route those budgets were sized around. The two responses also
+   * race 300 ms apart, so results can visibly flicker.
+   *
+   * So type-ahead still works for real typing, but a value that arrived *from*
+   * redux does not re-trigger it. The user did not ask for that search twice.
+   */
+  const typedByUser = useRef(false);
+
+  // Sync local state with redux state.
   useEffect(() => {
+    typedByUser.current = false;
+    setLocalQuery(query);
+  }, [query]);
+
+  // Auto-search when the debounced value changes, but only for user input, and
+  // only while already on the search page.
+  useEffect(() => {
+    if (!typedByUser.current) return;
+    typedByUser.current = false;
     if (debouncedQuery.trim() && window.location.pathname === "/search") {
       dispatch(setQuery(debouncedQuery));
       dispatch(searchPackage(debouncedQuery, 0));
@@ -184,11 +225,13 @@ const SearchBar = () => {
     }
     // Clear search on Escape
     if (event.key === "Escape") {
+      typedByUser.current = false;
       setLocalQuery("");
     }
   };
 
   const handleInputChange = (event) => {
+    typedByUser.current = true;
     setLocalQuery(event.target.value);
   };
 

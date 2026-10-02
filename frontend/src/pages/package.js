@@ -71,6 +71,10 @@ const PackagePage = () => {
   const navigate = useNavigate();
 
   const statuscode = useSelector((state) => state.package.statuscode);
+  // The transport status, distinct from the body's `code`. Needed because the
+  // three failure states below are told apart by status, not by message.
+  const httpStatus = useSelector((state) => state.package.httpStatus);
+  const retryAfter = useSelector((state) => state.package.retryAfter);
   const data = useSelector((state) => state.package.data);
   const isLoading = useSelector((state) => state.package.isLoading);
 
@@ -103,6 +107,17 @@ const PackagePage = () => {
     }
   }, [statuscode, navigate]);
 
+  /**
+   * Re-fetch after a transient failure.
+   *
+   * Offered for the rate-limited, offline and server-error states, and
+   * deliberately not for the not-found state -- retrying a package that does not
+   * exist cannot succeed, and offering it implies otherwise.
+   */
+  const retry = useCallback(() => {
+    dispatch(fetchPackageData(namespace_name, package_name));
+  }, [dispatch, namespace_name, package_name]);
+
   // Memoized sorted versions
   const sortedVersionsList = useMemo(() => {
     if (!data?.version_history) return [];
@@ -114,6 +129,72 @@ const PackagePage = () => {
   }
 
   if (!data) {
+    // Three different truths, previously collapsed into one.
+    //
+    // The old branch rendered "Package not found — doesn't exist or has been
+    // removed" for *every* failure, because `data` is null for all of them. So a
+    // 429 told the user their package had been deleted, a 500 told them the same,
+    // and so did a dropped connection. That is actively alarming and simply false,
+    // and it became reachable the moment rate limiting shipped: a burst of
+    // requests is now a normal event, and each one would have announced a
+    // deletion that did not happen.
+    //
+    // Reproduced by injecting each failure against the running app.
+    const isRateLimited = httpStatus === 429;
+    const isOffline = httpStatus === 0;
+    const notFound = httpStatus === 404 || statuscode === 404;
+
+    if (isRateLimited) {
+      return (
+        <Container className="package-page package-empty">
+          <Icon name="hourglass-half" size={48} className="package-empty__icon" />
+          <h1 className="package-empty__title">Too many requests</h1>
+          <p className="text-muted">
+            You have sent a lot of requests in a short time, so this one was held
+            back to keep the registry responsive for everyone. Nothing is wrong
+            with the package.
+            {retryAfter ? ` Try again in ${retryAfter} seconds.` : ""}
+          </p>
+          <Link to="/search" className="btn btn-primary mt-3">
+            Browse Packages
+          </Link>
+        </Container>
+      );
+    }
+
+    if (isOffline) {
+      return (
+        <Container className="package-page package-empty">
+          <Icon name="wifi" size={48} className="package-empty__icon" />
+          <h1 className="package-empty__title">Could not reach the registry</h1>
+          <p className="text-muted">
+            The request did not get a reply at all, which usually means a dropped
+            connection rather than a missing package. Check your network and try
+            again.
+          </p>
+          <button type="button" className="btn btn-primary mt-3" onClick={retry}>
+            Try again
+          </button>
+        </Container>
+      );
+    }
+
+    if (!notFound) {
+      return (
+        <Container className="package-page package-empty">
+          <Icon name="exclamation-triangle" size={48} className="package-empty__icon" />
+          <h1 className="package-empty__title">Could not load this package</h1>
+          <p className="text-muted">
+            The registry had a problem answering that request. This is on our side,
+            not yours, and the package has not been changed.
+          </p>
+          <button type="button" className="btn btn-primary mt-3" onClick={retry}>
+            Try again
+          </button>
+        </Container>
+      );
+    }
+
     return (
       <Container className="package-page package-empty">
         <Icon name="exclamation-triangle" size={48} className="package-empty__icon" />

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const { MongoClient } = require("mongodb");
 /**
  * Does the rate limiter actually refuse anything?
  *
@@ -8,10 +9,6 @@
  * the headers then promise a protection that does not exist — which is precisely
  * the state defect D41 recorded: the documentation promised `X-RateLimit-*` and a
  * 429 handler existed that nothing raised.
- *
- * A limiter that emits headers but never returns 429 is *worse* than none,
- * because the headers then promise a protection that does not exist -- which is
- * exactly the state D41 recorded.
  */
 
 const API = "http://127.0.0.1:8787";
