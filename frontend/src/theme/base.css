@@ -542,6 +542,13 @@ table {
   padding: var(--space-4) var(--space-5);
 }
 
+/* A dialog body that scrolls rather than growing past the viewport. Applied by
+   class rather than an inline maxHeight so the height is expressed once. */
+.modal-scroll-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
 .modal-body {
   padding: var(--space-5);
 }

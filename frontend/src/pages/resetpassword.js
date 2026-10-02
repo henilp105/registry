@@ -70,11 +70,8 @@ const ResetPassword = () => {
   const isSuccess = statuscode === 200;
 
   return (
-    <Container 
-      className="d-flex justify-content-center" 
-      style={{ paddingTop: 50 }}
-    >
-      <div style={{ width: "100%", maxWidth: "400px" }}>
+    <Container className="auth-narrow-page">
+      <div>
         <h1 className="mb-2">Reset Password</h1>
         <p className="text-muted mb-4">
           Enter your new password below.

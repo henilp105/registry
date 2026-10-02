@@ -179,15 +179,31 @@
 .password-strength-fill {
   height: 100%;
   border-radius: var(--radius-full);
+  background-color: var(--color-danger-solid);
   transition:
     width var(--duration-slow) var(--ease-standard),
     background-color var(--duration-base) var(--ease-standard);
 }
 
+/* Five buckets, worst to best, on the semantic ramp. The previous version
+   used a hard-coded Bootstrap hex ramp (#dc3545 #fd7e14 #ffc107 #20c997
+   #198754) in JS, which was a fifth palette and did not invert in dark mode. */
+.password-strength-fill--1 { background-color: var(--color-danger-solid); }
+.password-strength-fill--2 { background-color: var(--color-warning-solid); }
+.password-strength-fill--3 { background-color: var(--color-info-solid); }
+.password-strength-fill--4 { background-color: var(--color-success-solid); }
+.password-strength-fill--5 { background-color: var(--color-success-solid); }
+
 .password-strength-label {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
 }
+
+.password-strength-label--1 { color: var(--color-danger-text); }
+.password-strength-label--2 { color: var(--color-warning-text); }
+.password-strength-label--3 { color: var(--color-info-text); }
+.password-strength-label--4,
+.password-strength-label--5 { color: var(--color-success-text); }
 
 /* --------------------------------------------------------------------------
    Submit
@@ -471,6 +487,20 @@
 
 .verify-retry-btn:hover:not(:disabled) {
   box-shadow: var(--shadow-md);
+}
+
+/* A single centred column for the short standalone auth pages (reset
+ * password, and anything else that is one form with no header block). */
+.auth-narrow-page {
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - var(--header-height));
+  padding: var(--space-10) var(--space-4);
+}
+
+.auth-narrow-page > * {
+  width: 100%;
+  max-width: 25rem;
 }
 
 /* --------------------------------------------------------------------------

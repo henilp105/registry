@@ -194,7 +194,9 @@ const SearchBar = () => {
 
   return (
     <div className="d-flex flex-grow-1 mx-3" id="search-bar">
-      <div className="input-group" style={{ maxWidth: "500px" }}>
+      {/* The pill radius and the max width are in App.css (#search-bar);
+          the input and button each get one half so there is no seam. */}
+      <div className="input-group">
         <input
           type="search"
           className="form-control"
@@ -203,14 +205,12 @@ const SearchBar = () => {
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           aria-label="Search packages"
-          style={{ borderRadius: "50px 0 0 50px" }}
         />
-        <button 
-          className="btn btn-primary" 
+        <button
+          className="btn btn-primary"
           onClick={handleSearch}
           disabled={isLoading || !localQuery.trim()}
           aria-label="Submit search"
-          style={{ borderRadius: "0 50px 50px 0" }}
         >
           {isLoading ? (
             <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />

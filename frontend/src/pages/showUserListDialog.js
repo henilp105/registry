@@ -66,7 +66,7 @@ const ShowUserListDialog = ({
 
         {!isLoading && users && users.length === 0 && (
           <div className="text-center text-muted py-3">
-            <Icon name="users" size="2x" className="mb-2 d-block" />
+            <Icon name="users" size={32} className="mb-2 d-block" />
             No users found
           </div>
         )}

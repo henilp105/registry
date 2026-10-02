@@ -80,7 +80,7 @@ const ViewMalicousReports = ({ show, onHide }) => {
           Malicious Reports
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+      <Modal.Body className="modal-scroll-body">
         {renderContent()}
       </Modal.Body>
     </Modal>
