@@ -56,6 +56,10 @@ const PackageRatingGraph = ({ data }) => {
     [data]
   );
 
+  // The fallbacks are the light-theme token values, used only if
+  // getComputedStyle returns nothing (server render, or an exotic host). They
+  // are not theme colours in their own right: in a browser the token always
+  // wins, which is the point of reading it rather than hard-coding a fill.
   const barFill = useTokenColor("--color-brand-solid", "#5b53c0");
   const gridColor = useTokenColor("--color-border-subtle", "#e1e2ec");
   const axisColor = useTokenColor("--color-text-muted", "#4b4c5a");
