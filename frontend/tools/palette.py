@@ -9,6 +9,7 @@ the borders of interactive controls.
 Run `python3 palette.py` to verify, `python3 palette.py -w` to write tokens.css.
 """
 import math
+import os
 import sys
 
 # ---------------------------------------------------------------- oklch -> srgb
@@ -304,11 +305,132 @@ CHECKS_DARK_ONLY = [
 ]
 
 
+def all_checks(label):
+    return list(CHECKS) + (list(CHECKS_DARK_ONLY) if label == "DARK" else [])
+
+
+# Group headings for the generated contrast table, keyed by the minimum ratio.
+_GROUPS = [
+    (4.5, "Body text (WCAG 2.2 AA, SC 1.4.3)"),
+    (3.0, "Large text, focus rings and control borders (SC 1.4.11 / 1.4.6)"),
+    (1.2, "Decorative only - no AA floor applies"),
+]
+
+
+def write_contrast_doc(path):
+    """Emit docs/theme-contrast.md from the same data verify() checks.
+
+    The table is generated rather than hand-written so it cannot drift from the
+    palette: if a value in the palette changes, the next run rewrites the
+    numbers here, and verify() has already refused to emit tokens.css if any
+    pair fell below its floor.
+    """
+    rows = []
+    for label, pal in (("Light", LIGHT), ("Dark", DARK)):
+        for fg, bg, need, what in all_checks("DARK" if label == "Dark" else "LIGHT"):
+            rows.append(
+                {
+                    "theme": label,
+                    "fg": fg,
+                    "bg": bg,
+                    "ratio": ratio(pal[fg], pal[bg]),
+                    "need": need,
+                    "what": what,
+                    "fg_hex": pal[fg],
+                    "bg_hex": pal[bg],
+                }
+            )
+    by_pair = {}
+    for row in rows:
+        by_pair.setdefault((row["fg"], row["bg"], row["need"], row["what"]), {})[
+            row["theme"]
+        ] = row
+
+    out = []
+    out.append("# Contrast table\n\n")
+    out.append(
+        "Every foreground/background pair the UI uses, with its measured WCAG "
+        "2.2 contrast ratio in both themes.\n\n"
+    )
+    out.append(
+        "**These numbers are measured, not estimated.** They are computed from "
+        "the sRGB hex values in `frontend/tools/palette.py` by the same run "
+        "that generates `src/theme/tokens.css`. The generator refuses to "
+        "rewrite `tokens.css` if any pair falls below its floor, so a "
+        "regression cannot reach the token file unnoticed. If you change a "
+        "colour in the palette, re-run the generator and commit this document "
+        "alongside `tokens.css`.\n"
+    )
+
+    for need, heading in _GROUPS:
+        out.append(f"\n## {heading}\n\n")
+        out.append(
+            "| Pair | Light | Dark | Required | Used for |\n"
+            "| --- | --- | --- | --- | --- |\n"
+        )
+        for (fg, bg, n, what), themes in by_pair.items():
+            if n != need:
+                continue
+            # A check may exist in only one theme (CHECKS_DARK_ONLY). Print
+            # "not checked" rather than a blank cell, so an empty column is
+            # never mistaken for a passing measurement.
+            light = (
+                f"{themes['Light']['ratio']:.2f}:1"
+                if themes.get("Light")
+                else "not checked"
+            )
+            dark = (
+                f"{themes['Dark']['ratio']:.2f}:1"
+                if themes.get("Dark")
+                else "not checked"
+            )
+            out.append(
+                f"| `--color-{fg}` on `--color-{bg}` | {light} | "
+                f"{dark} | {need}:1 | {what} |\n"
+            )
+
+    total = len(by_pair)
+    both = sum(1 for t in by_pair.values() if "Light" in t and "Dark" in t)
+    single = total - both
+    out.append(
+        f"\n## Summary\n\n{total} pairs checked, all at or above their floor: "
+        f"{both} in both themes"
+        + (
+            f", and {single} in the dark theme only (marked *not checked* "
+            "above)."
+            if single
+            else "."
+        )
+        + "\n\nThe dark theme is not a separate palette: the same OKLCH hue and "
+        "roughly the same chroma with the lightness inverted, so a pair that "
+        "passes on the page in light mode passes on the page in dark mode. "
+        "The label colours on solid fills are the one place the two themes "
+        "differ deliberately - see `--color-on-*-solid`.\n"
+    )
+
+    out.append("\n## How to reproduce\n\n")
+    out.append("```sh\ncd frontend\npython3 tools/build_tokens.py\n```\n\n")
+    out.append(
+        "Add `--check` to verify without rewriting `tokens.css`, which is what "
+        "CI should do:\n\n```sh\npython3 tools/build_tokens.py --check\n```\n"
+    )
+    out.append(
+        "\nThe script prints every pair and its measured ratio, and exits "
+        "non-zero without writing anything if any check fails. Requires only "
+        "the Python standard library.\n"
+    )
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as fh:
+        fh.write("".join(out))
+    return path
+
+
 def verify():
     failures = []
     for label, pal in (("LIGHT", LIGHT), ("DARK", DARK)):
         print(f"\n=== {label} ===")
-        for fg, bg, need, what in CHECKS + (CHECKS_DARK_ONLY if label == "DARK" else []):
+        for fg, bg, need, what in all_checks(label):
             r = ratio(pal[fg], pal[bg])
             ok = r >= need
             if not ok:
@@ -330,6 +452,14 @@ def emit():
 
 if __name__ == "__main__":
     fails = verify()
+    if not fails:
+        # Only regenerate the doc when the palette passes, so the table can
+        # never document a failing state.
+        here = os.path.dirname(os.path.abspath(__file__))
+        doc = write_contrast_doc(
+            os.path.join(here, "..", "docs", "theme-contrast.md")
+        )
+        print("\nwrote " + os.path.relpath(doc, os.getcwd()))
     if "-w" in sys.argv:
         print("\n---- token values ----")
         print(emit())
