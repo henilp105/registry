@@ -34,6 +34,7 @@ import { getTarball, tarballKey, storageUsage } from "../lib/storage";
 import { TTL, entityVersion, serveCached } from "../lib/cache";
 import { ENTITY } from "../lib/cache";
 import { logger } from "../lib/logger";
+import { strId } from "../lib/permissions";
 
 /** Segments allowed in a namespace / package / version path component. */
 const SEGMENT = /^[A-Za-z0-9._-]{1,64}$/;
@@ -196,7 +197,7 @@ export async function recordDownload(env: Env, packageId: unknown): Promise<void
  */
 export async function pruneOrphanedTarballs(
   env: Env,
-  isKnown: (namespace: string, packageName: string, version: string) => Promise<boolean>,
+  liveKeys: Set<string>,
 ): Promise<{ scanned: number; removed: number }> {
   let scanned = 0;
   let removed = 0;
@@ -210,7 +211,8 @@ export async function pruneOrphanedTarballs(
         const parts = object.key.split("/"); // tarballs/<ns>/<pkg>/<ver>.tar.gz
         if (parts.length !== 4) continue;
         const version = stripExt(parts[3] as string);
-        if (await isKnown(parts[1] as string, parts[2] as string, version)) continue;
+        // D79: membership test is now O(1) and was moved out of the loop.
+        if (liveKeys.has(`${parts[1]}|${parts[2]}|${version}`)) continue;
 
         await env.TARBALLS.delete(object.key);
         removed += 1;
@@ -223,4 +225,59 @@ export async function pruneOrphanedTarballs(
   }
 
   return { scanned, removed };
+}
+
+/**
+ * O(1) membership test for the prune sweep, batched into TWO queries total
+ * (packages + namespaces) instead of one round trip per R2 object.
+ *
+ * The old per-object `findOne` had two problems:
+ *  1. one Durable Object round trip (subrequest) per R2 object -- a
+ *     100-object prune exhausted the Workers Free 50-subrequest budget and
+ *     the whole cron died with `Too many subrequests`, leaving `buildSnapshot`
+ *     (which runs after it) unexecuted as well.
+ *  2. it matched on `namespace_name`, a denormalised field older documents
+ *     may lack, so a live tarball was silently deleted (D79). The read path
+ *     falls back to the resolved namespace name; the prune now does the same.
+ */
+export async function collectLiveTarballKeys(env: Env): Promise<Set<string>> {
+  const live = new Set<string>();
+  try {
+    const [packages, namespaces] = await Promise.all([
+      db<unknown[]>(env, {
+        kind: "find",
+        collection: "packages",
+        filter: {},
+        projection: { name: 1, namespace: 1, namespace_name: 1, "versions.version": 1 },
+      }),
+      db<unknown[]>(env, {
+        kind: "find",
+        collection: "namespaces",
+        filter: {},
+        projection: { namespace: 1 },
+      }),
+    ]);
+
+    // Namespace _id -> namespace name, for packages whose `namespace_name` is
+    // absent (legacy documents) -- mirrors namespaces-shared.ts's fallback.
+    const nsNameById = new Map<string, string>();
+    for (const ns of (namespaces ?? []) as Record<string, unknown>[]) {
+      nsNameById.set(strId(ns._id), String(ns.namespace ?? ""));
+    }
+
+    for (const pkg of (packages ?? []) as Record<string, unknown>[]) {
+      const nsName =
+        typeof pkg.namespace_name === "string" && pkg.namespace_name.length > 0
+          ? pkg.namespace_name
+          : nsNameById.get(strId(pkg.namespace)) ?? "";
+      if (!nsName) continue;
+      for (const v of (pkg.versions ?? []) as Record<string, unknown>[]) {
+        const version = String(v.version ?? "");
+        if (version) live.add(`${nsName}|${String(pkg.name ?? "")}|${version}`);
+      }
+    }
+  } catch (err) {
+    logger.error("collect live keys failed", { message: err instanceof Error ? err.message : String(err) });
+  }
+  return live;
 }

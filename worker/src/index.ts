@@ -15,8 +15,7 @@ import type { Env } from "./db/client";
 import { INDEX_SPEC, EXPECTED_COLLECTIONS } from "./db/indexes";
 import { buildSnapshot, pruneArchives } from "./routes/archives";
 import { sweepExpiredTokens } from "./lib/upload-tokens";
-import { pruneOrphanedTarballs } from "./routes/tarballs";
-import { db } from "./db/client";
+import { collectLiveTarballKeys, pruneOrphanedTarballs } from "./routes/tarballs";
 import { corsHeaders, handlePreflight } from "./lib/cors";
 import { logger } from "./lib/logger";
 import { isExempt, rateLimitHeaders, rateLimitedResponse } from "./lib/rate-limit-middleware";
@@ -178,15 +177,12 @@ async function handleCron(cron: string, env: Env): Promise<void> {
         // Weekly R2 maintenance: drop tarballs whose version document is gone.
         // This is the repair path for anything a cascade delete could not reach
         // (defect D12), plus a fresh public snapshot and archive pruning.
-        const pruned = await pruneOrphanedTarballs(env, async (namespace, packageName, version) => {
-          const doc = await db<unknown>(env, {
-            kind: "findOne",
-            collection: "packages",
-            filter: { name: packageName, namespace_name: namespace, "versions.version": version },
-            projection: { _id: 1 },
-          });
-          return doc !== null;
-        });
+        // D79: batch the liveness check once (two queries total) instead of one
+        // DO round trip per R2 object -- which exhausted the 50-subrequest
+        // budget on any non-trivial registry, and matched on the denormalised
+        // namespace_name that old documents may lack, deleting live tarballs.
+        const liveKeys = await collectLiveTarballKeys(env);
+        const pruned = await pruneOrphanedTarballs(env, liveKeys);
         const snapshot = await buildSnapshot(env);
         const archives = await pruneArchives(env, 3);
         logger.info("weekly r2 maintenance", {
