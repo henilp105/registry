@@ -67,15 +67,16 @@ const ViewMalicousReports = ({ show, onHide }) => {
   };
 
   return (
-    <Modal 
-      show={show} 
-      onHide={onHide} 
+    <Modal
+      show={show}
+      onHide={onHide}
       onExited={handleExit}
       size="lg"
       centered
+      aria-labelledby="malicious-reports-modal"
     >
       <Modal.Header closeButton>
-        <Modal.Title>
+        <Modal.Title id="malicious-reports-modal">
           <Icon name="flag" className="me-2" />
           Malicious Reports
         </Modal.Title>

@@ -43,9 +43,17 @@ const ShowUserListDialog = ({
   }, [show, dispatch, admins, maintainers, packagemaintainers, namespace, packageName, uuid]);
 
   return (
-    <Modal show={show} onHide={onHide} centered>
+    // aria-labelledby + an id on the title. Without the pair, the dialog has
+    // role="dialog" and aria-modal but no accessible name, so a screen reader
+    // announces only "dialog" and the user has no idea which one is open.
+    <Modal
+      show={show}
+      onHide={onHide}
+      centered
+      aria-labelledby="user-list-modal"
+    >
       <Modal.Header closeButton>
-        <Modal.Title>{title}</Modal.Title>
+        <Modal.Title id="user-list-modal">{title}</Modal.Title>
       </Modal.Header>
 
       <Modal.Body>

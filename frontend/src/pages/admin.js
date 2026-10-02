@@ -380,9 +380,18 @@ const AdminSection = () => {
         onHide={() => handleShowReports(false)}
       />
 
-      <Modal show={modalData.showModal} onHide={closeModal} centered>
+      {/* aria-labelledby gives the dialog an accessible name; without it the
+          title is visible but unannounced. */}
+      <Modal
+        show={modalData.showModal}
+        onHide={closeModal}
+        centered
+        aria-labelledby="admin-confirm-modal"
+      >
         <Modal.Header closeButton>
-          <Modal.Title>{modalData.modalTitle}</Modal.Title>
+          <Modal.Title id="admin-confirm-modal">
+            {modalData.modalTitle}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div className="d-flex align-items-center">

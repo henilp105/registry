@@ -291,9 +291,15 @@ const Account = () => {
       </Row>
 
       {/* Password Reset Modal */}
-      <Modal show={showPasswordModal} onHide={handleClosePasswordModal} centered className="account-modal">
+      <Modal
+        show={showPasswordModal}
+        onHide={handleClosePasswordModal}
+        centered
+        className="account-modal"
+        aria-labelledby="change-password-modal"
+      >
         <Modal.Header closeButton>
-          <Modal.Title>
+          <Modal.Title id="change-password-modal">
             <Key className="me-2" />
             Change Password
           </Modal.Title>
