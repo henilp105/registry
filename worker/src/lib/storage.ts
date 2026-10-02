@@ -88,10 +88,17 @@ export function tarballKey(namespace: string, packageName: string, version: stri
  * cannot write outside its namespace prefix.
  */
 function assertSafeSegment(value: string, label: string): void {
-  if (!value || !/^[A-Za-z0-9._-]{1,64}$/.test(value)) {
+  // Defect D81: this charset used to reject '+' and any '..' anywhere. But
+  // validators.ts accepts full semver, which includes '+' (build metadata)
+  // and dot-separated prerelease identifiers -- so a package with version
+  // '1.0.0+build.5' passed validation and then failed to upload with
+  // "Invalid tarball file". '+' is a legal URL path segment and R2 keys are
+  // not filesystem paths, so both are safe; the checks below are the ones
+  // that actually matter for safety.
+  if (!value || !/^[A-Za-z0-9._~+-]{1,64}$/.test(value)) {
     throw new Error(`unsafe ${label} segment`);
   }
-  if (value === "." || value === ".." || value.includes("..")) {
+  if (value === "." || value === ".." || value.includes("/") || value.includes("\\")) {
     throw new Error(`unsafe ${label} segment`);
   }
 }

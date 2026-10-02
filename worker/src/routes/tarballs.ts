@@ -37,7 +37,8 @@ import { logger } from "../lib/logger";
 import { strId } from "../lib/permissions";
 
 /** Segments allowed in a namespace / package / version path component. */
-const SEGMENT = /^[A-Za-z0-9._-]{1,64}$/;
+// Matches the charset assertSafeSegment allows in storage.ts (D81).
+const SEGMENT = /^[A-Za-z0-9._~+-]{1,64}$/;
 
 export async function handleTarballRoutes(
   request: Request,
