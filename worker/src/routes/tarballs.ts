@@ -64,9 +64,20 @@ export async function handleTarballRoutes(
 
   // GET /tarballs/{ns}/{pkg}/{version}  and  GET /download/{ns}/{pkg}/{version}
   //
-  // Both accepted because the frontend builds its link from `ver.download_url`,
-  // which historically was `/tarballs/<ObjectId>`. The legacy shape is handled
-  // for backwards compatibility; the new one needs no database read.
+  // Two prefixes for one artifact, because the frontend builds its link from
+  // `ver.download_url` and has used both spellings.
+  //
+  // ── The legacy `/tarballs/<ObjectId>` shape is NOT supported ─────────────
+  // `v0.0.1` emitted `download_url = f"/tarballs/{file_object_id}"`, a GridFS
+  // ObjectId. There is no ObjectId in this architecture: artifacts live in R2
+  // under a key derivable from namespace/package/version, and GridFS is not
+  // used at all. A stored ObjectId identifies nothing here, so a legacy URL is
+  // unserveable rather than merely unimplemented -- there is nothing to look up.
+  //
+  // An earlier comment here claimed the legacy shape was "handled for backwards
+  // compatibility". It was not; only the 4-segment branch existed. Correcting
+  // the comment is the whole fix, because there is no code that can satisfy it.
+  // Any client holding a cached legacy `download_url` must re-fetch metadata.
   if (method !== "GET" && method !== "HEAD") return null;
 
   if (prefix === "tarballs" && segments.length === 4) {

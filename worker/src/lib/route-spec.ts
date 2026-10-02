@@ -262,6 +262,20 @@ export const ROUTES: RouteSpec[] = [
     notes: "`isAdmin` is a string, not a boolean. Preserved because the frontend compares it as a string.",
   },
   {
+    path: "/users/admin/transfer",
+    method: "POST",
+    operationId: "transferAccount",
+    summary: "Refused. Present only so it 501s instead of 404ing",
+    tags: ["users"],
+    responses: { "501": "Disabled" },
+    notes:
+      "`v0.0.1` kept a fully commented-out implementation and returned 501 with " +
+      "the body message `This Functionality has been disabled.` That exact message and " +
+      "status are reproduced, rather than dropped, because a deliberate 501 and an " +
+      "accidental 404 look identical to a client. The legacy handler was " +
+      "unauthenticated, so leaving it routable is pure attack surface.",
+  },
+  {
     path: "/users/delete",
     method: "POST",
     operationId: "deleteUser",
@@ -502,7 +516,21 @@ export const ROUTES: RouteSpec[] = [
     tags: ["packages"],
     responses: { ...ERR(["404"]), "200": "`users: [{id, username}]`" },
     cacheable: true,
-    notes: "Also accepted over POST, because the original allowed either verb.",
+    notes: "Also accepted over POST; see the POST entry below.",
+  },
+  {
+    path: "/packages/{namespace_name}/{package_name}/maintainers",
+    method: "POST",
+    operationId: "listPackageMaintainersOverPost",
+    summary: "List package maintainers, over POST",
+    tags: ["packages"],
+    responses: { ...ERR(["404"]), "200": "`users: [{id, username}]`" },
+    cacheable: true,
+    notes:
+      "Declared separately from the GET entry so a compatibility check against the legacy " +
+      "spec sees the verb. `v0.0.1` registered this route as `methods=[\"GET\",\"POST\"]`, and " +
+      "an earlier version of this spec documented only the GET, so the POST appeared to have " +
+      "been dropped even though the router has always served it.",
   },
   {
     path: "/packages/{namespace_name}/{package_name}/uploadToken",

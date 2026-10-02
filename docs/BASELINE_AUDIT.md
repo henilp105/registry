@@ -194,3 +194,73 @@ it is mistaken for coverage.
 **Still open:** `/terms` and `/privacy` are linked in the footer and 404. Left
 deliberate — inventing legal text is not a migration task — but flagged so it is
 a decision rather than an oversight.
+
+---
+
+## D47 — The compatibility claim was never independently checked
+
+**Severity: high (process, not code).** Found by running the
+`migration-architect` skill's own `compatibility_checker.py` against the real
+artifacts instead of trusting the migration's own summary.
+
+The headline claim — "the API contract did not change" — had only ever been
+asserted by the same code that made the changes. So the legacy surface was
+reconstructed from git: 36 operations, recovered by walking the `@swag_from`
+decorators in the Flask sources and resolving each to its YAML fragment. That is
+the only way to recover the contract as it actually was.
+
+**Run naively, the checker reported 47 breaking changes. 46 were artifacts:**
+
+- Flask writes path parameters as `<namespace>`; OpenAPI writes `{namespace}`.
+  A checker comparing path keys as literal strings calls all 7 of those a removed
+  endpoint.
+- Swagger 2.0 puts `formData` in `parameters`; OpenAPI 3 moves the same fields into
+  `requestBody.multipart/form-data`. Without hoisting, `password`, `upload_token`
+  and `tarball` all read as "removed required parameters".
+
+After normalising both, and matching paths on segment shape rather than
+parameter *names*:
+
+| Verdict | Count | Meaning |
+|---|---|---|
+| PRESERVED | 28 | same method, same path |
+| COSMETIC | 7 | `{namespace}` vs `{namespace_name}`; a client cannot tell |
+| REMOVED, justified | 1 | `GET /tarballs/{oid}` |
+| REMOVED, unexplained | 0 | — |
+
+So the contract holds: 35 of 36 operations are byte-for-byte reachable, and the
+36th is the one below.
+
+**`GET /tarballs/{oid}` is genuinely, unavoidably gone.** `v0.0.1` emitted
+`download_url = f"/tarballs/{file_object_id}"` — a GridFS ObjectId. Artifacts now
+live in R2 under a key derived from namespace/package/version, and GridFS is not
+used at all. A stored ObjectId identifies nothing in this architecture, so the URL
+is **unserveable rather than merely unimplemented**: there is nothing to look up.
+No amount of routing work recovers it.
+
+A comment in `routes/tarballs.ts` had claimed the legacy shape was "handled for
+backwards compatibility". It was not — only the 4-segment branch existed. The fix
+was correcting the comment, because there is no code that could satisfy it.
+
+**Two documentation defects the check surfaced:**
+
+1. `POST /packages/{ns}/{pkg}/maintainers` — `v0.0.1` registered
+   `methods=["GET","POST"]`, and the router has always served both, but the spec
+   declared only the GET. The POST read as dropped when it never was.
+2. `POST /users/admin/transfer` — routed, returning a deliberate 501, and absent
+   from the spec entirely. `openapi.test.ts` did not catch it because it was
+   circular: it asserted spec → document, so a route present in the router and
+   absent from the spec passed. There is now an anti-circular assertion that
+   every `501` the router can emit is documented.
+
+**The gate is now committed** as `scripts/check_api_compat.py`, so the claim is
+reproducible rather than a one-off. Verified it can actually fail: removing
+`GET /report/view` from the spec produces `REMOVED-UNEXPLAINED` and exit 2;
+restoring it returns to the documented state. Justified removals are an
+allow-list, so a *new* unexplained removal fails CI while a known one does not.
+
+Its limitation is documented rather than glossed: the gate compares legacy → new,
+so it is blind to the deletion of a route this migration *added*. Verified by
+removing `/auth/refresh` and watching the gate pass. The reverse direction is
+covered by `openapi.test.ts` and `frontend-contract.test.ts`.
+

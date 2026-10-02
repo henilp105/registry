@@ -1,4 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+
+function readSource(relative: string): string {
+  return readFileSync(new URL(relative, import.meta.url), "utf8");
+}
 import { buildOpenApi, ROUTE_COUNT } from "../src/lib/openapi";
 import { ROUTES, SORTED_BY_VALUES } from "../src/lib/route-spec";
 
@@ -34,6 +39,34 @@ describe("OpenAPI document shape", () => {
 
   it("defines the shared Envelope schema every response references", () => {
     expect(doc.components.schemas?.Envelope).toBeDefined();
+  });
+
+  it("documents every refusal the router makes", () => {
+    // `openapi.test.ts` was circular: it asserted spec -> document, so a route
+    // that existed in router.ts but had no spec entry passed. That is how
+    // `POST /users/admin/transfer` stayed undocumented -- the router returns a
+    // deliberate 501 for it, the spec said nothing.
+    //
+    // A refusal is a documented behaviour rather than a silent omission, so the
+    // assertion is: every 501 the router can emit has a spec entry.
+    const router = readSource("../src/router.ts");
+    const routeFiles = ["users", "packages", "namespaces", "auth", "tarballs", "archives", "meta", "validation"];
+    const sources = [router, ...routeFiles.map((f) => readSource(`../src/routes/${f}.ts`))];
+    const combined = sources.join("\n");
+
+    const refusals = [...combined.matchAll(/jsonError\(501,\s*"([^"]+)"/g)].map((m) => m[1]);
+    expect(refusals.length, "no 501 found; has this test gone stale?").toBeGreaterThan(0);
+
+    // Every refusal must be reachable through a documented path. Rather than
+    // trying to map handler back to path, assert the *message* is documented --
+    // a refusal nobody documented is the case worth catching.
+    const documentedNotes = ROUTES.map((r) => r.notes ?? "").join("\n") + JSON.stringify(doc);
+    for (const message of refusals) {
+      expect(
+        documentedNotes,
+        `the router refuses with "${message}" but no route documents that refusal`,
+      ).toContain(message);
+    }
   });
 
   it("documents every route in the spec table", () => {
@@ -81,9 +114,26 @@ describe("path parameters", () => {
 });
 
 describe("responses", () => {
-  it("always documents 200 and at least one error", () => {
+  it("always documents 200 on every live route", () => {
+    // Exempt: routes that only ever refuse. `POST /users/admin/transfer`
+    // returns 501 by design and never had a success path, so demanding a 200
+    // of it would be demanding a lie.
+    const refusals = new Set(["transferAccount"]);
+
     for (const route of ROUTES) {
+      if (refusals.has(route.operationId)) continue;
       expect(Object.keys(route.responses), `${route.method} ${route.path}`).toContain("200");
+    }
+  });
+
+  it("documents a refusal-only route as having no success response", () => {
+    // The inverse: if a route is marked refusal-only, prove it really has no
+    // 2xx, so adding a `200` later is a deliberate act rather than an accident.
+    for (const route of ROUTES) {
+      const codes = Object.keys(route.responses);
+      const isRefusalOnly = codes.every((c) => c.startsWith("5"));
+      if (!isRefusalOnly) continue;
+      expect(codes, `${route.operationId} looks refusal-only`).toContain("501");
     }
   });
 
