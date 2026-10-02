@@ -48,6 +48,7 @@ import {
   FolderFill,
   FolderMinus,
   Globe2,
+  HourglassBottom,
   Grid3x3GapFill,
   HouseFill,
   InfoCircleFill,
@@ -59,6 +60,7 @@ import {
   PersonStanding,
   PlusCircleFill,
   PlusLg,
+  Wifi,
   QuestionCircleFill,
   Search,
   ShieldLockFill,
@@ -73,6 +75,8 @@ import {
  *  each entry stays traceable during review. */
 const ICONS = {
   archive: ArchiveFill, // fa-archive
+  "hourglass-half": HourglassBottom,
+  wifi: Wifi,
   book: BookFill, // fa-book
   check: CheckLg, // fa-check
   "check-circle": CheckCircleFill, // fa-check-circle
