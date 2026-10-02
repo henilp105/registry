@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   reset,
   getUserAccount,
@@ -247,10 +247,12 @@ const Account = () => {
                   <span className="account-info-label">Primary Email</span>
                   <span className="account-info-value account-email">{email}</span>
                 </div>
-                <button 
+                <button
+                  type="button"
                   className="account-edit-btn"
                   onClick={handleOpenEmailModal}
                   title="Edit email"
+                  aria-label="Edit primary email"
                 >
                   <PencilSquare size={16} />
                 </button>
@@ -264,10 +266,12 @@ const Account = () => {
                   <span className="account-info-label">Password</span>
                   <span className="account-info-value">••••••••••</span>
                 </div>
-                <button 
+                <button
+                  type="button"
                   className="account-edit-btn"
                   onClick={handleOpenPasswordModal}
                   title="Change password"
+                  aria-label="Change password"
                 >
                   <PencilSquare size={16} />
                 </button>
@@ -277,9 +281,10 @@ const Account = () => {
             <div className="account-profile-link">
               <PersonCircle size={20} />
               <span>View your public profile at</span>
-              <a href={`/users/${username}`}>
-                /users/{username}
-              </a>
+              {/* A router Link, not an <a href>: this is an in-app route, and
+                  a plain anchor would tear down the whole SPA and re-fetch
+                  the bundle. */}
+              <Link to={`/users/${username}`}>/users/{username}</Link>
             </div>
           </div>
         </Col>
