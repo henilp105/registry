@@ -31,6 +31,13 @@
             : "light";
         }
         document.documentElement.setAttribute("data-theme", theme);
+        // Mirror onto data-bs-theme too. Bootstrap 5.3 gates its whole dark
+        // palette on that attribute, so without it Bootstrap components stay
+        // light inside a dark theme. Keep in sync with applyTheme() in
+        // src/theme/theme.js -- this copy runs before first paint precisely so
+        // there is no white flash, which is also why it cannot wait for the
+        // bundle to load.
+        document.documentElement.setAttribute("data-bs-theme", theme);
         document.documentElement.style.colorScheme = theme;
       })();
     </script>

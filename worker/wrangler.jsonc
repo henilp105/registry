@@ -38,7 +38,16 @@
     "MONGO_DB_NAME": "fpmregistry",
     "PBKDF2_ITERATIONS": "210000",
     "HOST": "http://localhost:5173",
-    "ALLOWED_ORIGINS": "http://localhost:5173",
+    // Both loopback spellings. `localhost` and `127.0.0.1` are different
+    // origins to a browser, and which one a developer uses depends on their
+    // tooling -- CRA serves on localhost, but a container or a Playwright script
+    // reaches 127.0.0.1. With only one listed, the other silently fails closed
+    // and the symptom is a blank page with no error in any log: the browser
+    // blocks the response before the app can report it.
+    //
+    // Still an allow-list, not a wildcard. Loopback only, which cannot be reached
+    // from off-machine.
+    "ALLOWED_ORIGINS": "http://localhost:5173,http://127.0.0.1:5173",
     // Secrets are NOT in this file. Set with:
     //   wrangler secret put JWT_SECRET_KEY
     //   wrangler secret put VALIDATION_SECRET

@@ -69,6 +69,108 @@
   transition: color var(--duration-fast) var(--ease-standard);
 }
 
+/* The theme owns its own navigation colour.
+ *
+ * Bootstrap's `.nav-link { color: var(--bs-nav-link-color) }` has specificity
+ * (0,1,0) and beats the theme's `a { color: var(--color-link) }` at (0,0,1), so
+ * every top-level link took Bootstrap's colour instead of the palette's. In dark
+ * mode that was Bootstrap's *light* default -- black on the dark background at
+ * 1.11:1. Invisible, and failing WCAG AA for large text and UI components as well
+ * as for body text. Measured from the rendered DOM, not from the token file:
+ * every token was correct, and the defect lived in the layer Bootstrap controls,
+ * which is exactly what a token audit cannot see.
+ *
+ * This overrides the *variable*, not the property. That matters:
+ *
+ *   - `.nav-link`'s own rule reads `--bs-nav-link-color`, so setting it on the
+ *     container re-themes every nav link with no specificity contest at all.
+ *   - The Register CTA is a `.nav-link` that is also a `.btn-primary`. Setting
+ *     `color` directly would beat `.btn`'s `color: var(--bs-btn-color)` at equal
+ *     specificity by source order, which produced white text on the white button
+ *     in light mode and 1.1:1 in dark. Overriding the variable leaves
+ *     `--bs-btn-color` in charge of the button, which is correct.
+ *
+ * Two mechanisms are deliberately in play. `applyTheme` mirrors `data-theme`
+ * onto `data-bs-theme`, which activates Bootstrap's own dark palette and so
+ * corrects every Bootstrap component at once. This block keeps the theme
+ * authoritative for its own navigation even if that mirror is dropped. One
+ * mechanism fixing a whole framework is worth having; depending on it alone is
+ * not.
+ *
+ * Selector note: `react-bootstrap`'s `<Nav>` renders `<div class="navbar-nav">`,
+ * not the `<ul class="nav">` of Bootstrap 4, so scoping to `.nav` matches
+ * nothing. The first attempt at this rule silently did nothing for that reason.
+ */
+.navbar-nav {
+  --bs-nav-link-color: var(--color-text-muted);
+  --bs-nav-link-hover-color: var(--color-text);
+}
+
+/* The Register CTA is a `.nav-link` that is also a `.btn-primary`, and Bootstrap
+ * gives `.nav-link` a `background: 0 0` shorthand. A shorthand resets
+ * `background-color`, so it wiped the button's background entirely: `--bs-btn-bg`
+ * resolved correctly to the brand colour while the rendered background stayed
+ * `rgba(0, 0, 0, 0)`. The result was white text with no button behind it at
+ * 1.0:1 on the light page, and near-black text on the dark page at 1.1:1.
+ *
+ * Both rules have specificity (0,1,0) and `.nav-link` comes later in Bootstrap's
+ * stylesheet, so it won. Restating `background-color` at (0,2,0) is the fix; the
+ * longhand is required, because a `background` shorthand here would reintroduce
+ * the same reset.
+ */
+.navbar-nav .nav-cta {
+  background-color: var(--color-brand-solid);
+}
+
+/* Underline that grows from the centre on hover/focus. */
+.nav-link-hover {
+  position: relative;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+/* The theme owns its own navigation colour.
+ *
+ * Bootstrap's `.nav-link { color: var(--bs-nav-link-color) }` has specificity
+ * (0,1,0) and beats the theme's `a { color: var(--color-link) }` at (0,0,1), so
+ * every top-level link took Bootstrap's colour instead of the palette's. In dark
+ * mode that was Bootstrap's *light* default, black at 1.11:1 on the dark
+ * background -- invisible, and failing WCAG AA for large text and UI components
+ * as well as for body text.
+ *
+ * Two things fix it, and both are wanted:
+ *
+ *   1. `applyTheme` now mirrors `data-theme` onto `data-bs-theme`, which is what
+ *      activates Bootstrap's own dark palette. That corrects every Bootstrap
+ *      component at once rather than one rule at a time.
+ *   2. This block restates the nav colour at matching specificity, so the theme
+ *      stays authoritative for its own navigation even if that mirror is ever
+ *      dropped. One mechanism fixing a whole framework is worth having; relying
+ *      on it alone is not.
+ *
+ * Selector note: `react-bootstrap`'s `<Nav>` renders `<div class="navbar-nav">`,
+ * not the `<ul class="nav">` of Bootstrap 4. Scoping to `.nav` matches nothing,
+ * which is why the first attempt at this rule silently did nothing.
+ *
+ * `!important` is deliberately not used: it would also beat a user's override.
+ */
+.navbar-nav .nav-link-hover,
+.navbar-nav .nav-link-hover:hover,
+.navbar-nav .nav-link-hover:focus-visible {
+  color: var(--color-text-muted);
+}
+
+.navbar-nav .nav-link-hover:hover,
+.navbar-nav .nav-link-hover:focus-visible {
+  color: var(--color-text);
+}
+
+/* The CTA keeps its own contrast requirement. */
+.navbar-nav .nav-cta,
+.navbar-nav .nav-cta:hover,
+.navbar-nav .nav-cta:focus-visible {
+  color: var(--color-on-brand-solid);
+}
+
 .nav-link-hover::after {
   content: "";
   position: absolute;

@@ -40,6 +40,23 @@ export const resolveTheme = () => {
  */
 export const applyTheme = (theme) => {
   document.documentElement.setAttribute("data-theme", theme);
+  // Mirror onto `data-bs-theme`, which is the attribute Bootstrap 5.3 gates its
+  // entire dark palette on.
+  //
+  // Without this, Bootstrap stays in light mode inside our dark theme, and the
+  // damage is not subtle: `.navbar` declares `--bs-navbar-color: rgba(0,0,0,.65)`
+  // as its *light* default, so in a dark theme the nav links rendered
+  // black-on-near-black at 1.11:1 — invisible, and failing WCAG AA for large
+  // text and UI components as well as normal text.
+  //
+  // Found by rendering the site and measuring computed contrast, not by reading
+  // the token file: every token was correct. The bug lived in the layer Bootstrap
+  // controls, which is precisely what a token audit cannot see.
+  //
+  // Mirroring rather than replacing `data-theme` keeps one source of truth. The
+  // tokens continue to be driven by `data-theme`, so nothing about the palette
+  // depends on Bootstrap's attribute being present.
+  document.documentElement.setAttribute("data-bs-theme", theme);
   // Keep the browser UI (address bar, form controls) in step.
   document.documentElement.style.colorScheme = theme;
 };

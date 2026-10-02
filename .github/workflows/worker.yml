@@ -74,3 +74,71 @@ jobs:
             if [ ! -s "$f" ]; then echo "missing or empty: $f"; exit 1; fi
             echo "ok: $f ($(wc -l < "$f") lines)"
           done
+
+  theme-contract:
+    name: Theme contract holds
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Repo-root job: these assertions are about frontend source, not the Worker.
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+
+      # The theme is written twice: once in `applyTheme()` and once as an inline
+      # script in index.html that must run before first paint. The source comment
+      # says "keep the two in sync", which is a request, not a mechanism -- and
+      # they did drift, silently, with no failing build.
+      #
+      # The failure that mattered: `data-theme` was set but `data-bs-theme` was
+      # not, so Bootstrap 5.3 stayed in its light palette inside our dark theme.
+      # `.navbar` declares `--bs-navbar-color: rgba(0,0,0,.65)` as its light
+      # default, so the top-level nav links rendered black-on-black at 1.11:1.
+      # A token audit cannot catch this -- every token was correct and the defect
+      # lived in a layer the theme does not own.
+      - name: Both theme writers must set data-bs-theme
+        run: |
+          set -euo pipefail
+          for f in frontend/src/theme/theme.js frontend/public/index.html; do
+            if ! grep -q 'data-bs-theme' "$f"; then
+              echo "FAIL: $f sets data-theme but not data-bs-theme."
+              echo "      Bootstrap 5.3 gates its dark palette on data-bs-theme, so"
+              echo "      omitting it leaves every Bootstrap component in light colours"
+              echo "      inside the dark theme."
+              exit 1
+            fi
+            echo "ok: $f sets data-bs-theme"
+          done
+
+      # A colour rule that never matches is worse than no rule: it reads as
+      # deliberate and silently does nothing. `.nav` was used where
+      # react-bootstrap renders `.navbar-nav`, so the nav colour override applied
+      # to nothing at all.
+      - name: Nav colour override must target the element that exists
+        run: |
+          set -euo pipefail
+          if ! grep -q '\.navbar-nav' frontend/src/App.css; then
+            echo "FAIL: frontend/src/App.css has no .navbar-nav rule."
+            echo "      react-bootstrap's <Nav> renders <div class=\"navbar-nav\">, not"
+            echo "      the <ul class=\"nav\"> of Bootstrap 4."
+            exit 1
+          fi
+          echo "ok: nav colour override targets .navbar-nav"
+
+      # The Register CTA is both `.nav-link` and `.btn-primary`. Bootstrap's
+      # `.nav-link { background: 0 0 }` is a shorthand that resets
+      # background-color, so the button lost its background and rendered as white
+      # text with nothing behind it -- 1.0:1 on the light page. The longhand must
+      # be restated.
+      - name: The nav CTA must restate its background as a longhand
+        run: |
+          set -euo pipefail
+          if ! grep -q 'nav-cta' frontend/src/App.css \
+             || ! grep -A3 'nav-cta {' frontend/src/App.css | grep -q 'background-color'; then
+            echo "FAIL: .navbar-nav .nav-cta does not set background-color."
+            echo "      Without it the Register button is transparent with white text."
+            exit 1
+          fi
+          echo "ok: nav CTA restates background-color"
+

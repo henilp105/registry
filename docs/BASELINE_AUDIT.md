@@ -401,3 +401,107 @@ absence of evidence is not evidence of disconnection.
 **The honest summary: none of D49–D53 could have been caught by any amount of
 unit testing.** They needed the process running against documents that exist.
 
+---
+
+## D54 — Dark mode rendered the navbar at 1.11:1, and the Register CTA had no background
+
+**Severity: high (accessibility). Found by rendering the site.**
+
+This is the gap I had flagged as unverified for most of the migration. The
+redesign shipped a contrast table of 53 measured pairs, all correct, and the dark
+theme was still unusable.
+
+### What the browser actually showed
+
+Measured with `getComputedStyle` on the rendered DOM, both schemes:
+
+| Element | Light | Dark (before) | Verdict |
+|---|---|---|---|
+| `fpm registry` wordmark | `rgb(0,0,0)` on white | `rgb(0,0,0)` on `rgb(22,22,30)` | **1.17:1** |
+| `Archives` / `Help` / `Login` | fine | `rgba(0,0,0,.65)` on `rgb(22,22,30)` | **1.11:1** |
+| `Register` CTA | **1.0:1** | **1.11:1** | invisible |
+
+Both fail AA for normal text, **and** for large text, **and** for UI components.
+Confirmed against `a11y-audit`'s `contrast_checker.py`, not my own arithmetic.
+
+### Cause 1 — `data-bs-theme` was never set
+
+Bootstrap 5.3 gates its **entire dark palette** on `[data-bs-theme=dark]`. The
+theme sets `data-theme`, a different attribute, and never mirrored it. So
+Bootstrap stayed in light mode inside our dark theme, and `.navbar` declared its
+light default `--bs-navbar-color: rgba(0,0,0,.65)` — black on a black background.
+
+`applyTheme()` now mirrors `data-theme` onto `data-bs-theme`, and so does the
+inline pre-paint script in `public/index.html`, which `theme.js` explicitly
+warned must be kept in sync. One mechanism fixes every Bootstrap component at
+once, which is why it is worth having rather than patching component by component.
+
+### Cause 2 — `.nav-link` outranks the theme's own link rule
+
+`.nav-link { color: var(--bs-nav-link-color) }` is specificity (0,1,0) and beats
+`a { color: var(--color-link) }` at (0,0,1), so the nav links took Bootstrap's
+colour rather than the palette's.
+
+Fixed by overriding the **variable** on the container, not the property:
+
+```css
+.navbar-nav { --bs-nav-link-color: var(--color-text-muted); }
+```
+
+`.nav-link`'s own rule reads that variable, so there is no specificity contest.
+
+Selector note: `react-bootstrap`'s `<Nav>` renders `<div class="navbar-nav">`, not
+Bootstrap 4's `<ul class="nav">`. My first attempt scoped to `.nav`, matched
+nothing, and did nothing at all — a colour rule that never matches is worse than
+none, because it reads as deliberate.
+
+### Cause 3 — the Register CTA never had a background
+
+It is both `.nav-link` and `.btn-primary`, and Bootstrap gives `.nav-link` a
+`background: 0 0` **shorthand**, which resets `background-color`. Equal
+specificity, later in source order, so `.nav-link` won and `--bs-btn-bg` was
+computed correctly (`#5b53c0`) while the rendered background stayed
+`rgba(0,0,0,0)`. White text, no button behind it.
+
+Restated as the longhand at (0,2,0). A `background` shorthand here would have
+reintroduced the same reset.
+
+This one is not caused by the migration and predates it — the CTA has been a
+transparent white-on-white button since the redesign. It read as an "unstyled
+link" in every screenshot, which is exactly the kind of thing a design review
+skips over.
+
+### Why no existing check caught any of it
+
+The token audit reads `tokens.css`. Every token *was* correct. These defects live
+in the cascade, in a framework the theme does not own. There is no static analysis
+of a token file that will ever report "Bootstrap's navbar variable is winning".
+
+Verified after the fix, from the rendered DOM:
+
+| Element | Dark (after) | Verdict |
+|---|---|---|
+| wordmark | `rgb(255,255,255)` on `rgb(22,22,30)` | 17.99:1 — AAA |
+| nav links | `rgb(185,186,194)` on `rgb(22,22,30)` | 8.03:1 — AAA |
+| Register CTA | `rgb(6,6,19)` on `rgb(142,143,239)` | 7.02:1 — AAA |
+
+And the whole suite, 11 routes × 2 viewports × 2 schemes: **66/66 structural
+checks, 0 unhandled exceptions, 0 failed requests**, no empty canvases, no glyphs
+that failed to load, exactly one `<main>` per page.
+
+### Guards added
+
+- `.github/workflows/worker.yml` gains a `theme-contract` job asserting both theme
+  writers set `data-bs-theme`, that the nav override targets `.navbar-nav`, and
+  that the CTA restates `background-color` as a longhand. The third one exists
+  because a rule that never matches reads as deliberate.
+- `scripts/frontend_visual_audit.cjs` is the audit itself, committed so the
+  claim is reproducible. Not in CI: it needs a browser and a running API.
+
+### Also fixed
+
+The dev CORS allowlist named only `http://localhost:5173`, so a browser reaching
+`http://127.0.0.1:5173` was silently blocked — no error in any log, the response
+just never reaches the app. Both loopback spellings are now allowed, and an
+unlisted origin still gets nothing.
+
