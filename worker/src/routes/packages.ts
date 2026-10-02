@@ -177,9 +177,13 @@ async function searchPackages(env: Env, url: URL): Promise<Response> {
   // `$text` results are ordered by relevance; everything else by the mapped
   // field. Only one of these two applies, so build the sort object explicitly
   // rather than with a computed key.
+  // Defect D81: non-unique sort keys (name, textScore) made pagination
+  // non-deterministic -- two queries for consecutive pages could order ties
+  // differently and yield duplicate or skipped rows. Every sort is broken by
+  // a unique key as the last comparator.
   const sort: Record<string, unknown> = usesText
-    ? { score: { $meta: "textScore" } }
-    : { [sortField]: direction };
+    ? { score: { $meta: "textScore" }, name: 1, _id: 1 }
+    : { [sortField]: direction, name: 1, _id: 1 };
 
   const pipeline: Record<string, unknown>[] = [{ $match: filter }, { $sort: sort }];
 

@@ -97,7 +97,17 @@ export function buildMatchFilter(
     // -1 drops stop words, so a bare "the" does not match every document.
     base.$text = { $search: plan.term };
   } else if (plan.kind === "prefix") {
-    base.name = { $regex: `^${escapeRegex(plan.term)}`, $options: "i" };
+    const prefix = { name: { $regex: `^${escapeRegex(plan.term)}`, $options: "i" } };
+    // Defect D81: this used to overwrite base.name outright, silently
+    // discarding a `package=` filter the caller also passed
+    // (GET /packages_cli?package=json&query=*). Merge instead with $and so
+    // both constraints apply.
+    if (extra.name !== undefined) {
+      delete base.name;
+      base.$and = [{ name: (extra as Record<string, unknown>).name }, prefix];
+    } else {
+      base.name = prefix.name;
+    }
   }
   return base;
 }
