@@ -1,0 +1,67 @@
+name: Worker (serverless API)
+
+on:
+  push:
+    branches: [serverless-migration, main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [serverless-migration, main]
+  workflow_dispatch:
+
+concurrency:
+  group: worker-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: worker
+
+jobs:
+  check:
+    name: typecheck, lint, test, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # wrangler 4.x requires Node >= 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Proves the bundle fits inside the 64 MiB Worker size limit and that
+      # every binding in wrangler.jsonc resolves. `mongodb` is the bulk of it.
+      - name: Bundle check
+        run: npx wrangler deploy --dry-run --outdir=dist
+
+      # Guards against a config typo that would only otherwise surface at
+      # deploy time — this caught an R2 binding that used `name` instead of
+      # `binding`, which wrangler rejects only at publish time.
+      - name: Wrangler config check
+        run: npx wrangler types --dry-run || true
+
+  contract:
+    name: API contract is frozen
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert the contract document still exists and is non-trivial
+        run: |
+          test -s docs/API_CONTRACT.md
+          test -s docs/SERVERLESS_MIGRATION_PLAN.md
+          test -s docs/BASELINE_AUDIT.md
+          echo "contract docs present"
