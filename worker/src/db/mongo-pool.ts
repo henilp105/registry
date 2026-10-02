@@ -147,11 +147,37 @@ export class MongoPool extends DurableObject<PoolEnv> {
     try {
       await session.withTransaction(async () => {
         out = null;
-        for (const step of steps) {
-          const c = db.collection(step.collection);
+        for (const raw of steps) {
+          const c = db.collection(raw.collection);
+          // Every filter and update in a transaction goes through the same
+          // hex -> ObjectId conversion as the non-transactional path.
+          //
+          // Omitting it made **every cascade delete silently delete nothing**
+          // while returning HTTP 200. `POST /namespace/<ns>/delete` filtered
+          // `{_id: "<24 hex>"}` against a stored ObjectId, matched zero rows, and
+          // answered `code: 200, "Namespace deleted successfully"` with the
+          // document still present. Same for delete_package and delete_user.
+          //
+          // That is the worst possible shape for this bug: the legacy defect the
+          // audit recorded as fixed ("delete_namespace never deleted anything and
+          // always returned code:500 at HTTP 200") was still there, only with a
+          // tidier status code. Found by exercising the write path against the
+          // live cluster; the unit tests all used object identity rather than
+          // asserting that a document actually disappeared.
+          // `filter` and `update` only exist on some variants of the union, so
+          // they are read through `"in"` rather than off the whole union.
+          const step = {
+            ...raw,
+            filter: "filter" in raw && raw.filter ? (toBsonQueries(raw.filter) as Document) : undefined,
+            update: "update" in raw && raw.update ? (toBsonQueries(raw.update) as Document) : undefined,
+          } as typeof raw;
           switch (step.kind) {
             case "insertOne": {
-              const r = await c.insertOne(step.doc, { session });
+              // Same conversion as the non-transactional path above: a cascade
+              // delete runs in a transaction and its writes must obey the same
+              // id-representation rule, or a transactionally-created document
+              // would differ from an ordinarily-created one.
+              const r = await c.insertOne(toBsonQueries(step.doc) as Document, { session });
               out = { insertedId: r.insertedId };
               break;
             }
@@ -449,7 +475,22 @@ export class MongoPool extends DurableObject<PoolEnv> {
       case "count":
         return await c.countDocuments(op.filter as Filter<Document>);
       case "insertOne": {
-        const r = await c.insertOne(op.doc);
+        // The document goes through the same hex -> ObjectId conversion as the
+        // filters do. Without this, the app writes id *references* as strings.
+        //
+        // How that happened: `toRpcSafe` turns an ObjectId into its hex string on
+        // the way out of the Durable Object, because workerd cannot serialise a
+        // BSON ObjectId. A handler then reads `namespace._id` from a fetched
+        // document and stores it on the next insert -- as a string. The document
+        // looks fine and every read of it returns 404.
+        //
+        // Concretely, `POST /packages` published a package whose `namespace` was
+        // the string "6abf6fa3c720a1d7775834f5" rather than an ObjectId, after
+        // which `GET /packages/{ns}/{pkg}`, `POST /ratings/...` and
+        // `PUT /packages` all 404'd for that package, while a hand-seeded package
+        // with a real ObjectId worked fine. `ratings` had the same problem with
+        // `package_id` and `user_id`.
+        const r = await c.insertOne(toBsonQueries(op.doc) as Document);
         return { insertedId: r.insertedId };
       }
       case "updateOne": {

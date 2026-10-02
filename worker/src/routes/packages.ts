@@ -742,11 +742,40 @@ async function deprecatePackage(
   const raw = (body.get("isDeprecated") ?? "true").toLowerCase();
   const shouldDeprecate = raw !== "false";
 
+  // Two updates, because the flag lives in two places and only one of them is
+  // read by the client.
+  //
+  // The package-level flag is what search filters on, so it has to be set or a
+  // deprecated package keeps appearing in results. The **version**-level flag is
+  // what the API returns in `latest_version_data` and every `version_history`
+  // entry, and what the frontend compares against the string "true". Setting only
+  // the package flag made `PUT /packages` answer HTTP 200
+  // "Package deprecated successfully" while `isDeprecated` stayed `"false"` on
+  // every version, so the deprecation badge never appeared in the UI.
+  //
+  // That is the exact failure this migration set out to close. `v0.0.1` had no
+  // deprecation route at all; adding one that reports success without changing
+  // what the client reads is the same defect wearing a 200.
   await db(env, {
     kind: "updateOne",
     collection: "packages",
     filter: { _id: target.package._id },
     update: { $set: { is_deprecated: shouldDeprecate, updated_at: new Date() } },
+  });
+
+  await db(env, {
+    kind: "updateOne",
+    collection: "packages",
+    filter: { _id: target.package._id },
+    update: {
+      $set: {
+        // `versions` is an array of subdocuments, so the positional-all
+        // operator is required -- there is no dotted path into array elements
+        // for a whole-array assignment.
+        "versions.$[].is_deprecated": shouldDeprecate,
+        "versions.$[].isDeprecated": String(shouldDeprecate),
+      },
+    },
   });
 
   await invalidate(

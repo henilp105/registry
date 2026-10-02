@@ -505,3 +505,113 @@ The dev CORS allowlist named only `http://localhost:5173`, so a browser reaching
 just never reaches the app. Both loopback spellings are now allowed, and an
 unlisted origin still gets nothing.
 
+---
+
+## D55–D58 — The write path had never been exercised
+
+**Severity: D55, D57 and D58 are critical. Found by running the write path.**
+
+D49 fixed the read path. Nothing had ever exercised a **write** — and writes are
+the larger, riskier half: authentication, publish to R2, ratings, deprecation, and
+three cascade deletes. A broken read fails visibly; a broken write fails *silently
+and corrupts state*.
+
+`scripts/write_path_audit.mjs` drives the whole write surface against the live
+cluster and asserts on the response **and** on the resulting database state. That
+second half is the point: the recurring legacy failure is "HTTP 200 with a message
+claiming success", which a status-code assertion cannot see.
+
+It found four product defects and four bugs in the harness itself.
+
+### D55 — Every cascade delete silently deleted nothing (critical)
+
+`POST /namespace/<ns>/delete` answered `code: 200, "Namespace deleted
+successfully"` and the document was still there. Same for `delete_package` and
+`delete_user`.
+
+Root cause was D49's own fix, incompletely applied. `toRpcSafe` must stringify
+ObjectIds because workerd cannot serialise them, so `toBsonQueries` converts hex
+back to ObjectId on the way out to queries. That was wired into `#run` and into
+transactional **inserts** — but not into a transaction's **filters**. Every
+cascade delete runs inside a transaction, so `{_id: "<24 hex>"}` matched zero rows
+and the step silently no-opped.
+
+This is the worst shape a bug can take. The audit register recorded
+`delete_namespace` as already fixed — "compared the namespace name against an
+ObjectId, so it never deleted anything and always returned code:500 at HTTP 200".
+The defect was still present; only the status code had improved to `200`. A
+migration that fixed the code but kept the guarantee is worse than one that left a
+loud failure in place.
+
+The unit tests missed it because they asserted object identity, not that a
+document actually disappeared.
+
+### D56 — Deprecating a package never reached the client (high)
+
+`PUT /packages` set `is_deprecated` on the **package document**, but the API
+returns `is_deprecated` / `isDeprecated` per **version**, and the frontend reads
+the version field. So the route answered `200 "Package deprecated successfully"`
+while `isDeprecated` stayed `"false"` on every version — the badge never appeared.
+
+That is the same defect as the one this migration set out to close. `v0.0.1` had no
+deprecation route; adding one that reports success without changing what the client
+reads is the same bug wearing a 200.
+
+Now writes both, using `versions.$[]` — there is no dotted path for assigning
+across an array of subdocuments. Verified end to end: deprecate → the API reports
+`"true"`, the package drops out of search; un-deprecate → the version flag returns
+to `"false"` and it reappears.
+
+### D57 — App-written id references were stored as strings (critical)
+
+A direct consequence of D49. `POST /packages` published a package whose
+`namespace` was the **string** `"6abf72a8..."` rather than an ObjectId, because it
+copied `_id` off a fetched document — which `toRpcSafe` had turned into a string —
+straight into the insert. `insertOne` was not passed through `toBsonQueries`.
+
+Every subsequent read of that package 404'd, while a package inserted with a real
+ObjectId worked fine, which is exactly why the read tests had all passed. Same
+problem in `ratings.package_id` and `ratings.user_id`.
+
+Both insert paths — plain and transactional — now convert.
+
+### D58 — `POST /users/delete` returned 500 for any namespace author (high)
+
+`Cannot apply $pull to a non-array value`. The cascade ran
+`$pull: { author: <id>, admins: …, maintainers: … }` over every namespace, but
+`namespaces.author` is a **scalar** ObjectId, not an array. `$pull` on a non-array
+throws, and because the cascade runs in a transaction the exception rolled the
+whole thing back — so the endpoint 500'd and deleted nothing for any user who had
+authored a namespace.
+
+Split into two steps: `$pull` for the arrays, `$set: {author: null}` for the
+scalar.
+
+### Four bugs in the harness itself
+
+Worth recording, because the first instinct on each was to suspect the product:
+
+- **`POST /users/admin` returns 401 for a non-admin**, not `isAdmin: "false"`. It
+  is an admin-only probe, not a role query. The harness was wrong.
+- **Upload tokens live in their own `upload_tokens` collection**, not on the
+  namespace document — `v0.0.1` pushed them onto `namespaces.upload_tokens[]`
+  forever with no sweep (D4). The harness looked in the wrong place.
+- **Ratings are stored inside the package document** at `ratings.users.<userId>`,
+  not in a collection, so concurrent votes cannot lose each other. Harness again.
+- **Deleting a package's last version deletes the package** ("no longer
+  installable"), so a following package-delete correctly 404s. The harness created
+  its own absence and then called it a defect.
+
+The harness now asserts the admin boundary explicitly — a non-admin is refused,
+nothing changes — and only then promotes a user to exercise the real cascade.
+
+### The test gap this exposed
+
+No test asserted that a document **disappeared** after a delete. Every cascade
+test checked the response and, at most, that the call did not throw. A delete that
+reports success and does nothing passes all of them.
+
+`write_path_audit.mjs` asserts on database state after every mutating step, and is
+committed so the claim is reproducible. Not in CI: it needs a running Worker and a
+live cluster, and it mutates state.
+

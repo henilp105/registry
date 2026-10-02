@@ -312,13 +312,28 @@ async function deleteUser(
         collection: "namespaces",
         filter: {},
         update: {
+          // Arrays only. `author` is deliberately absent from this `$pull`:
+          // it is a **scalar** ObjectId, not an array, and `$pull` on a
+          // non-array raises `Cannot apply $pull to a non-array value`.
+          //
+          // Because this runs inside a transaction, that one bad field rolled the
+          // whole cascade back, so `POST /users/delete` returned HTTP 500 and
+          // deleted nothing -- for any user who had authored a namespace. Found
+          // by exercising the write path against the live cluster; no unit test
+          // reached it, because every fixture had `author` already absent.
           $pull: {
-            author: target._id,
             admins: target._id,
             maintainers: target._id,
             packages: { $in: ownedIds },
           },
         },
+      },
+      {
+        // The scalar half of the same cleanup, as its own step.
+        kind: "updateMany",
+        collection: "namespaces",
+        filter: { author: target._id },
+        update: { $set: { author: null } },
       },
       {
         kind: "updateMany",
