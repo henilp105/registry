@@ -24,7 +24,10 @@
 
 import {
   ArchiveFill,
+  BarChartFill,
   BookFill,
+  Boxes,
+  CalendarFill,
   CheckCircleFill,
   CheckLg,
   ChevronDoubleLeft,
@@ -33,26 +36,36 @@ import {
   ChevronRight,
   ClipboardFill,
   ClockFill,
+  Diagram2Fill,
+  Download,
   ExclamationCircleFill,
   ExclamationTriangleFill,
   EyeFill,
   EyeSlashFill,
+  FileEarmarkTextFill,
   FlagFill,
   Folder2Open,
   FolderFill,
+  FolderMinus,
+  Globe2,
   Grid3x3GapFill,
+  HouseFill,
   InfoCircleFill,
   KeyFill,
   PeopleFill,
   PersonDashFill,
   PersonGear,
   PersonPlusFill,
+  PersonStanding,
   PlusCircleFill,
   PlusLg,
   QuestionCircleFill,
   Search,
   ShieldLockFill,
   StarFill,
+  TagFill,
+  TerminalFill,
+  TrashFill,
   BoxArrowRight,
 } from "react-bootstrap-icons";
 
@@ -90,6 +103,24 @@ const ICONS = {
   users: PeopleFill, // fa-users
   "angle-double-left": ChevronDoubleLeft, // fa-angle-double-left
   "angle-double-right": ChevronDoubleRight, // fa-angle-double-right
+
+  // --- MDBIcon <fas icon="..."> names, also never rendered (mdb.css was
+  // never imported either) ---
+  // react-bootstrap-icons has no scales-of-justice glyph; the closest
+  // available metaphor for a licence field.
+  "balance-scale": PersonStanding, // fa-balance-scale
+  boxes: Boxes, // fa-boxes
+  "calendar-alt": CalendarFill, // fa-calendar-alt
+  "chart-bar": BarChartFill, // fa-chart-bar
+  "code-branch": Diagram2Fill, // fa-code-branch
+  download: Download, // fa-download
+  globe: Globe2, // fa-globe
+  home: HouseFill, // fa-home
+  readme: FileEarmarkTextFill, // fa-readme
+  tag: TagFill, // fa-tag
+  terminal: TerminalFill, // fa-terminal
+  "trash-alt": TrashFill, // fa-trash-alt
+  "folder-minus": FolderMinus, // fa-folder-minus
 };
 
 const SIZES = {

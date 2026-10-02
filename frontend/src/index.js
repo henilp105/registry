@@ -16,7 +16,6 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "./theme/base.css";
 import "./index.css";
 import App from "./App";
-import { CookiesProvider } from "react-cookie";
 import { configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import rootReducer from "./store/reducers/rootReducer";
@@ -70,15 +69,12 @@ const persistor = persistStore(store);
 root.render(
   <Provider store={store}>
     <PersistGate persistor={persistor}>
-      <CookiesProvider>
-        <App />
-      </CookiesProvider>
+      <App />
     </PersistGate>
   </Provider>
-  // </React.StrictMode>
 );
 
-// If you want to start measuring performance in your app, pass a function
-// to log results (for example: reportWebVitals(console.log))
-// or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
-// reportWebVitals();
+// The web-vitals report call was removed along with the dependency. If you
+// want it back, `npm i web-vitals` and add
+//   reportWebVitals(console.log)
+// after this render.

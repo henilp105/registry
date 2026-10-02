@@ -1,21 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  MDBIcon,
-  MDBTabs,
-  MDBTabsItem,
-  MDBTabsLink,
-  MDBTabsContent,
-  MDBTabsPane,
-  MDBContainer,
-  MDBRow,
-  MDBCol,
-  MDBTable,
-  MDBTableBody,
-  MDBTableHead,
-} from "mdb-react-ui-kit";
 import Container from "react-bootstrap/Container";
+import Row from "react-bootstrap/Row";
+import Col from "react-bootstrap/Col";
+import Table from "react-bootstrap/Table";
+import Nav from "react-bootstrap/Nav";
+import Tab from "react-bootstrap/Tab";
+import { Button } from "react-bootstrap";
 import {
   fetchPackageData,
   verifyUserRole,
@@ -23,43 +15,52 @@ import {
 import ShowUserListDialog from "./showUserListDialog";
 import ReportPackageForm from "./reportPackageForm";
 import RatePackageForm from "./ratePackageForm";
-import { Button } from "react-bootstrap";
 import PackageRatingGraph from "./packageRatingGraph";
-import Markdown from 'react-markdown';
+import Markdown from "react-markdown";
 import { Skeleton, SkeletonText } from "../components/SkeletonLoader";
+import Icon from "../components/Icon";
+import "./package.css";
+
+/* The four tabs. `eventKey` doubles as the value the activeTab state holds,
+ * so adding a tab is a one-line change here and the ARIA wiring below picks
+ * it up. */
+const TABS = [
+  { key: "readme", label: "Readme", icon: "readme" },
+  { key: "dependencies", label: "Dependencies", icon: "boxes" },
+  { key: "versions", label: "Versions", icon: "tag" },
+  { key: "stats", label: "Stats", icon: "chart-bar" },
+];
 
 // Skeleton component for package loading state
 const PackageSkeleton = () => (
-  <Container style={{ paddingTop: 25 }}>
+  <Container className="package-page package-page--loading">
     <div className="d-flex justify-content-between align-items-start mb-3">
       <div>
         <Skeleton width="300px" height="32px" className="mb-2" />
         <Skeleton width="200px" height="20px" />
       </div>
-      <Skeleton width="180px" height="40px" style={{ borderRadius: '25px' }} />
+      <Skeleton width="180px" height="40px" className="skeleton-pill" />
     </div>
-    
+
     <div className="mb-4">
       <Skeleton width="100%" height="50px" className="mb-3" />
     </div>
-    
-    <MDBContainer>
-      <MDBRow>
-        <MDBCol size="9">
-          <SkeletonText lines={8} />
-        </MDBCol>
-        <MDBCol size="3">
-          <Skeleton width="100%" height="20px" className="mb-2" />
-          <Skeleton width="80%" height="16px" className="mb-3" />
-          <Skeleton width="100%" height="1px" className="mb-3" />
-          <Skeleton width="100%" height="20px" className="mb-2" />
-          <Skeleton width="60%" height="16px" className="mb-3" />
-          <Skeleton width="100%" height="1px" className="mb-3" />
-          <Skeleton width="100%" height="20px" className="mb-2" />
-          <Skeleton width="70%" height="16px" />
-        </MDBCol>
-      </MDBRow>
-    </MDBContainer>
+
+    <Row>
+      <Col md={9}>
+        <SkeletonText lines={8} />
+      </Col>
+      <Col md={3}>
+        <Skeleton width="100%" height="20px" className="mb-2" />
+        <Skeleton width="80%" height="16px" className="mb-3" />
+        <Skeleton width="100%" height="1px" className="mb-3" />
+        <Skeleton width="100%" height="20px" className="mb-2" />
+        <Skeleton width="60%" height="16px" className="mb-3" />
+        <Skeleton width="100%" height="1px" className="mb-3" />
+        <Skeleton width="100%" height="20px" className="mb-2" />
+        <Skeleton width="70%" height="16px" />
+      </Col>
+    </Row>
   </Container>
 );
 
@@ -68,11 +69,11 @@ const PackagePage = () => {
   const { namespace_name, package_name } = useParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  
+
   const statuscode = useSelector((state) => state.package.statuscode);
   const data = useSelector((state) => state.package.data);
   const isLoading = useSelector((state) => state.package.isLoading);
-  
+
   const [togglePackageMaintainersDialog, setTogglePackageMaintainersDialog] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [showRateForm, setShowRateForm] = useState(false);
@@ -114,10 +115,13 @@ const PackagePage = () => {
 
   if (!data) {
     return (
-      <Container style={{ paddingTop: 50, textAlign: 'center' }}>
-        <MDBIcon fas icon="exclamation-triangle" size="3x" className="text-warning mb-3" />
-        <h4>Package not found</h4>
-        <p className="text-muted">The package you're looking for doesn't exist or has been removed.</p>
+      <Container className="package-page package-empty">
+        <Icon name="exclamation-triangle" size={48} className="package-empty__icon" />
+        <h1 className="package-empty__title">Package not found</h1>
+        <p className="text-muted">
+          The package you&apos;re looking for doesn&apos;t exist or has been
+          removed.
+        </p>
         <Link to="/search" className="btn btn-primary mt-3">
           Browse Packages
         </Link>
@@ -126,25 +130,22 @@ const PackagePage = () => {
   }
 
   return (
-    <Container style={{ paddingTop: 25 }}>
+    <Container className="package-page">
       {/* Package Header */}
       <header className="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
         <div>
-          <h1 style={{ fontSize: 24, marginBottom: 8 }}>
-            <Link
-              to={`/namespaces/${data.namespace}`}
-              style={{ textDecoration: "none", color: '#734f96' }}
-            >
+          <h1 className="package-title">
+            <Link to={`/namespaces/${data.namespace}`} className="package-title__namespace">
               {data.namespace}
             </Link>
-            <span className="text-muted mx-1">/</span>
+            <span className="package-title__separator" aria-hidden="true">/</span>
             <span>{data.name}</span>
           </h1>
-          <p className="text-muted mb-0" style={{ fontSize: 14 }}>
-            <MDBIcon fas icon="tag" className="me-1" />
-            v{data.latest_version_data?.version}
-            <span className="mx-2">•</span>
-            <MDBIcon far icon="clock" className="me-1" />
+          <p className="package-subtitle">
+            <Icon name="tag" className="me-1" />
+            <span className="font-mono">v{data.latest_version_data?.version}</span>
+            <span className="mx-2" aria-hidden="true">•</span>
+            <Icon name="clock" className="me-1" />
             Published {formatTimeAgo(data.updated_at)}
           </p>
         </div>
@@ -164,112 +165,79 @@ const PackagePage = () => {
         />
       </header>
 
-      {/* Navigation Tabs */}
-      <MDBTabs className="mb-4" style={{ borderBottom: '1px solid #dee2e6' }}>
-        <MDBTabsItem>
-          <MDBTabsLink
-            onClick={() => handleTabClick("readme")}
-            active={activeTab === "readme"}
-            type="button"
-            style={{ padding: '12px 20px' }}
-          >
-            <MDBIcon fab icon="readme" className="me-2" aria-hidden="true" />
-            Readme
-          </MDBTabsLink>
-        </MDBTabsItem>
-        <MDBTabsItem>
-          <MDBTabsLink
-            onClick={() => handleTabClick("dependencies")}
-            active={activeTab === "dependencies"}
-            type="button"
-            style={{ padding: '12px 20px' }}
-          >
-            <MDBIcon fas icon="boxes" className="me-2" aria-hidden="true" />
-            Dependencies
-          </MDBTabsLink>
-        </MDBTabsItem>
-        <MDBTabsItem>
-          <MDBTabsLink
-            onClick={() => handleTabClick("versions")}
-            active={activeTab === "versions"}
-            type="button"
-            style={{ padding: '12px 20px' }}
-          >
-            <MDBIcon fas icon="tag" className="me-2" aria-hidden="true" />
-            Versions
-            {data.version_history?.length > 0 && (
-              <span className="badge bg-secondary ms-2">{data.version_history.length}</span>
-            )}
-          </MDBTabsLink>
-        </MDBTabsItem>
-        <MDBTabsItem>
-          <MDBTabsLink
-            onClick={() => handleTabClick("stats")}
-            active={activeTab === "stats"}
-            type="button"
-            style={{ padding: '12px 20px' }}
-          >
-            <MDBIcon fas icon="chart-bar" className="me-2" aria-hidden="true" />
-            Stats
-          </MDBTabsLink>
-        </MDBTabsItem>
-      </MDBTabs>
+      {/*
+        react-bootstrap Nav + Tab rather than the MDBTabs family this used to
+        use. MDBTabsLink renders an anchor with no href, so no tab was keyboard
+        reachable and the tab/tabpanel relationship was not exposed at all.
+        Nav/Tab emit role="tab"/"tablist"/"tabpanel" with aria-selected and
+        arrow-key navigation.
+      */}
+      <Tab.Container activeKey={activeTab} onSelect={handleTabClick}>
+        <Nav variant="tabs" className="package-tabs mb-4">
+          {TABS.map(({ key, label, icon }) => (
+            <Nav.Item key={key}>
+              <Nav.Link eventKey={key} className="package-tabs__link">
+                <Icon name={icon} className="me-2" />
+                {label}
+                {key === "versions" && data.version_history?.length > 0 && (
+                  <span className="badge bg-secondary ms-2">
+                    {data.version_history.length}
+                  </span>
+                )}
+              </Nav.Link>
+            </Nav.Item>
+          ))}
+        </Nav>
 
-      {/* Tab Content */}
-      <MDBTabsContent>
-        <MDBTabsPane show={activeTab === "readme"}>
-          <MDBContainer>
-            <MDBRow>
-              <MDBCol md="9" className="mb-4">
+        <Tab.Content>
+          <Tab.Pane eventKey="readme">
+            <Row>
+              <Col md={9} className="mb-4">
                 <article className="readme-content">
-                  <Markdown>{data.registry_description || '*No readme available*'}</Markdown>
+                  <Markdown>{data.registry_description || "*No readme available*"}</Markdown>
                 </article>
-              </MDBCol>
-              <PackageSidebar 
-                data={data} 
+              </Col>
+              <PackageSidebar
+                data={data}
                 onRate={() => setShowRateForm(true)}
                 onReport={() => setShowReportForm(true)}
                 onCopyInstall={copyInstallCommand}
                 copiedToClipboard={copiedToClipboard}
               />
-            </MDBRow>
-          </MDBContainer>
-        </MDBTabsPane>
+            </Row>
+          </Tab.Pane>
 
-        <MDBTabsPane show={activeTab === "dependencies"}>
-          <MDBContainer>
-            <MDBRow>
-              <MDBCol md="9" className="mb-4">
+          <Tab.Pane eventKey="dependencies">
+            <Row>
+              <Col md={9} className="mb-4">
                 <p className="text-muted mt-3">
-                  <MDBIcon fas icon="info-circle" className="me-2" />
+                  <Icon name="info-circle" className="me-2" />
                   Dependency information is parsed from the package manifest.
                 </p>
-              </MDBCol>
+              </Col>
               <PackageSidebar data={data} />
-            </MDBRow>
-          </MDBContainer>
-        </MDBTabsPane>
+            </Row>
+          </Tab.Pane>
 
-        <MDBTabsPane show={activeTab === "versions"}>
-          <MDBContainer>
-            <MDBRow>
-              <MDBCol md="9" className="mb-4">
+          <Tab.Pane eventKey="versions">
+            <Row>
+              <Col md={9} className="mb-4">
                 {sortedVersionsList.length > 0 ? (
-                  <MDBTable hover responsive className="mt-3">
-                    <MDBTableHead>
+                  <Table hover responsive className="mt-3 package-versions">
+                    <thead>
                       <tr>
                         <th scope="col">Version</th>
                         <th scope="col">Published</th>
                         <th scope="col">Status</th>
                         <th scope="col">Download</th>
                       </tr>
-                    </MDBTableHead>
-                    <MDBTableBody>
+                    </thead>
+                    <tbody>
                       {sortedVersionsList.map((ver, index) => (
                         <tr key={ver.version}>
                           <td>
-                            <span className={index === 0 ? 'fw-bold' : ''}>
-                              v{ver.version}
+                            <span className={index === 0 ? "fw-bold" : ""}>
+                              <span className="font-mono">v{ver.version}</span>
                               {index === 0 && (
                                 <span className="badge bg-success ms-2">Latest</span>
                               )}
@@ -279,7 +247,7 @@ const PackagePage = () => {
                           <td>
                             {ver.isDeprecated === "true" ? (
                               <span className="badge bg-warning text-dark">
-                                <MDBIcon fas icon="exclamation-triangle" className="me-1" />
+                                <Icon name="exclamation-triangle" className="me-1" size={12} />
                                 Deprecated
                               </span>
                             ) : (
@@ -292,30 +260,28 @@ const PackagePage = () => {
                               className="btn btn-sm btn-outline-primary"
                               download
                             >
-                              <MDBIcon fas icon="download" className="me-1" />
+                              <Icon name="download" className="me-1" size={13} />
                               Download
                             </a>
                           </td>
                         </tr>
                       ))}
-                    </MDBTableBody>
-                  </MDBTable>
+                    </tbody>
+                  </Table>
                 ) : (
                   <p className="text-muted">No version history available.</p>
                 )}
-              </MDBCol>
+              </Col>
               <PackageSidebar data={data} />
-            </MDBRow>
-          </MDBContainer>
-        </MDBTabsPane>
+            </Row>
+          </Tab.Pane>
 
-        <MDBTabsPane show={activeTab === "stats"}>
-          <MDBContainer>
-            <h2 style={{ fontSize: 24, textAlign: "left", marginBottom: 20 }}>Package Statistics</h2>
+          <Tab.Pane eventKey="stats">
+            <h2 className="package-section-title">Package Statistics</h2>
             <PackageRatingGraph data={data.ratings_count} />
-          </MDBContainer>
-        </MDBTabsPane>
-      </MDBTabsContent>
+          </Tab.Pane>
+        </Tab.Content>
+      </Tab.Container>
 
       {/* Dialogs */}
       <RatePackageForm
@@ -354,15 +320,10 @@ const ViewPackageMaintainersButton = ({
   return (
     <button
       type="button"
-      className="btn btn-outline-success"
-      style={{
-        padding: "8px 16px",
-        borderRadius: "25px",
-        fontSize: "14px",
-      }}
+      className="btn btn-outline-success btn-pill"
       onClick={onShowMaintainers}
     >
-      <MDBIcon fas icon="users" className="me-2" />
+      <Icon name="users" className="me-2" />
       View Package Maintainers
     </button>
   );
@@ -371,38 +332,36 @@ const ViewPackageMaintainersButton = ({
 // Package Sidebar Component
 const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboard }) => {
   const installCommand = `${data.name} = {'namespace'='${data.namespace}'}`;
-  
+
   return (
-    <MDBCol md="3">
+    <Col md={3}>
       {/* Install Section */}
       <div className="mb-4">
-        <h6 className="text-uppercase text-muted small mb-2">
-          <MDBIcon fas icon="download" className="me-2" />
+        <h6 className="package-sidebar__heading">
+          <Icon name="download" className="me-2" size={13} />
           Install
         </h6>
         <p className="small text-muted mb-1">Add to fpm.toml:</p>
         <div className="position-relative">
-          <code 
-            className="d-block p-2 bg-light rounded small"
-            style={{ wordBreak: 'break-all' }}
-          >
+          <code className="package-install-command d-block">
             {installCommand}
           </code>
           {onCopyInstall && (
             <button
               type="button"
-              className="btn btn-sm btn-link position-absolute"
-              style={{ top: '2px', right: '2px', padding: '2px 6px' }}
+              className="btn btn-sm btn-link package-install-command__copy"
               onClick={onCopyInstall}
               aria-label="Copy install command"
             >
-              <MDBIcon fas icon={copiedToClipboard ? "check" : "copy"} />
+              <Icon name={copiedToClipboard ? "check" : "copy"} />
             </button>
           )}
         </div>
-        {copiedToClipboard && (
-          <small className="text-success">Copied to clipboard!</small>
-        )}
+        {/* Announced on copy, so a screen-reader user learns the clipboard
+            action succeeded rather than only sighted users seeing the swap. */}
+        <small className="text-success" role="status">
+          {copiedToClipboard ? "Copied to clipboard!" : ""}
+        </small>
       </div>
 
       <hr />
@@ -411,15 +370,15 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
       {data.repository && (
         <>
           <div className="mb-3">
-            <h6 className="text-uppercase text-muted small mb-2">
-              <MDBIcon fas icon="code-branch" className="me-2" />
+            <h6 className="package-sidebar__heading">
+              <Icon name="code-branch" className="me-2" size={13} />
               Repository
             </h6>
-            <a 
+            <a
               href={data.repository}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-break"
+              className="text-break font-mono package-sidebar__value"
             >
               {data.repository}
             </a>
@@ -432,11 +391,11 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
       {data.homepage && (
         <>
           <div className="mb-3">
-            <h6 className="text-uppercase text-muted small mb-2">
-              <MDBIcon fas icon="home" className="me-2" />
+            <h6 className="package-sidebar__heading">
+              <Icon name="home" className="me-2" size={13} />
               Homepage
             </h6>
-            <a 
+            <a
               href={data.homepage}
               target="_blank"
               rel="noopener noreferrer"
@@ -451,30 +410,30 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
 
       {/* License */}
       <div className="mb-3">
-        <h6 className="text-uppercase text-muted small mb-2">
-          <MDBIcon fas icon="balance-scale" className="me-2" />
+        <h6 className="package-sidebar__heading">
+          <Icon name="balance-scale" className="me-2" size={13} />
           License
         </h6>
-        <span>{data.license || 'Not specified'}</span>
+        <span>{data.license || "Not specified"}</span>
       </div>
 
       <hr />
 
       {/* Version */}
       <div className="mb-3">
-        <h6 className="text-uppercase text-muted small mb-2">
-          <MDBIcon fas icon="tag" className="me-2" />
+        <h6 className="package-sidebar__heading">
+          <Icon name="tag" className="me-2" size={13} />
           Version
         </h6>
-        <span>v{data.latest_version_data?.version}</span>
+        <span className="font-mono">v{data.latest_version_data?.version}</span>
       </div>
 
       <hr />
 
       {/* Last Published */}
       <div className="mb-3">
-        <h6 className="text-uppercase text-muted small mb-2">
-          <MDBIcon far icon="calendar-alt" className="me-2" />
+        <h6 className="package-sidebar__heading">
+          <Icon name="calendar-alt" className="me-2" size={13} />
           Last Published
         </h6>
         <span>{formatTimeAgo(data.updated_at)}</span>
@@ -492,7 +451,7 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
                 onClick={onRate}
                 className="flex-grow-1"
               >
-                <MDBIcon fas icon="star" className="me-1" />
+                <Icon name="star" className="me-1" size={13} />
                 Rate
               </Button>
             )}
@@ -503,14 +462,14 @@ const PackageSidebar = ({ data, onRate, onReport, onCopyInstall, copiedToClipboa
                 onClick={onReport}
                 className="flex-grow-1"
               >
-                <MDBIcon fas icon="flag" className="me-1" />
+                <Icon name="flag" className="me-1" size={13} />
                 Report
               </Button>
             )}
           </div>
         </>
       )}
-    </MDBCol>
+    </Col>
   );
 };
 
@@ -520,9 +479,9 @@ const formatTimeAgo = (date) => {
   const currentDate = new Date();
   const diffTime = currentDate.getTime() - updatedDate.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays === 0) return 'today';
-  if (diffDays === 1) return 'yesterday';
+
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "yesterday";
   if (diffDays < 7) return `${diffDays} days ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;

@@ -16,6 +16,7 @@ import {
   InputGroup
 } from "react-bootstrap";
 import { Eye, EyeSlash } from "react-bootstrap-icons";
+import Icon from "../components/Icon";
 
 const AuthForm = ({ isLogin }) => {
   const [formData, setFormData] = useState({
@@ -153,14 +154,14 @@ const AuthForm = ({ isLogin }) => {
             {/* Alert Messages */}
             {error && (
               <Alert variant="danger" className="d-flex align-items-center py-2">
-                <i className="bi bi-exclamation-circle me-2"></i>
+                <Icon name="exclamation-circle" className="me-2" />
                 <span>{error}</span>
               </Alert>
             )}
 
             {message && (
               <Alert variant="success" className="d-flex align-items-center py-2">
-                <i className="bi bi-check-circle me-2"></i>
+                <Icon name="check-circle" className="me-2" />
                 <span>{message}</span>
               </Alert>
             )}
@@ -180,7 +181,7 @@ const AuthForm = ({ isLogin }) => {
                     className={`${errors.username ? "border-danger" : "border-primary"} w-100 fw-medium py-2`}
                   />
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
-                    <i className="bi bi-exclamation-circle me-1"></i>
+                    <Icon name="exclamation-circle" className="me-1" size={13} />
                     {errors.username}
                   </Form.Control.Feedback>
                 </Form.Group>
@@ -200,7 +201,7 @@ const AuthForm = ({ isLogin }) => {
                     className={`${errors.user_identifier ? "border-danger" : "border-primary"} w-100 fw-medium py-2`}
                   />
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
-                    <i className="bi bi-exclamation-circle me-1"></i>
+                    <Icon name="exclamation-circle" className="me-1" size={13} />
                     {errors.user_identifier}
                   </Form.Control.Feedback>
                 </Form.Group>
@@ -217,7 +218,7 @@ const AuthForm = ({ isLogin }) => {
                     className={`${errors.email ? "border-danger" : "border-primary"} w-100 fw-medium py-2`}
                   />
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
-                    <i className="bi bi-exclamation-circle me-1"></i>
+                    <Icon name="exclamation-circle" className="me-1" size={13} />
                     {errors.email}
                   </Form.Control.Feedback>
                 </Form.Group>
@@ -288,7 +289,7 @@ const AuthForm = ({ isLogin }) => {
 
                 {errors.password && (
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
-                    <i className="bi bi-exclamation-circle me-1"></i>
+                    <Icon name="exclamation-circle" className="me-1" size={13} />
                     {errors.password}
                   </Form.Control.Feedback>
                 )}
