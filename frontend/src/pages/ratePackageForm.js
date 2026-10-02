@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Form, Button, Modal, Spinner, Alert } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -56,15 +56,22 @@ const RatePackageForm = ({ namespace, package: packageName, show, onHide }) => {
     dispatch(resetErrorMessage());
   }, [dispatch]);
 
-  // Auto-close on success after delay
+  // Auto-close on success after delay. onHide lives in a ref: the parent
+  // passes a fresh inline closure on every render, which would otherwise
+  // reset the countdown and the dialog would never dismiss (D84).
+  const onHideRef = useRef(onHide);
+  useEffect(() => {
+    onHideRef.current = onHide;
+  }, [onHide]);
+
   useEffect(() => {
     if (isSuccess && show) {
       const timer = setTimeout(() => {
-        onHide();
+        onHideRef.current();
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [isSuccess, show, onHide]);
+  }, [isSuccess, show]);
 
   return (
     <Modal
