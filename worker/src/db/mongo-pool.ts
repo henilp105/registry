@@ -32,10 +32,10 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
+import { toBsonQueries, toRpcSafe } from "./bson";
 import { hashPassword, parseIterations, verifyPassword } from "../lib/password";
 import {
   MongoClient,
-  ObjectId,
   type ClientSession,
   type Db,
   type Document,
@@ -546,75 +546,3 @@ function isRetryable(err: unknown): boolean {
 }
 
 const RETRYABLE_CODES = new Set([6, 7, 89, 91, 189, 9001, 10107, 11600, 11602, 13435, 13436]);
-
-/**
- * Convert 24-character hex strings back into ObjectIds, recursively, inside any
- * query fragment.
- *
- * ── Why this exists, and why it is here rather than in the handlers ─────────
- * The RPC layer cannot serialise a BSON ObjectId, so `toRpcSafe` turns every id
- * into its hex string on the way out. A handler then reads `doc._id` and feeds it
- * straight back into the next filter.
- *
- * Measured against MongoDB 8.0.34 with driver 7.7.0, that fails:
- *
- *     { _id: "<24 hex>" }              -> 0 matches
- *     { _id: ObjectId(...) }           -> 1 match
- *
- * So the driver does **not** coerce a hex string on an `_id` path either, which
- * is the opposite of the long-standing assumption this codebase was written on
- * (`lib/ids.ts` says "the MongoDB driver converts a 24-character hex string into
- * an ObjectId automatically"). Scattering a conversion helper over ~30 filter
- * call sites would work until the next author forgot one, and a forgotten one is
- * a silent zero-match: no error, just an empty result that reads as "not found".
- *
- * Doing it once, here, means the hex form is *always* usable as a filter.
- *
- * ── The assumption this makes ───────────────────────────────────────────────
- * A string of exactly 24 hex characters is assumed to be an id. Checked against
- * the schema: the only other hex-valued fields are `sha256` (64 chars) and
- * upload-token digests (64 chars), so there is no collision today. If a future
- * field ever holds a 24-hex value that is *not* an id, this would silently change
- * its meaning -- which is the trade, made deliberately and recorded here.
- */
-const HEX24 = /^[0-9a-fA-F]{24}$/;
-
-function toBsonQueries(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(toBsonQueries);
-  if (value === null || typeof value !== "object") {
-    return HEX24.test(String(value ?? "")) ? new ObjectId(String(value)) : value;
-  }
-  if (value instanceof Date || value instanceof ObjectId) return value;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = toBsonQueries(v);
-  return out;
-}
-
-/**
- * Convert BSON values into something workerd's RPC layer can serialise.
- *
- * Deliberately lossy in one direction only: an ObjectId becomes its hex string,
- * which is what the API already exposes as `_id` everywhere else. Dates become
- * ISO strings. Everything else is returned as-is, so there is exactly one place
- * in the codebase that knows about BSON's type surface.
- */
-function toRpcSafe(value: unknown): unknown {
-  if (value === null || value === undefined) return value ?? null;
-  if (value instanceof Date) return value.toISOString();
-  if (typeof value === "bigint") return Number(value);
-  if (Array.isArray(value)) return value.map(toRpcSafe);
-  if (typeof value === "object") {
-    const proto = Object.getPrototypeOf(value);
-    // BSON ObjectId, and anything else driver-specific exposing toHexString().
-    if (typeof (value as { toHexString?: unknown }).toHexString === "function") {
-      return (value as { toHexString(): string }).toHexString();
-    }
-    if (proto === null) return value;
-    // A Buffer/Uint8Array is already RPC-safe; `Date` was handled above.
-    if (value instanceof Uint8Array) return Array.from(value);
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = toRpcSafe(v);
-    return out;
-  }
-  return value;
-}

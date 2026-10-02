@@ -36,6 +36,7 @@ import type { Env } from "../db/client";
 import { jsonError, jsonOk } from "../lib/responses";
 import type { AuthContext } from "../lib/auth";
 import { canPublishPackage, isSiteAdmin, strId } from "../lib/permissions";
+import { isDuplicateKeyError, versionAppendFilter } from "../lib/publish";
 import {
   compareVersionsDescending,
   validateLicense,
@@ -338,32 +339,6 @@ async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
 
   const totalDocs = total ?? 0;
   return jsonOk({ packages, total_pages: limit > 0 ? Math.ceil(totalDocs / limit) : 0 });
-}
-
-/**
- * Is this a MongoDB duplicate-key error?
- *
- * Code 11000 is raised by a unique index, which is the *correct* outcome when two
- * requests try to create the same package. Callers use this to fold the loser into
- * the winner rather than failing it.
- */
-function isDuplicateKeyError(err: unknown): boolean {
-  if (typeof err !== "object" || err === null) return false;
-  const code = (err as { code?: unknown }).code;
-  if (code === 11000 || code === 11001) return true;
-  // Also match the message. The error is raised inside the Durable Object and
-  // re-thrown in the Worker across workerd's RPC boundary, which does not carry
-  // arbitrary properties -- so `err.code` arrives undefined and a code-only check
-  // never matches. Measured: the same race that this guards returned HTTP 500
-  // with `E11000 duplicate key error ... packages_name_namespace_unique` because
-  // of exactly that.
-  //
-  // `E11000` is stable MongoDB output across server versions, so matching on it is
-  // not relying on prose.
-  const message = typeof (err as { message?: unknown }).message === "string"
-    ? String((err as { message: string }).message)
-    : "";
-  return message.startsWith("E11000") || message.includes("duplicate key error");
 }
 
 /** Newest version by semver comparison, or `null` when there are none. */
@@ -964,7 +939,7 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
     const result = (await db<{ modifiedCount: number }>(env, {
       kind: "updateOne",
       collection: "packages",
-      filter: { _id: packageId, "versions.version": { $ne: version } },
+      filter: versionAppendFilter(packageId, version),
       update: {
         $push: { versions: versionDoc },
         $set: { updated_at: now, license },
