@@ -30,6 +30,7 @@ import { authenticate } from "../lib/auth";
 import type { AuthContext } from "../lib/auth";
 import {
   canPublishPackage,
+  containsId,
   isNamespaceAdmin,
   isNamespaceAuthor,
   isNamespaceMaintainer,
@@ -37,6 +38,7 @@ import {
   isSiteAdmin,
   managesOnlySelf,
   strId,
+  type IdLike,
   type NamespaceLike,
   type UserLike,
 } from "../lib/permissions";
@@ -188,18 +190,24 @@ async function profile(request: Request, env: Env, username: string): Promise<Re
       id: strId(n._id),
       name: n.namespace,
       description: n.description,
-      isNamespaceAdmin: contains(viewer?._id, n.admins),
-      isNamespaceMaintainer: contains(viewer?._id, n.maintainers),
+      // Defect D68: these were `contains(viewer?._id, n.admins)` against a
+      // signature of `contains(list, id)` -- the arguments were swapped, so
+      // `list` was a hex string, `Array.isArray` was false, and both flags were
+      // **always false** no matter who was asking.
+      //
+      // Measured: the viewer `_id` and `n.admins[0]` were byte-identical
+      // ("6abfa8c70798ba06d7211b0b"), `strId(a) === strId(b)` was true, and
+      // `contains(a, b)` still returned false. The only reason is the swapped
+      // order, and the local duplicate is gone so it cannot happen again.
+      // Cast, because the aggregation result is typed `Record<string, unknown>`.
+      // Safe: `$project` selects `admins`/`maintainers` straight off the document,
+      // and `containsId` re-checks `Array.isArray` itself.
+      isNamespaceAdmin: containsId(n.admins as IdLike[], viewer?._id),
+      isNamespaceMaintainer: containsId(n.maintainers as IdLike[], viewer?._id),
       isAuthor: strId(n.author) === strId(viewer?._id),
       packageCount: n.packageCount,
     })),
   });
-}
-
-function contains(list: unknown, id: unknown): boolean {
-  if (!Array.isArray(list)) return false;
-  const target = strId(id);
-  return target !== "" && list.some((e) => strId(e) === target);
 }
 
 /** Load the authenticated user's own document. */

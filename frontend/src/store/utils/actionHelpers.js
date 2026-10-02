@@ -75,37 +75,84 @@ export const asyncInitialState = {
  * @param {Object} state - Current state
  * @returns {Object} New state with loading true
  */
-export const handleRequest = (state) => ({
+export const handleRequest = (state, arg) => ({
   ...state,
+  // Merged for the same reason as handleSuccess (D69): callers pass
+  // `{ errorMessage: null }` to clear a stale error, and that was being dropped,
+  // so a failed attempt left its message on screen while the retry was running.
+  ...(payloadOf(arg) ?? {}),
   isLoading: true,
   error: null,
 });
 
 /**
- * Handle SUCCESS action - clear loading, set message
+ * Normalise what callers actually pass as the second argument.
+ *
+ * Two shapes reach these helpers:
+ *   - a Redux **action**, whose fields live under `.payload`;
+ *   - a plain **fields object**, `{ successMessage, uploadToken }`.
+ *
+ * Defect D69: only the first was handled, and **no caller used it** -- all nine
+ * call sites across eight reducers passed a plain fields object. The second
+ * argument was therefore read as an action, `action.payload` was `undefined`, and
+ * every one of those handlers reduced to "clear loading, set message to null":
+ * a silent no-op that looked correct.
+ *
+ * The visible symptom was a publish credential that the server had minted and
+ * stored but never showed, with no error anywhere.
+ */
+const payloadOf = (arg) =>
+  arg && typeof arg === "object" && "payload" in arg ? arg.payload : arg;
+
+/**
+ * Handle SUCCESS action - clear loading, set message and any caller-supplied fields
  * @param {Object} state - Current state
- * @param {Object} action - Redux action
+ * @param {Object} arg - Redux action, or a plain fields object
  * @returns {Object} New state
  */
-export const handleSuccess = (state, action) => ({
-  ...state,
-  isLoading: false,
-  message: action.payload?.message || null,
-  error: null,
-});
+export const handleSuccess = (state, arg) => {
+  const fields = payloadOf(arg) ?? {};
+  return {
+    ...state,
+    // Caller fields win, so a reducer can set `uploadToken`, `successMessage`,
+    // data arrays, and so on, rather than only a message.
+    ...fields,
+    isLoading: false,
+    error: null,
+    // Cleared explicitly. The token dialogs and the rating/report forms read
+    // `errorMessage`, so without this a previous failure stayed on screen behind
+    // the success -- the stale-message problem, on the success path.
+    errorMessage: fields.errorMessage ?? null,
+  };
+};
 
 /**
  * Handle FAILURE action - clear loading, set error
  * @param {Object} state - Current state
- * @param {Object} action - Redux action
+ * @param {Object} arg - Redux action, a plain fields object, or `null` plus fields
  * @returns {Object} New state
+ *
+ * Callers write `handleFailure(state, null, { errorMessage })`, so a third
+ * argument is honoured as well. Without that, the message those callers meant to
+ * surface was dropped and `error` fell back to a generic string.
  */
-export const handleFailure = (state, action) => ({
-  ...state,
-  isLoading: false,
-  error: action.payload?.message || "An error occurred",
-  message: null,
-});
+export const handleFailure = (state, arg, maybeFields) => {
+  const fields = maybeFields ?? payloadOf(arg) ?? {};
+  return {
+    ...state,
+    ...fields,
+    isLoading: false,
+    // `errorMessage` is included because that is the field the reducers that call
+    // this actually set; a consumer reading `error` would otherwise be left with a
+    // generic "An error occurred" while the real message sat in the state unused.
+    error:
+      fields.error ??
+      fields.errorMessage ??
+      fields.message ??
+      "An error occurred",
+    message: null,
+  };
+};
 
 /**
  * Reset messages and errors

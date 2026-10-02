@@ -1024,3 +1024,221 @@ PBKDF2 key derivation (176 ms of CPU, which is why it runs in the Durable Object
 rather than the Worker, where the Free plan allows 10 ms) plus a Durable Object
 round trip and an Atlas write. It is not a defect, but it is the number a user
 waits through, and the button correctly shows "Creating account…" throughout.
+
+---
+
+## D68 — nobody was ever a namespace admin
+
+**Severity: high. Found by driving the token dialog, which nothing had ever done.**
+
+### What it looked like
+
+You create a namespace. You are its author, its admin and its maintainer — the API
+agrees, MongoDB agrees, the create form even tells you *"You'll become the admin of
+this namespace."* Open your dashboard and the namespace card shows **no buttons at
+all**: no Generate Token, no Add Admin, no Remove Admin, no Add Maintainer, no
+Remove Maintainer.
+
+### Why
+
+`src/routes/users.ts` computed the membership flags with a local helper:
+
+```ts
+function contains(list: unknown, id: unknown): boolean {
+  if (!Array.isArray(list)) return false;
+  const target = strId(id);
+  return target !== "" && list.some((e) => strId(e) === target);
+}
+```
+
+and called it as:
+
+```ts
+isNamespaceAdmin: contains(viewer?._id, n.admins),      // ← arguments swapped
+isNamespaceMaintainer: contains(viewer?._id, n.maintainers),
+```
+
+**The signature is `(list, id)`.** So `list` received a hex string,
+`Array.isArray("6abfa8c7…")` is `false`, and the function returned `false`
+unconditionally — for every user, in every namespace, forever.
+
+The helper itself is correct. `isAuthor` on the same object, one line below, uses
+`strId(n.author) === strId(viewer?._id)` and was always right. The three flags on
+one object, two of them permanently false.
+
+### How it was pinned down
+
+Three candidate explanations were wrong before the right one:
+
+1. *Stale cache.* `namespaces.ts` has no `invalidate` calls, which looked promising.
+   But `/users/{u}` is not served through `serveCached` at all, and `ENTITY.user`
+   is referenced nowhere. Ruled out by reading the code, not by guessing.
+2. *Wrong database.* The harnesses use `fpmregistry_local`, which `.dev.vars` does
+   set. Ruled out.
+3. *A short description.* A probe that created a namespace with the description
+   `"why"` was silently rejected by a client-side rule requiring ten characters, so
+   no namespace existed and `/users/{u}` was *correctly* empty. Two rounds were lost
+   to this — the harness was reporting a missing namespace as a missing feature.
+
+The decisive step was instrumenting the response itself:
+
+```json
+"isNamespaceAdmin": false,
+"_dbg": { "viewerId": "6abfa8c70798ba06d7211b0b",
+          "admins":   "[\"6abfa8c70798ba06d7211b0b\"]",
+          "containsResult": false,
+          "eq": true }
+```
+
+`eq: true` — the two ids are byte-identical — and `containsResult: false`. Nothing
+about the data can explain that except the argument order.
+
+### The fix
+
+Deleted the local duplicate and used `containsId` from `lib/permissions`, whose
+entire reason for existing is comparing ids across the mixed ObjectId/string
+representations this codebase stores. Live verification, same request:
+
+```
+"isNamespaceAdmin": true, "isNamespaceMaintainer": true, "isAuthor": true
+```
+
+and the dashboard grew all five buttons.
+
+### Guards — `worker/test/membership-flags.test.ts`
+
+- No route may declare its own `function contains(`. A local copy is precisely what
+  let the wrong call compile and read as correct.
+- No membership helper may be called with an id first and a list second.
+- `users.ts` must compute both flags with `containsId`, list first.
+- `containsId` itself: a hex string and the equivalent ObjectId compare equal, case
+  is normalised, and the two shapes that return false — a non-array, an absent id —
+  are the ones D68 actually hit.
+
+**Verified by mutation**: swapping the arguments back fails 2 of 4.
+
+Writing this guard took two attempts that were themselves wrong. The first version
+matched the wrong thing and failed on clean code, because it matched the *comment*
+documenting the bug; a scanner that cannot tell prose from code stops being read.
+The second mutation attempt silently did not apply (the real call site carries
+`as IdLike[]`), and reporting "tests pass" on an unmutated file would have been the
+worst possible outcome — so it now prints the mutated line before running.
+
+---
+
+## D69 — publish tokens were minted and never shown
+
+**Severity: high. Same journey, next step down.**
+
+### What it looked like
+
+Press **Generate Token**. The spinner clears. Nothing happens. No token, no error,
+no message — and the token *was* created: the record is in `upload_tokens`, hashed,
+scoped and expiring. The server did the work and told the client about it, and the
+client threw the answer away.
+
+### Why
+
+`src/store/utils/actionHelpers.js`:
+
+```js
+export const handleSuccess = (state, action) => ({
+  ...state,
+  isLoading: false,
+  message: action.payload?.message || null,
+  error: null,
+});
+```
+
+It reads the second argument as a **Redux action**. But no caller passes one. All
+nine call sites across eight reducers pass a **plain fields object**:
+
+```js
+return handleSuccess(state, {
+  successMessage: action.payload.message,
+  uploadToken: action.payload.uploadToken,
+});
+```
+
+So `action.payload` was `undefined`, `message` became `null`, and
+`successMessage` / `uploadToken` — the two fields the caller asked for — were never
+written at all. Every one of those handlers reduced to *"stop the spinner"*: a
+silent no-op that reads as correct.
+
+### Blast radius
+
+The eight reducers sharing it: namespace token, package token, email verification,
+archives, user profile, package rating, malicious-report viewing and malicious-report
+submission. Any feature whose success state is set through these helpers was
+dropping it. Token generation is simply where it was noticed, because it is the one
+whose output is a credential and therefore visibly absent.
+
+### The fix
+
+The helpers now accept either shape, via `payloadOf()`: an action (fields under
+`.payload`) or a fields object. `handleSuccess` and `handleRequest` merge the
+caller's fields; `handleFailure` also accepts the three-argument form
+`(state, null, fields)` that callers were already using and that was being discarded
+along with everything else.
+
+Two further gaps surfaced while writing the tests:
+
+- `handleFailure` derived `error` only from `error`/`message`, so a caller passing
+  `errorMessage` left any consumer reading `error` with a generic *"An error
+  occurred"* while the real message sat unused in state.
+- `handleSuccess` never cleared `errorMessage`, so a previous failure stayed on
+  screen behind the success.
+
+Both fixed. Both were found by the new test, not by reading the code.
+
+### Guard — `scripts/check_store_helpers.mjs`, 17/17, wired into CI
+
+The frontend has no test runner, and adding Jest or Vitest with a React harness for
+four pure functions is a large dependency decision to guard a small surface.
+Instead the **real source file is copied to a temporary `.mjs` and imported as
+written** — no transformation, no re-implementation — so what is tested is what
+ships. It also asserts against the actual reducer sources that callers still pass
+fields.
+
+**Verified by mutation**: dropping the `...fields` spread fails 3 checks, with
+`uploadToken=null` — precisely the observed symptom.
+
+---
+
+## D70 — the token field had no accessible name
+
+The generated token is rendered into a readOnly `<input>` with no `<label>`,
+`aria-label` or `title`, so a screen reader announces a bare text box that cannot be
+distinguished from the other inputs in the dialog. Now labelled in both the
+namespace and package token dialogs.
+
+The check that found it was itself vacuous at first: it tested the serialised object
+for the literal string `"null"`, which never appears in `{"byLabel":null,…}`, so it
+**passed while the input had no name at all**. It now evaluates the name sources
+directly. `input.labels` is a live `NodeList` with no `.map`, which threw on the
+first honest attempt.
+
+---
+
+## Harness note — the upload rate limit is address-keyed, and that is correct
+
+`POST /packages` is authenticated by an *upload token*, not a bearer token, so
+`clientKey()` has no identity and falls back to the source address. Every harness
+run therefore shared one `a:127.0.0.1` bucket of **5 uploads/hour**, and by the
+fourth run the harness could not verify anything — the limiter was working exactly
+as designed and the harness was at fault.
+
+`scripts/token_journey.cjs` now sends a distinct `cf-connecting-ip` per run, which is
+the same remedy already applied to the other harnesses: model a fleet of separate
+CI clients rather than one client hammering the registry. The check that consumes
+the result distinguishes a 429 from a refusal, so an exhausted bucket can never be
+mistaken for evidence that a revoked token was rejected — which is how an earlier
+version of that check passed for the wrong reason.
+
+## Harness note — versions are embedded, not top-level
+
+`sha256` and `version` live on the embedded document in `packages.versions[]`, not
+on the package. An assertion reading `pkgDoc.sha256` reported `undefined` and passed
+on a vacuous `undefined…` string, and the revocation check compared a `version`
+field that does not exist, so it passed regardless of what was written. Both now
+read the version array.

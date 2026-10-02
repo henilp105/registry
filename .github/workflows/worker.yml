@@ -209,6 +209,20 @@ jobs:
           [ "$fail" -eq 0 ] && echo "all harness imports present"
           exit "$fail"
 
+      - name: Frontend Redux helpers behave
+        run: |
+          set -euo pipefail
+          # Defect D69: `handleSuccess(state, action)` read `action.payload`, but all
+          # nine call sites passed a plain fields object, so every one of those
+          # handlers silently reduced to "clear the spinner". The symptom was a
+          # publish credential that the server minted and stored and the UI never
+          # showed.
+          #
+          # The frontend has no test runner, and adding one for four pure functions
+          # is a large dependency decision. The real source is imported as written
+          # instead, so this guards what ships rather than a copy of it.
+          node scripts/check_store_helpers.mjs
+
       - name: Python scripts parse
         run: |
           set -euo pipefail

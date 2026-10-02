@@ -79,10 +79,16 @@ const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show,
               Token Generated Successfully
             </Form.Label>
             <InputGroup>
+              {/* `aria-label` rather than a visible label: the value is a secret and
+                  a visible caption above it would be noise, but the field still
+                  needs a name -- a screen reader otherwise announces a bare text
+                  box, and the user cannot tell it apart from the other inputs in
+                  the dialog. Defect D70. */}
               <Form.Control
                 type="text"
                 value={uploadToken}
                 readOnly
+                aria-label="Generated upload token"
                 className="font-monospace"
               />
               <Button
