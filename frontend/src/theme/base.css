@@ -301,10 +301,13 @@ table {
   --bs-btn-color: var(--color-warning-text);
   --bs-btn-bg: var(--color-warning-soft);
   --bs-btn-border-color: var(--color-warning-solid);
-  --bs-btn-hover-color: var(--color-warning-text);
+  /* Defect D84: hover used --color-warning-text on --color-warning-solid. In
+     the dark theme both invert to light ambers, measuring 1.40:1. The hover
+     and active fragments must use the token pair built for that surface. */
+  --bs-btn-hover-color: var(--color-on-warning-solid);
   --bs-btn-hover-bg: var(--color-warning-solid);
   --bs-btn-hover-border-color: var(--color-warning-solid);
-  --bs-btn-active-color: var(--color-warning-text);
+  --bs-btn-active-color: var(--color-on-warning-solid);
   --bs-btn-active-bg: var(--color-warning-solid);
   --bs-btn-active-border-color: var(--color-warning-solid);
   --bs-btn-disabled-color: var(--color-text-disabled);
@@ -382,6 +385,15 @@ table {
 .bg-light { background-color: var(--color-surface-sunken) !important; }
 .bg-body { background-color: var(--color-surface-canvas) !important; }
 .bg-white { background-color: var(--color-surface) !important; }
+
+/* Defect D84: Bootstrap's .bg-warning et al. paint a saturated amber/red
+   that pairs with the browser's inherited text colour -- white on amber
+   measures ~1.95:1. These utility overrides pair each colour with the token
+   pair built for it, the same way .text-danger et al. above are corrected. */
+.bg-warning { background-color: var(--color-warning-soft) !important; color: var(--color-warning-text) !important; }
+.bg-danger { background-color: var(--color-danger-soft) !important; color: var(--color-danger-text) !important; }
+.bg-success { background-color: var(--color-success-soft) !important; color: var(--color-success-text) !important; }
+.bg-info { background-color: var(--color-info-soft) !important; color: var(--color-info-text) !important; }
 
 /* -- Alerts ------------------------------------------------------------- */
 
@@ -710,4 +722,90 @@ table {
   .no-print {
     display: none !important;
   }
+}
+
+/* ==========================================================================
+   Bridge to Bootstrap 5 (moved here -- D84)
+   Load order: tokens.css, Bootstrap, base.css. This block must win against
+   Bootstrap's own :root declarations, so it has to live in base.css, and
+   specificity is raised (:root:root) so it also beats Bootstrap's
+   [data-bs-theme=dark] rules at equal source order.
+   ========================================================================== */
+
+/* ==========================================================================
+   Bridge to Bootstrap 5
+   --------------------------------------------------------------------------
+   react-bootstrap (Cards, Modals, Forms, Alerts, Spinners, Dropdowns, Tabs) is
+   kept deliberately: its Modal is the accessible, focus-trapping dialog this
+   app relies on, and rebuilding that would be a regression, not an upgrade.
+   Bootstrap 5.3 is driven largely by CSS custom properties, so re-pointing
+   them at the tokens above themes most of it for free. The parts that hard-code
+   hex (.btn-*, .text-*, .alert-*, .badge.bg-*) are re-pointed once, in
+   theme/base.css. Bootstrap itself is imported exactly once, in src/index.js.
+   ========================================================================== */
+:root:root,
+[data-theme="dark"]:root {
+  --bs-body-bg: var(--color-surface-canvas);
+  --bs-body-color: var(--color-text);
+  --bs-body-color-rgb: 14, 15, 21;
+  --bs-secondary-color: var(--color-text-muted);
+  --bs-secondary-color-rgb: 75, 76, 90;
+  --bs-secondary-bg: var(--color-surface-sunken);
+  --bs-tertiary-color: var(--color-text-subtle);
+  --bs-tertiary-bg: var(--color-surface-sunken);
+  --bs-emphasis-color: var(--color-text);
+  --bs-heading-color: var(--color-text);
+
+  --bs-border-color: var(--color-border);
+  --bs-border-color-translucent: var(--color-border-subtle);
+
+  --bs-link-color: var(--color-link);
+  --bs-link-hover-color: var(--color-link-hover);
+
+  --bs-primary: var(--color-brand-solid);
+  --bs-primary-rgb: 91, 83, 192;
+  --bs-secondary: var(--color-text-muted);
+  --bs-secondary-rgb: 75, 76, 90;
+  --bs-success: var(--color-success-solid);
+  --bs-success-rgb: 38, 137, 76;
+  --bs-danger: var(--color-danger-solid);
+  --bs-danger-rgb: 207, 73, 70;
+  --bs-warning: var(--color-warning-solid);
+  --bs-warning-rgb: 229, 163, 35;
+  --bs-info: var(--color-info-solid);
+  --bs-info-rgb: 0, 134, 177;
+  --bs-light: var(--color-surface-sunken);
+  --bs-light-rgb: 243, 243, 249;
+  --bs-dark: var(--color-text);
+  --bs-dark-rgb: 14, 15, 21;
+
+  --bs-body-font-family: var(--font-sans);
+  --bs-body-font-size: var(--font-size-base);
+  --bs-body-line-height: var(--line-height-normal);
+  --bs-body-font-weight: var(--font-weight-regular);
+
+  --bs-border-radius: var(--radius-md);
+  --bs-border-radius-sm: var(--radius-sm);
+  --bs-border-radius-lg: var(--radius-lg);
+  --bs-border-radius-pill: var(--radius-full);
+
+  --bs-focus-ring-color: var(--color-focus);
+  --bs-focus-ring-width: 3px;
+  --bs-focus-ring-opacity: 1;
+
+  --bs-box-shadow-sm: var(--shadow-sm);
+  --bs-box-shadow: var(--shadow-md);
+  --bs-box-shadow-lg: var(--shadow-lg);
+
+  --bs-font-monospace: var(--font-mono);
+  --bs-code-color: var(--color-danger-text);
+  --bs-code-bg: var(--color-surface-sunken);
+}
+
+[data-theme="dark"]:root {
+  /* The light values above are correct in light mode only. Dark text tokens
+     need their own RGB triples, or Bootstrap components that build rgba()
+     from these (e.g. .text-muted) render near-black on a dark surface. */
+  --bs-body-color-rgb: 243, 243, 247;
+  --bs-secondary-color-rgb: 185, 186, 194;
 }
