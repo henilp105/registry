@@ -1,0 +1,309 @@
+/* Create-namespace form.
+ *
+ * The page carried a `styles` object of 210 lines with 39 literal hex values,
+ * including a hard-coded indigo gradient (#6366f1 -> #8b5cf6) on the header
+ * and the submit button. That is the same gradient AuthForm was using and
+ * close to --color-brand-solid, so it is now the brand ramp proper.
+ *
+ * Field state (error / valid / focus) used to be computed in JS by merging
+ * three style objects per field. It is three class names now, and the
+ * transitions live in the stylesheet.
+ */
+
+.namespace-page {
+  min-height: calc(100vh - var(--header-height));
+  padding: var(--space-12) var(--space-4);
+}
+
+.namespace-card {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--space-5);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+/* --------------------------------------------------------------------------
+   Header
+   -------------------------------------------------------------------------- */
+
+.namespace-card__header {
+  padding: var(--space-10) var(--space-8);
+  background: linear-gradient(
+    135deg,
+    var(--primary-600),
+    var(--primary-400)
+  );
+  color: var(--color-text-inverse);
+  text-align: center;
+}
+
+.namespace-card__header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto var(--space-4);
+  border-radius: var(--radius-lg);
+  /* White at low alpha over the gradient. Kept as a translucent white rather
+     than a token because it is a tint of the gradient behind it, not a
+     surface - the dark theme inverts the gradient underneath it instead. */
+  background-color: rgb(255 255 255 / 20%);
+}
+
+.namespace-card__title {
+  margin-bottom: var(--space-2);
+  color: inherit;
+  font-size: var(--font-size-2xl);
+}
+
+.namespace-card__subtitle {
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* --------------------------------------------------------------------------
+   Form
+   -------------------------------------------------------------------------- */
+
+.namespace-card__body {
+  padding: var(--space-8);
+}
+
+.namespace-field {
+  margin-bottom: var(--space-6);
+}
+
+.namespace-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.namespace-input,
+.namespace-textarea {
+  display: block;
+  width: 100%;
+  padding: 0.875rem var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.namespace-textarea {
+  min-height: 7.5rem;
+  resize: vertical;
+}
+
+.namespace-input::placeholder,
+.namespace-textarea::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.namespace-input:disabled,
+.namespace-textarea:disabled {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+/* State classes, applied by the component once the field has been touched.
+   The focus ring is :focus-visible in base.css; these are the
+   validation-specific tints on top. */
+.namespace-input--error,
+.namespace-textarea--error {
+  border-color: var(--color-danger-solid);
+}
+
+.namespace-input--valid,
+.namespace-textarea--valid {
+  border-color: var(--color-success-solid);
+}
+
+/* --------------------------------------------------------------------------
+   Field messages
+   -------------------------------------------------------------------------- */
+
+.namespace-hint,
+.namespace-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.namespace-hint {
+  color: var(--color-text-muted);
+}
+
+.namespace-error {
+  color: var(--color-danger-text);
+}
+
+/* --------------------------------------------------------------------------
+   Alerts
+   -------------------------------------------------------------------------- */
+
+.namespace-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid;
+  border-radius: var(--radius-lg);
+}
+
+.namespace-alert--success {
+  border-color: var(--color-success-solid);
+  background-color: var(--color-success-soft);
+  color: var(--color-success-text);
+}
+
+.namespace-alert--error {
+  border-color: var(--color-danger-solid);
+  background-color: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+
+/* --------------------------------------------------------------------------
+   Submit
+   -------------------------------------------------------------------------- */
+
+.namespace-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-4) var(--space-6);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    135deg,
+    var(--color-brand-solid),
+    var(--color-brand-solid-hover)
+  );
+  color: var(--color-on-brand-solid);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+/* Was onMouseOver/onMouseOut mutating e.currentTarget.style directly, so the
+   lift never happened for keyboard users. A CSS :hover/:focus-visible pair
+   covers both. */
+.namespace-submit:hover:not(:disabled),
+.namespace-submit:focus-visible:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.namespace-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .namespace-submit:hover:not(:disabled),
+  .namespace-submit:focus-visible:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Info card and sidebar
+   -------------------------------------------------------------------------- */
+
+.namespace-info {
+  margin-top: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface-sunken);
+}
+
+.namespace-info__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: var(--color-brand-solid);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.namespace-info__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.namespace-info__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.namespace-info__list svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-success-solid);
+}
+
+.namespace-side {
+  padding: var(--space-6);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.namespace-side__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: var(--color-brand-solid);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.namespace-side__text {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+}
+
+/* --------------------------------------------------------------------------
+   Loading
+   -------------------------------------------------------------------------- */
+
+.namespace-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 25rem;
+}
+
+.namespace-loading__text {
+  color: var(--color-text-muted);
+}
