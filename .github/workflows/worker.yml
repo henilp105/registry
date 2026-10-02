@@ -1,10 +1,13 @@
 name: Worker (serverless API)
 
 on:
+  # Any branch, so an integration or hotfix branch cannot merge with a broken
+  # Worker unnoticed. This was a branch allow-list, and the first integration
+  # branch of the migration ran zero Worker checks as a result.
   push:
-    branches: [serverless-migration, main, 'feat/**', 'fix/**']
+    branches: ["**"]
   pull_request:
-    branches: [serverless-migration, main]
+    branches: ["**"]
   workflow_dispatch:
 
 concurrency:
