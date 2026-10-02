@@ -1594,3 +1594,60 @@ ends: **every check so far verified a layer, and the defects lived in the gaps b
 layers.** The API was correct while the forms were unreachable; the endpoints were
 correct while the dialogs that call them had never run; the token was minted correctly
 while the reducer discarded it.
+
+---
+
+## D75 — `Validate Packages` is red on `main`, and that is the correct behaviour
+
+**Severity: low. Found by looking at the CI list rather than only my own workflows.**
+
+### What it looked like
+
+`Validate Packages` — a workflow I had not been tracking, because it does not gate my
+commits — last ran at `932a3b2` and **failed**. It had not run since, so `main` carried
+a red check that nobody was looking at.
+
+### Why
+
+Not a regression. It runs on a 30-minute cron and `workflow_dispatch` only — never on a
+push — so the run at `932a3b2` was the schedule firing, not that commit breaking
+anything. Both jobs fail for the same reason:
+
+- `Fail fast if the registry is not configured` → `Repository variable
+  REGISTRY_API_URL is not set.`
+- `Ping the pending queue` → the registry has no `/internal/validation/pending` to
+  reach.
+
+Both are the **validation API not existing yet**. The workflow calls the registry's
+own validation endpoint, and the registry has not been deployed.
+
+### Why it was left failing
+
+Softening it into a skip would be the wrong trade. The fail-fast exists so that an
+accidentally-unset `REGISTRY_API_URL` or `VALIDATION_SECRET` is loud once there *is* a
+registry — and a validator that quietly stops validating is precisely the failure
+**D36** recorded, where `validate.py` looped forever until the 6-hour job cap and
+failed every time regardless.
+
+So the check stays strict and the *state* is documented instead:
+
+- the workflow header now says, in full, that it is expected to be red until the first
+  deployment, that this is the fail-fast working as intended, and that it is **not
+  push-triggered** so its state says nothing about whether a commit is healthy;
+- `DEPLOYMENT.md` lists setting `REGISTRY_API_URL` and `VALIDATION_SECRET` as step 6
+  of the deployment, with the same note.
+
+Judge commits by `Worker (serverless API)` and `Run Tests for Backend`, which are the
+two that gate.
+
+### The process lesson, which is the uncomfortable one
+
+A red check that is *correct* is still a red check, and red trains people to ignore
+the badge. The honest options are "make it green" or "say loudly that it is not a
+signal", and this picks the second while keeping the strictness that catches real
+misconfiguration.
+
+What it does not do is hide it. The alternative — skipping the job when unconfigured —
+would have made `main` look clean while the validation pipeline was in fact not
+running at all, which is the failure mode D36 describes and the one most worth
+avoiding.

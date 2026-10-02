@@ -43,6 +43,15 @@ and `SALT` must match whatever the accounts were hashed with. **Changing `SALT`
 after accounts exist locks every existing user out** — it is not a free rotation.
 
 
+6. Set the GitHub variables the validation workflow needs, or leave it failing on
+   purpose: repository variable `REGISTRY_API_URL`, and secret `VALIDATION_SECRET`
+   with the same value as the Worker's. `Validate Packages` is **red until both
+   exist** — it runs a 30-minute cron against a registry that is not deployed, and
+   fails fast rather than skipping. That is deliberate (see the header of
+   `.github/workflows/validate-packages.yml`), and it goes green within 30 minutes
+   of the deploy with no code change. It is not push-triggered, so it says nothing
+   about whether a commit is healthy.
+
 ### Required GitHub configuration
 
 | Where | What | Why |

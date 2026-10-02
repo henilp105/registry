@@ -15,6 +15,28 @@ name: Validate Packages
 # ephemeral runner that is destroyed afterwards, so there is no long-lived host
 # to compromise, and the Python it runs refuses traversal and shell
 # metacharacters by construction.
+#
+# ── This workflow is RED until the first deployment. That is expected. ──────────
+# It runs on a 30-minute cron against a registry that does not exist yet, so both
+# jobs fail on `Fail fast if the registry is not configured` and
+# `Ping the pending queue`, with:
+#
+#     Repository variable REGISTRY_API_URL is not set.
+#
+# That is the fail-fast working as intended, not a regression. It was left failing
+# deliberately rather than softened into a skip, because after deployment an
+# accidentally-unset variable must be loud -- a validator that quietly stops
+# validating is the exact failure D36 was about.
+#
+# The cost of that choice is a permanently red check on `main`, which is a real one:
+# red trains people to ignore the badge. So it is stated here, and it is item 6 on
+# the deployment checklist in DEPLOYMENT.md. Set both, and this goes green within
+# 30 minutes with no code change.
+#
+# It is *not* triggered by pushes -- only by `schedule` and `workflow_dispatch` --
+# so its state tells you nothing about whether a commit is healthy. Judge commits by
+# "Worker (serverless API)" and "Run Tests for Backend", which are the two that
+# gate.
 
 on:
   schedule:
