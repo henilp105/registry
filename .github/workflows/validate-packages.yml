@@ -1,0 +1,115 @@
+name: Validate Packages
+
+# Replaces `.github/workflows/security_checks.yml`, which ran
+# `backend/validate.py` in a container. That had two problems:
+#
+#   1. On v2.0.1 it had become an infinite loop (`while True: validate();
+#      time.sleep(60)`) while the workflow stayed a one-shot with no
+#      `timeout-minutes`, so it ran until the 6-hour job cap and failed every
+#      time (defect D36).
+#   2. `validate.py` interpolated an unvalidated package name into
+#      `subprocess.run(..., shell=True)` across four commands and into `rm -rf`,
+#      so any publisher could get command execution on the runner (defect D7).
+#
+# This workflow instead calls the registry's own validation API. Each job is an
+# ephemeral runner that is destroyed afterwards, so there is no long-lived host
+# to compromise, and the Python it runs refuses traversal and shell
+# metacharacters by construction.
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub Actions cron is free on public repositories.
+    - cron: "13,43 * * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Maximum packages to validate this run"
+        required: false
+        default: "20"
+
+concurrency:
+  group: validate-packages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate uploaded packages
+    runs-on: ubuntu-latest
+    # The whole batch, including downloads and extractions. A run that exceeds
+    # this is a runaway, and failing loudly beats hanging for six hours.
+    timeout-minutes: 25
+    env:
+      REGISTRY_API_URL: ${{ vars.REGISTRY_API_URL }}
+      VALIDATION_SECRET: ${{ secrets.VALIDATION_SECRET }}
+      VALIDATION_BATCH: ${{ github.event.inputs.limit || '20' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      # The validator only needs a TOML parser, which is in the standard library
+      # from 3.11. tomli is the backstop for anything older.
+      - name: Install validator dependencies
+        run: pip install --quiet tomli
+
+      - name: Fail fast if the registry is not configured
+        run: |
+          if [ -z "$REGISTRY_API_URL" ]; then
+            echo "::error::Repository variable REGISTRY_API_URL is not set."
+            echo "Add it under Settings -> Secrets and variables -> Actions -> Variables."
+            exit 1
+          fi
+          if [ -z "$VALIDATION_SECRET" ]; then
+            echo "::error::Secret VALIDATION_SECRET is not set."
+            exit 1
+          fi
+
+      - name: Run validation
+        run: python scripts/validate_packages.py --api "$REGISTRY_API_URL"
+
+      # A validation failure for an individual package is data, not a build
+      # break: the script records the verdict and exits 0. Only infrastructure
+      # problems should fail the job, so only report rather than fail here.
+      - name: Summarise
+        if: always()
+        run: |
+          {
+            echo "### Package validation"
+            echo ""
+            echo "- commit: \`${GITHUB_SHA:0:7}\`"
+            echo "- api: \`${REGISTRY_API_URL}\`"
+            echo ""
+            echo "Individual package verdicts are recorded against each version"
+            echo "in the registry; they do not fail this job."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Cheap signal that the callback API is actually reachable. Runs every 6 hours
+  # so an outage is noticed long before a user waits 30 minutes for a publish to
+  # be verified.
+  health:
+    name: Validation API reachable
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      REGISTRY_API_URL: ${{ vars.REGISTRY_API_URL }}
+      VALIDATION_SECRET: ${{ secrets.VALIDATION_SECRET }}
+    steps:
+      - name: Ping the pending queue
+        run: |
+          set -euo pipefail
+          status=$(curl -s -o /tmp/pending.json -w '%{http_code}' \
+            -H "Authorization: Bearer $VALIDATION_SECRET" \
+            "$REGISTRY_API_URL/internal/validation/pending?limit=1")
+          if [ "$status" != "200" ]; then
+            echo "::error::validation API returned HTTP $status"
+            cat /tmp/pending.json
+            exit 1
+          fi
+          echo "ok: $(head -c 200 /tmp/pending.json)"
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}

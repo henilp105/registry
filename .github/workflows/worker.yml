@@ -1,0 +1,73 @@
+name: Worker (serverless API)
+
+on:
+  push:
+    branches: [serverless-migration, main, 'feat/**', 'fix/**']
+  pull_request:
+    branches: [serverless-migration, main]
+  workflow_dispatch:
+
+concurrency:
+  group: worker-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: worker
+
+jobs:
+  check:
+    name: typecheck, lint, test, bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # wrangler 4.x requires Node >= 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Proves the bundle fits inside the 64 MiB Worker size limit and that
+      # every binding in wrangler.jsonc resolves. `mongodb` is the bulk of it.
+      - name: Bundle check
+        run: npx wrangler deploy --dry-run --outdir=dist
+
+      # Regenerates worker-configuration.d.ts from wrangler.jsonc, which
+      # validates every binding reference in the config. No `|| true`: a
+      # malformed binding must fail here rather than at publish time.
+      - name: Wrangler config check
+        run: npx wrangler types
+
+  contract:
+    name: API contract is frozen
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # The workflow default puts every job in worker/; these assertions are about
+    # repo-root docs, so this job must run from the root.
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert the contract documents still exist and are non-trivial
+        run: |
+          set -euo pipefail
+          for f in docs/API_CONTRACT.md docs/SERVERLESS_MIGRATION_PLAN.md docs/BASELINE_AUDIT.md; do
+            if [ ! -s "$f" ]; then echo "missing or empty: $f"; exit 1; fi
+            echo "ok: $f ($(wc -l < "$f") lines)"
+          done

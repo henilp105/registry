@@ -1,0 +1,114 @@
+{
+  // fpm-registry-api — Cloudflare Workers Free plan.
+  //
+  // Free-tier budget this config is designed against (see
+  // docs/SERVERLESS_MIGRATION_PLAN.md §1):
+  //   Workers      100,000 req/day · 10 ms CPU/invocation · 128 MB · 50 subrequests
+  //   Durable Obj  100,000 req/day · 13,000 GB-s/day · 5 GB · 30 s CPU/request
+  //   KV           100k reads + 1k writes/day · 1 GB
+  //   R2           10 GB-month · free egress
+  //
+  // The 10 ms Worker CPU limit is the binding constraint. It is why the
+  // MongoDB connection lives in a Durable Object (30 s CPU) instead of
+  // being opened per request: a single PBKDF2-SHA256 round of MongoDB's
+  // SCRAM handshake costs ~4.5 ms of CPU, so a cold connection inside a
+  // handler reliably exceeds 10 ms and returns Cloudflare error 1102.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fpm-registry-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Explicit CPU ceiling. Cloudflare recommends setting this to prevent
+  // runaway bills on the paid plan; on free it bounds error 1102 blast radius.
+  "limits": {
+    "cpu_ms": 10
+  },
+
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
+
+  "vars": {
+    "ENVIRONMENT": "development",
+    "MONGO_DB_NAME": "fpmregistry",
+    "PBKDF2_ITERATIONS": "210000",
+    "HOST": "http://localhost:5173",
+    "ALLOWED_ORIGINS": "http://localhost:5173",
+    // Secrets are NOT in this file. Set with:
+    //   wrangler secret put JWT_SECRET_KEY
+    //   wrangler secret put VALIDATION_SECRET
+    //   wrangler secret put BREVO_API_KEY
+  },
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MONGO_POOL",
+        "class_name": "MongoPool"
+      }
+    ]
+  },
+
+  "r2_buckets": [
+    {
+      "binding": "TARBALLS",
+      "bucket_name": "fpm-registry-tarballs",
+      "preview_bucket_name": "fpm-registry-tarballs-preview"
+    }
+  ],
+
+  "kv_namespaces": [
+    {
+      "binding": "CACHE",
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
+    }
+  ],
+
+  "triggers": {
+    // 5 cron triggers are available on the free plan; we use 4.
+    "crons": [
+      "17 * * * *",   // hourly   — refresh hot package cache from MongoDB
+      "*/30 * * * *", // 30-min   — rebuild the search index
+      "0 3 * * *",    // 03:00 UTC— pending validation sweep
+      "0 4 * * 0"     // 04:00 Sun— prune orphaned tarballs from R2
+    ]
+  },
+
+  "env": {
+    "staging": {
+      "name": "fpm-registry-api-staging",
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "MONGO_DB_NAME": "fpmregistry_staging",
+        "HOST": "https://staging.registry.fortran-lang.org",
+        "ALLOWED_ORIGINS": "https://staging.registry.fortran-lang.org"
+      },
+      "r2_buckets": [
+        {
+          "binding": "TARBALLS",
+          "bucket_name": "fpm-registry-tarballs-staging"
+        }
+      ]
+    },
+    "production": {
+      "name": "fpm-registry-api",
+      "vars": {
+        "ENVIRONMENT": "production",
+        "MONGO_DB_NAME": "fpmregistry",
+        "HOST": "https://registry.fortran-lang.org",
+        "ALLOWED_ORIGINS": "https://registry.fortran-lang.org"
+      },
+      "r2_buckets": [
+        {
+          "binding": "TARBALLS",
+          "bucket_name": "fpm-registry-tarballs"
+        }
+      ]
+    }
+  }
+}
