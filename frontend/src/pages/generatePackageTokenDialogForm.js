@@ -11,9 +11,10 @@ import {
   resetMessages,
 } from "../store/actions/generatePackageTokenActions";
 import Icon from "../components/Icon";
+import { useCopyToClipboard } from "../utils/useCopyToClipboard";
 
 const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show, onHide }) => {
-  const [copied, setCopied] = useState(false);
+  const [copied, copyToClipboard, clearCopied] = useCopyToClipboard();
   const dispatch = useDispatch();
   
   const accessToken = useSelector((state) => state.auth.accessToken);
@@ -38,17 +39,13 @@ const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show,
   }, [dispatch, accessToken, namespace, packageName]);
 
   const handleCopy = useCallback(() => {
-    if (uploadToken) {
-      navigator.clipboard.writeText(uploadToken);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }, [uploadToken]);
+    if (uploadToken) copyToClipboard(uploadToken);
+  }, [uploadToken, copyToClipboard]);
 
   const resetData = useCallback(() => {
-    setCopied(false);
+    clearCopied();
     dispatch(resetMessages());
-  }, [dispatch]);
+  }, [dispatch, clearCopied]);
 
   return (
     <Modal

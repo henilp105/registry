@@ -11,9 +11,10 @@ import {
   resetMessages,
 } from "../store/actions/generateNamespaceTokenActions";
 import Icon from "../components/Icon";
+import { useCopyToClipboard } from "../utils/useCopyToClipboard";
 
 const GenerateNamespaceTokenDialogForm = ({ namespace, show, onHide }) => {
-  const [copied, setCopied] = useState(false);
+  const [copied, copyToClipboard, clearCopied] = useCopyToClipboard();
   const dispatch = useDispatch();
   
   const accessToken = useSelector((state) => state.auth.accessToken);
@@ -37,17 +38,13 @@ const GenerateNamespaceTokenDialogForm = ({ namespace, show, onHide }) => {
   }, [dispatch, accessToken, namespace]);
 
   const handleCopy = useCallback(() => {
-    if (uploadToken) {
-      navigator.clipboard.writeText(uploadToken);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  }, [uploadToken]);
+    if (uploadToken) copyToClipboard(uploadToken);
+  }, [uploadToken, copyToClipboard]);
 
   const resetData = useCallback(() => {
-    setCopied(false);
+    clearCopied();
     dispatch(resetMessages());
-  }, [dispatch]);
+  }, [dispatch, clearCopied]);
 
   return (
     <Modal

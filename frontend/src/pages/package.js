@@ -20,6 +20,7 @@ import Markdown from "react-markdown";
 import { Skeleton, SkeletonText } from "../components/SkeletonLoader";
 import Icon from "../components/Icon";
 import { safeUrl } from "../utils/safeUrl";
+import { useCopyToClipboard } from "../utils/useCopyToClipboard";
 import "./package.css";
 
 /* The four tabs. `eventKey` doubles as the value the activeTab state holds,
@@ -82,7 +83,6 @@ const PackagePage = () => {
   const [togglePackageMaintainersDialog, setTogglePackageMaintainersDialog] = useState(false);
   const [showReportForm, setShowReportForm] = useState(false);
   const [showRateForm, setShowRateForm] = useState(false);
-  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
 
   const handleTabClick = useCallback((value) => {
     if (value !== activeTab) {
@@ -90,13 +90,12 @@ const PackagePage = () => {
     }
   }, [activeTab]);
 
+  const [copiedToClipboard, copyToClipboard] = useCopyToClipboard();
+
   const copyInstallCommand = useCallback(() => {
     const command = `${data.name} = {'namespace'='${data.namespace}'}`;
-    navigator.clipboard.writeText(command).then(() => {
-      setCopiedToClipboard(true);
-      setTimeout(() => setCopiedToClipboard(false), 2000);
-    });
-  }, [data?.name, data?.namespace]);
+    copyToClipboard(command);
+  }, [data?.name, data?.namespace, copyToClipboard]);
 
   useEffect(() => {
     dispatch(fetchPackageData(namespace_name, package_name));
