@@ -615,3 +615,75 @@ reports success and does nothing passes all of them.
 committed so the claim is reproducible. Not in CI: it needs a running Worker and a
 live cluster, and it mutates state.
 
+---
+
+## D59 — A publish that lost the create race failed instead of folding in
+
+**Severity: medium (availability). Found by concurrency testing.**
+
+`scripts/write_path_fuzz.mjs` drives the upload and rating paths with hostile
+input and with genuinely parallel requests. Hostile input came back clean — every
+one of 15 rejected, and all 8 injection-shaped searches left the database intact.
+Concurrency found one defect, and fixing it surfaced a second that I introduced.
+
+### D59 — five parallel publishes, one version
+
+`packages_name_namespace_unique` is a unique index on `(name, namespace)`. Five
+concurrent *first* publishes of the same package therefore produce exactly one
+insert; the other four got a duplicate-key error and were returned as failures.
+Measured: five parallel publishes of five different versions left **one** version
+on the package.
+
+The index is behaving correctly. Failing the publish is not the right response: the
+package now exists, and it is exactly where that version belongs. This is not
+theoretical — a CI matrix publishing several versions of one package at once
+loses all but one.
+
+The insert now catches the duplicate key and folds the version in with an atomic
+`$push`.
+
+**And `err.code` did not survive the RPC boundary.** The first attempt still
+returned HTTP 500: the error is raised inside the Durable Object and re-thrown
+across workerd's RPC layer, which does not carry arbitrary properties, so
+`err.code === 11000` never matched and only the message survived. Detection now
+checks the code *and* the `E11000` prefix, which is stable MongoDB output rather
+than prose.
+
+### D60 — six copies of the same version (introduced by the D59 fix)
+
+Folding the losers into `$push` made the same-version race worse: a bare `$push`
+is atomic but **not idempotent**, so eight concurrent publishes of 1.0.0 inserted
+eight identical entries — six surviving copies, which then appear in
+`version_history` as `1.0.0` repeated.
+
+Caught because the harness asserted on the *stored* version list rather than on
+the response. A check that only counted HTTP 200s would have passed this happily.
+
+The append now carries `"versions.version": { $ne: version }` in its filter, which
+keeps it atomic — exactly one request matches and pushes, the rest match zero
+documents and are told the version already exists.
+
+### What came back clean, and is worth recording
+
+- **15 hostile uploads all rejected** with nothing written: path traversal (`a/b`,
+  `..`), a null byte, a shell metacharacter (`a;rm -rf /`), an over-length name,
+  version `0.0.0`, a non-semver version, a version containing `/`, an empty
+  license, a missing tarball, and a 50 MB + 1 KB artifact (413).
+- **8 injection-shaped searches** (`"; dropDatabase(); //`, `.*`, `^`, `\`,
+  `{"$ne": null}`, 600 characters, `<script>`, `%00`) all returned 200 or 400 and
+  left every collection present. `$text` plus the capped query length means the
+  user's string never reaches a `$regex`.
+- **Ratings are genuinely race-free.** Ten accounts voting simultaneously: 10/10
+  accepted, 10 votes stored, and the derived average was exactly 3.0 — which is the
+  correct mean of the 1..5 values submitted. This is the D25-class defect
+  *actually* fixed, verified rather than asserted.
+- **Duplicate namespace creation** is correctly serialised by its unique index:
+  five racing creates yielded one document and one 200.
+
+### The gap
+
+The concurrency claims in the migration — "race-free rating counter", "atomic
+$push" — were argued from first principles, not measured. Reasoning about races is
+how D59 and D60 both existed: the first because nobody imagined two CI jobs
+publishing at once, the second because it was introduced by a fix for the first.
+

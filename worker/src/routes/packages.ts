@@ -340,6 +340,32 @@ async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
   return jsonOk({ packages, total_pages: limit > 0 ? Math.ceil(totalDocs / limit) : 0 });
 }
 
+/**
+ * Is this a MongoDB duplicate-key error?
+ *
+ * Code 11000 is raised by a unique index, which is the *correct* outcome when two
+ * requests try to create the same package. Callers use this to fold the loser into
+ * the winner rather than failing it.
+ */
+function isDuplicateKeyError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const code = (err as { code?: unknown }).code;
+  if (code === 11000 || code === 11001) return true;
+  // Also match the message. The error is raised inside the Durable Object and
+  // re-thrown in the Worker across workerd's RPC boundary, which does not carry
+  // arbitrary properties -- so `err.code` arrives undefined and a code-only check
+  // never matches. Measured: the same race that this guards returned HTTP 500
+  // with `E11000 duplicate key error ... packages_name_namespace_unique` because
+  // of exactly that.
+  //
+  // `E11000` is stable MongoDB output across server versions, so matching on it is
+  // not relying on prose.
+  const message = typeof (err as { message?: unknown }).message === "string"
+    ? String((err as { message: string }).message)
+    : "";
+  return message.startsWith("E11000") || message.includes("duplicate key error");
+}
+
 /** Newest version by semver comparison, or `null` when there are none. */
 function latestVersionOf(versions: unknown): string | null {
   if (!Array.isArray(versions) || versions.length === 0) return null;
@@ -922,16 +948,35 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
     unable_to_verify: true,
   };
 
-  if (existing) {
-    await db(env, {
+  /**
+   * Append this version to an existing package document, unless it is already
+   * there.
+   *
+   * The `"versions.version": { $ne: version }` clause is load-bearing. A bare
+   * `$push` is atomic but not idempotent, so eight concurrent publishes of the
+   * *same* version insert eight identical entries -- measured at six copies after
+   * the duplicate-key race was fixed, which then surfaces in `version_history` as
+   * 1.0.0 repeated. Folding the guard into the filter keeps it atomic: exactly one
+   * request matches and pushes, the rest match zero documents and are told the
+   * version already exists.
+   */
+  const appendVersion = async (packageId: unknown): Promise<boolean> => {
+    const result = (await db<{ modifiedCount: number }>(env, {
       kind: "updateOne",
       collection: "packages",
-      filter: { _id: existing._id },
+      filter: { _id: packageId, "versions.version": { $ne: version } },
       update: {
         $push: { versions: versionDoc },
         $set: { updated_at: now, license },
       },
-    });
+    })) as { modifiedCount: number };
+    return (result?.modifiedCount ?? 0) > 0;
+  };
+
+  if (existing) {
+    if (!(await appendVersion(existing._id))) {
+      return jsonError(400, `Version ${version} of ${packageName} already exists`);
+    }
   } else {
     const uploader = await db<(Record<string, unknown> & { _id: unknown }) | null>(env, {
       kind: "findOne",
@@ -940,10 +985,7 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
       projection: { _id: 1 },
     }) as (Record<string, unknown> & { _id: unknown }) | null;
 
-    const inserted = (await db<{ insertedId: unknown }>(env, {
-      kind: "insertOne",
-      collection: "packages",
-      doc: {
+    const document = {
         name: packageName,
         namespace: namespace._id,
         namespace_name: namespace.namespace,
@@ -968,8 +1010,53 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
         created_at: now,
         updated_at: now,
         versions: [versionDoc],
-      },
-    })) as { insertedId: unknown };
+      };
+
+    let inserted: { insertedId: unknown };
+    try {
+      inserted = (await db<{ insertedId: unknown }>(env, {
+        kind: "insertOne",
+        collection: "packages",
+        doc: document,
+      })) as { insertedId: unknown };
+    } catch (err) {
+      // Lost the create race.
+      //
+      // `packages_name_namespace_unique` is a unique index on (name, namespace),
+      // so of several concurrent first publishes of the same package exactly one
+      // insert wins and the rest get a duplicate-key error. Measured: five parallel
+      // publishes of five different versions left **one** version on the package
+      // and failed the other four outright.
+      //
+      // That is the index doing its job, but failing the publish is the wrong
+      // response to it. The package now exists and is exactly where this version
+      // belongs, so fold the version in with an atomic `$push` rather than
+      // returning an error the client cannot act on. This matters in practice: a
+      // CI matrix publishing several versions of one package at once would lose
+      // all but one.
+      if (!isDuplicateKeyError(err)) throw err;
+
+      const now_ = await db<{ _id: unknown } | null>(env, {
+        kind: "findOne",
+        collection: "packages",
+        filter: { name: packageName, namespace: namespace._id },
+        projection: { _id: 1 },
+      });
+      if (!now_) throw err; // genuinely gone again; surface the original failure
+      logger.warn("publish lost the create race; appending to the existing package", {
+        package: `${namespace.namespace}/${packageName}`,
+        version,
+      });
+      if (!(await appendVersion(now_._id))) {
+        return jsonError(400, `Version ${version} of ${packageName} already exists`);
+      }
+      await invalidate(
+        env,
+        ENTITY.package(namespace.namespace, packageName),
+        ENTITY.namespacePackages(namespace.namespace),
+      );
+      return jsonOk({ message: "Package Uploaded Successfully." });
+    }
 
     await db(env, {
       kind: "updateOne",
