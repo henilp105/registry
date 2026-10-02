@@ -127,7 +127,7 @@ const HelpSection = ({ title, intro, code, steps }) => (
 );
 
 const Help = () => (
-  <main className="help">
+  <div className="help">
     <h1 className="help__title">Package Registry Help Guide</h1>
 
     {/* Two columns on wide screens, one on narrow. The sections are grouped
@@ -148,7 +148,7 @@ const Help = () => (
     {SECTIONS.slice(4).map((section) => (
       <HelpSection key={section.id} {...section} />
     ))}
-  </main>
+  </div>
 );
 
 export default Help;

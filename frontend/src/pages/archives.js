@@ -41,7 +41,7 @@ const Archives = () => {
   }
 
   return (
-    <main className="archives">
+    <div className="archives">
       <h1 className="archives__title">Registry Archives</h1>
 
       <section aria-labelledby="archives-snapshots">
@@ -125,7 +125,7 @@ const Archives = () => {
           intended for reference and historical purposes.
         </p>
       </section>
-    </main>
+    </div>
   );
 };
 

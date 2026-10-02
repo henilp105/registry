@@ -11,6 +11,37 @@
  */
 
 /* --------------------------------------------------------------------------
+   Page frame
+   -------------------------------------------------------------------------- */
+
+/* The <main> that wraps the routed content. tabIndex={-1} in App.js makes it
+   focusable programmatically (for the skip link and the post-navigation focus
+   reset) without adding it to the tab order; this removes the UA focus ring
+   that would otherwise draw a box around the whole page on arrival. */
+#main-content:focus {
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   Footer
+   -------------------------------------------------------------------------- */
+
+.app-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding: var(--space-6) var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.app-footer a {
+  color: var(--color-link);
+}
+
+/* --------------------------------------------------------------------------
    Navbar
    -------------------------------------------------------------------------- */
 
