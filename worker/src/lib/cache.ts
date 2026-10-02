@@ -214,9 +214,18 @@ export async function serveCached(
 
   const fresh = await loader();
 
+  // Defect D80: deriving an ETag buffers the *entire* artifact, and cachePut
+  // then buffers it again. On a 50 MB tarball that is two full copies held at
+  // once against the 128 MB Worker limit, and the SHA-1 over 50 MB alone can
+  // exceed the 10 ms CPU ceiling (error 1102). Small JSON payloads still get
+  // the ETag win; anything large is streamed past the cache.
+  const MAX_ETAG_BYTES = 4 * 1024 * 1024;
+  const declaredLength = Number(fresh.headers.get("content-length") ?? NaN);
+  const tooLargeForEtag = Number.isFinite(declaredLength) && declaredLength > MAX_ETAG_BYTES;
+
   // Build a strong ETag over the body bytes.
   let etag: string | undefined;
-  if (fresh.status === 200) {
+  if (fresh.status === 200 && !tooLargeForEtag) {
     try {
       const bytes = await fresh.clone().arrayBuffer();
       const digest = await crypto.subtle.digest("SHA-1", bytes);
@@ -236,7 +245,8 @@ export async function serveCached(
     }
   }
 
-  if (ttl > 0) await cachePut(url, fresh, ttl, version);
+  // Defect D80: never re-buffer a large artifact into the Cache API.
+  if (ttl > 0 && !tooLargeForEtag) await cachePut(url, fresh, ttl, version);
 
   return new Response(fresh.body, { status: fresh.status, headers });
 }

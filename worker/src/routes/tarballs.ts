@@ -130,13 +130,12 @@ async function serveTarball(
   const entity = ENTITY.package(namespace, packageName);
   const versionToken = await entityVersion(env, entity);
   const internal = new URL(`https://internal/dl/${namespace}/${packageName}/${version}`);
-  void versionToken;
 
   return serveCached(
     new Request(internal),
     internal,
     TTL.tarball,
-    undefined,
+    versionToken,
     async () => {
       const result = await getTarball(env, key);
       if (!result.ok) {
