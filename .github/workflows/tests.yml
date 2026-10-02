@@ -15,10 +15,15 @@ env:
     SALT: MYSALT
     HOST: localhost
     RESET_EMAIL: reset@localhost.com
-    RESET_PASSWORD: reset
-    SUDO_PASSWORD: fortran
+    # Both must be at least 8 characters: backend/utils/validators.py rejects
+    # anything shorter, and test_sudo_user_signup signs up with SUDO_PASSWORD.
+    # v2.0.1 shipped `reset` and `fortran` here while enforcing len >= 8, so
+    # this workflow has failed on every run since at least 2026-02-07.
+    RESET_PASSWORD: resetpass
+    SUDO_PASSWORD: fortranpass
     IS_CI: true
-    JWT_SECRET_KEY: fpm-registry-test-secret-key
+    # 40 bytes: PyJWT warns below the 32-byte minimum for HS256 (RFC 7518 3.2).
+    JWT_SECRET_KEY: fpm-registry-test-secret-key-v2-0123456789ab
 
 jobs:
   test:
