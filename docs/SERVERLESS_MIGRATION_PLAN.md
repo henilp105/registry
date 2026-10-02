@@ -2,6 +2,8 @@
 
 > **Status:** Approved for execution · **Author:** migration-architect · **Date:** 2026-10-02
 > **Target:** 100% free-tier hosting. No credit card. No paid plan, ever.
+> **Base branch:** `origin/v2.0.1` (`0e3677d`) — see [`BASELINE_AUDIT.md`](./BASELINE_AUDIT.md) §1 for
+> the branch comparison and [`API_CONTRACT.md`](./API_CONTRACT.md) for the frozen endpoint contract.
 
 ---
 
@@ -178,17 +180,24 @@ tested rollback.**
 
 | Phase | Scope | Validation gate | Rollback |
 |---|---|---|---|
-| **0** | Baseline: freeze API contract from `docs/API.md` + 33 swagger files into an executable OpenAPI 3.1 spec + golden contract tests | Contract test suite green against the *current* Flask app | N/A (no behaviour change) |
+| **0** | Baseline: freeze API contract into an executable OpenAPI 3.1 spec + golden contract tests | Contract suite green against the *current* Flask app | N/A (no behaviour change) |
 | **1** | Worker skeleton: `wrangler.jsonc`, routing, CORS allowlist, health, 404/500 parity | Vitest + parity diff vs Phase 0 spec | Revert deploy |
 | **2** | `MongoPool` Durable Object: `globalThis` singleton, lazy TLS+SCRAM handshake, `try/finally` close, reconnect + backoff, connection health | **CPU probe**: warm request must stay < 10 ms Worker CPU | Disable binding → Worker returns 503 |
-| **3** | Auth routes (`login`, `signup`, `logout`, JWT, `forgot/reset-password`, `verify-email`, `change-email`) | Phase 0 auth contract tests pass verbatim | Feature-flag to legacy |
-| **4** | Namespaces + users routes | Contract tests | Feature-flag |
-| **5** | Packages routes (read) + Cache API layer | Contract tests + cache-hit ratio ≥ 80 % | Bypass cache |
-| **6** | Package upload → **R2**, signed-URL download | Upload/download round-trip + digest verify | R2 → GridFS shim |
-| **7** | Search (KV/D1 materialised index) + Cron rebuild | Search parity vs Mongo `$regex`/`$text` | Serve Mongo search |
-| **8** | Validation pipeline → GitHub Actions; `check_digests` → Cron | End-to-end validation of a real tarball | Legacy sync validator |
-| **9** | Email provider swap; OpenAPI docs; hardening; perf pass | Full suite + perf budget | Revert |
+| **2b** | **Correctness sweep** (fixes, not ports) — semver ordering, cascade deletes, repair `verify_user_role` + `delete_namespace`, `report/view` triage, real HTTP status codes, numeric `ratings`, race-free rating counter | Phase 0 suite green + new regression tests per defect | Revert deploy |
+| **3** | Auth routes (`login`, `signup`, `logout`, JWT, `forgot/reset-password`, `verify-email`, `change-email`). Kills the `SUDO_PASSWORD` backdoor (D1), the token oracle (D2/D6), wildcard CORS (D3) | Phase 0 auth contract tests pass verbatim | Feature-flag to legacy |
+| **4** | Namespaces + users routes. Scoped, single-use, hashed upload tokens replacing unrevocable ones (D4) | Contract tests | Feature-flag |
+| **5** | Packages routes (read) + Cache API layer + **the full MongoDB index set** (D17) + `$lookup` to kill N+1 (D25) + bounded page size (D19) | Contract tests + cache-hit ratio ≥ 80 % | Bypass cache |
+| **6** | Package upload → **R2**, signed-URL download. Fixes `dry_run` leakage (D15), adds a SHA-256 artifact checksum (D24), validates the package-name charset (D7) | Upload/download round-trip + digest verify | R2 → GridFS shim |
+| **7** | Search (KV/D1 materialised index) replacing unindexed regex (D18) + Cron rebuild + the missing deprecation API (D26) | Search parity vs Mongo `$regex`/`$text` | Serve Mongo search |
+| **8** | Validation pipeline → GitHub Actions (kills shell injection D7 + zip-bomb D8); `check_digests` → Cron; bounded download stats (D20) | End-to-end validation of a real tarball | Legacy sync validator |
+| **9** | Email provider (Brevo HTTP, already in `v2.0.1`) + OpenAPI docs + hardening + perf pass | Full suite + perf budget | Revert |
 | **10** | **Canary → cutover**: 10 % → 50 % → 100 % traffic at Cloudflare | Error rate + p95 within SLO for 72 h | **DNS/worker flip back to legacy — under 60 s** |
+
+> **Phase 2b exists because the audit found 16 correctness defects (D9–D16, D20–D23) that a naive
+> 1:1 port would faithfully reproduce** — including a `latest_version_data` that is the wrong
+> version for `0.10.0` vs `0.9.0`, three endpoints that are permanently broken, and deletes that
+> crash `GET /users/<username>`. Fixing them is explicitly permitted by the brief and is additive
+> or non-breaking to the contract.
 
 ### Traffic cutover (Strangler Fig, per `migration-architect`)
 
