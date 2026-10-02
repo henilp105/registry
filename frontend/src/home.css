@@ -1,220 +1,256 @@
-/* Home Page Styles */
+/* Home page: logo, search field, suggestion chips, quick links.
+ *
+ * Rewritten onto tokens. The file had 14 hex values, all of them a grey ramp
+ * plus a #3d94f6 blue that matched neither the old purple nor the current
+ * brand. The chips and quick links were `background: white` with a hard
+ * `outline: 2px solid #3d94f6` on :focus, which both ignored the theme and
+ * doubled up with the focus ring base.css already draws.
+ */
+
+#home-container {
+  padding: var(--space-6) var(--space-4) var(--space-16);
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Logo
+   -------------------------------------------------------------------------- */
 
 #fpm-logo {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    max-width: 100%;
-    margin-top: 6em;
-    margin-bottom: 2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  margin: var(--space-16) 0 var(--space-8);
+  animation: home-fade-in var(--duration-slow) var(--ease-decelerate);
 }
 
 #fpm-logo img {
-    max-width: 328px;
-    transition: transform 0.3s ease;
+  max-width: 20.5rem;
+  height: auto;
+  transition: transform var(--duration-slow) var(--ease-standard);
 }
 
 #fpm-logo img:hover {
-    transform: scale(1.02);
+  transform: scale(1.02);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #fpm-logo,
+  #fpm-logo img {
+    animation: none;
+    transition: none;
+  }
+
+  #fpm-logo img:hover {
+    transform: none;
+  }
 }
 
 #fpm-subscript {
-    margin: 1.5em auto;
-    color: #666;
+  margin: var(--space-6) auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-lg);
+  animation: home-fade-in var(--duration-slow) var(--ease-decelerate) 0.2s both;
 }
 
-/* Search Container */
+/* --------------------------------------------------------------------------
+   Search
+   -------------------------------------------------------------------------- */
+
 .search-container {
-    width: 100%;
-    margin: 0 auto;
-    transition: transform 0.2s ease;
+  width: 100%;
+  margin: 0 auto;
+  animation: home-fade-in var(--duration-slow) var(--ease-decelerate) 0.1s both;
 }
 
-.search-container.search-focused {
-    transform: scale(1.02);
+@media (prefers-reduced-motion: reduce) {
+  .search-container {
+    animation: none;
+  }
 }
 
 .search-input-group {
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    border-radius: 50px;
-    overflow: hidden;
-    transition: box-shadow 0.3s ease;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition: box-shadow var(--duration-base) var(--ease-standard);
 }
 
-.search-container.search-focused .search-input-group {
-    box-shadow: 0 6px 30px rgba(61, 148, 246, 0.25);
+/* The focus ring belongs to the input, which base.css styles. The group only
+   deepens its own shadow so the focused field reads as the active one. */
+.search-container:focus-within .search-input-group {
+  box-shadow: var(--shadow-lg);
 }
 
 #home-search {
-    border: none;
-    padding: 1rem 1.5rem;
-    font-size: 1.1rem;
+  padding: var(--space-4) var(--space-6);
+  border: 0;
+  font-size: 1.125rem;
 }
 
+/* base.css draws the ring; do not also suppress it here. */
 #home-search:focus {
-    box-shadow: none;
-    outline: none;
+  box-shadow: none;
 }
 
 .search-button {
-    padding: 0 1.5rem;
-    border: none;
-    border-radius: 0 50px 50px 0 !important;
+  padding: 0 var(--space-6);
+  border: 0;
+  border-radius: 0 var(--radius-full) var(--radius-full) 0;
 }
 
-/* Search Hints */
+/* --------------------------------------------------------------------------
+   Suggestion chips
+   -------------------------------------------------------------------------- */
+
 .search-hints {
-    margin-top: 1rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    color: #888;
-    font-size: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-sm);
 }
 
 .search-suggestion {
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 20px;
-    padding: 0.25rem 0.75rem;
-    font-size: 0.85rem;
-    color: #666;
-    cursor: pointer;
-    transition: all 0.2s ease;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
 
 .search-suggestion:hover {
-    background: #f0f0f0;
-    border-color: #3d94f6;
-    color: #3d94f6;
+  border-color: var(--color-brand-solid);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-brand-solid);
 }
 
-.search-suggestion:focus {
-    outline: 2px solid #3d94f6;
-    outline-offset: 2px;
-}
+/* --------------------------------------------------------------------------
+   Quick links
+   -------------------------------------------------------------------------- */
 
-/* Quick Links */
 .quick-links {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    margin-top: 3rem;
-    flex-wrap: wrap;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+  animation: home-fade-in var(--duration-slow) var(--ease-decelerate) 0.3s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-links {
+    animation: none;
+  }
 }
 
 .quick-link {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
-    background: white;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    color: #555;
-    font-size: 0.9rem;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
 }
 
 .quick-link:hover {
-    background: #f8f9fa;
-    border-color: #3d94f6;
-    color: #3d94f6;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-brand-solid);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-brand-solid);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
 }
 
-.quick-link:focus {
-    outline: 2px solid #3d94f6;
-    outline-offset: 2px;
+@media (prefers-reduced-motion: reduce) {
+  .quick-link:hover {
+    transform: none;
+  }
 }
 
-.quick-link i {
+.quick-link .icon {
+  font-size: 1rem;
+}
+
+/* --------------------------------------------------------------------------
+   Entrance
+   -------------------------------------------------------------------------- */
+
+@keyframes home-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Narrow screens
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 48em) {
+  #fpm-logo {
+    margin: var(--space-12) 0 var(--space-6);
+  }
+
+  #fpm-logo img {
+    max-width: 12.5rem;
+  }
+
+  #home-search {
+    padding: var(--space-3) var(--space-4);
     font-size: 1rem;
+  }
+
+  #home-container {
+    padding-right: var(--space-3);
+    padding-left: var(--space-3);
+  }
+
+  #fpm-subscript {
+    font-size: 1rem;
+  }
+
+  .search-hints {
+    font-size: var(--font-size-xs);
+  }
+
+  .quick-links {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+
+  .quick-link {
+    justify-content: center;
+  }
 }
 
-/* Responsive Styles */
-@media only screen and (max-width: 768px) {
-    #fpm-logo {
-        margin-top: 4em;
-    }
-
-    #fpm-logo img {
-        max-width: 200px;
-    }
-
-    #home-search {
-        font-size: 1rem;
-        padding: 0.75rem 1rem;
-    }
-
-    #home-container {
-        width: 90%;
-        padding: 0 1rem;
-    }
-
-    #fpm-subscript {
-        font-size: 1rem;
-    }
-
-    .search-hints {
-        font-size: 0.8rem;
-    }
-
-    .quick-links {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.5rem;
-    }
-
-    .quick-link {
-        justify-content: center;
-    }
-}
-
-@media only screen and (min-width: 768px) {
-    #home-search {
-        font-size: 1.25rem;
-    }
-
-    #home-container {
-        width: 50%;
-        max-width: 600px;
-    }
-
-    #fpm-subscript {
-        font-size: 1.25rem;
-    }
-}
-
-/* Animations */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-#fpm-logo {
-    animation: fadeIn 0.5s ease-out;
-}
-
-.search-container {
-    animation: fadeIn 0.5s ease-out 0.1s both;
-}
-
-#fpm-subscript {
-    animation: fadeIn 0.5s ease-out 0.2s both;
-}
-
-.quick-links {
-    animation: fadeIn 0.5s ease-out 0.3s both;
+@media (min-width: 48em) {
+  #home-container {
+    max-width: 37.5rem;
+  }
 }

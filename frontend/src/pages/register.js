@@ -163,10 +163,12 @@ const Register = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <img 
-            src="https://fortran-lang.org/_static/fortran-logo-256x256.png" 
-            alt="FPM Registry" 
+          <img
+            src={`${process.env.PUBLIC_URL}/brand/fortran-logo-256.png`}
+            alt="FPM Registry"
             className="auth-logo"
+            width={64}
+            height={64}
           />
           <h1 className="auth-title">Create Account</h1>
           <p className="auth-subtitle">Join the fpm Registry community</p>
