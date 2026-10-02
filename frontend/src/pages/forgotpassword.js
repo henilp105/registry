@@ -5,10 +5,12 @@ import { Link } from "react-router-dom";
 import { InfoCircle, ExclamationCircleFill, CheckCircleFill } from "react-bootstrap-icons";
 import "./auth.css";
 
-const Tooltip = ({ text }) => (
-  <span className="auth-tooltip">
-    <InfoCircle className="auth-tooltip-icon" />
-    <span className="auth-tooltip-text">{text}</span>
+const Tooltip = ({ text, id }) => (
+  <span className="auth-tooltip" tabIndex={0}>
+    <InfoCircle className="auth-tooltip-icon" aria-hidden="true" />
+    <span className="auth-tooltip-text" id={id} role="tooltip">
+      {text}
+    </span>
   </span>
 );
 
@@ -94,10 +96,11 @@ const ForgotPassword = () => {
           <div className="auth-form-group">
             <label htmlFor="email" className="auth-label">
               Email Address
-              <Tooltip text="Enter the email you used to create your account" />
             </label>
+            <Tooltip id="email-hint" text="Enter the email you used to create your account" />
             <input
               id="email"
+              aria-describedby="email-hint"
               type="email"
               name="email"
               className={`auth-input ${getFieldState()}`}

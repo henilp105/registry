@@ -5,10 +5,12 @@ import { signup, resetErrorMessage } from "../store/actions/authActions";
 import { InfoCircle, CheckCircleFill, ExclamationCircleFill, Eye, EyeSlash } from "react-bootstrap-icons";
 import "./auth.css";
 
-const Tooltip = ({ text }) => (
-  <span className="auth-tooltip">
-    <InfoCircle className="auth-tooltip-icon" />
-    <span className="auth-tooltip-text">{text}</span>
+const Tooltip = ({ text, id }) => (
+  <span className="auth-tooltip" tabIndex={0}>
+    <InfoCircle className="auth-tooltip-icon" aria-hidden="true" />
+    <span className="auth-tooltip-text" id={id} role="tooltip">
+      {text}
+    </span>
   </span>
 );
 
@@ -194,10 +196,11 @@ const Register = () => {
           <div className="auth-form-group">
             <label htmlFor="username" className="auth-label">
               Username
-              <Tooltip text="3+ characters: letters, numbers, underscores, hyphens" />
             </label>
+            <Tooltip id="username-hint" text="3+ characters: letters, numbers, underscores, hyphens" />
             <input
               id="username"
+              aria-describedby="username-hint"
               type="text"
               name="username"
               className={`auth-input ${getFieldState('username')}`}
@@ -218,10 +221,11 @@ const Register = () => {
           <div className="auth-form-group">
             <label htmlFor="email" className="auth-label">
               Email
-              <Tooltip text="We'll send a verification email to this address" />
             </label>
+            <Tooltip id="email-hint" text="We'll send a verification email to this address" />
             <input
               id="email"
+              aria-describedby="email-hint"
               type="email"
               name="email"
               className={`auth-input ${getFieldState('email')}`}
@@ -242,11 +246,12 @@ const Register = () => {
           <div className="auth-form-group">
             <label htmlFor="password" className="auth-label">
               Password
-              <Tooltip text="Minimum 8 characters. Mix letters, numbers & symbols for strength." />
             </label>
+            <Tooltip id="password-hint" text="Minimum 8 characters. Mix letters, numbers & symbols for strength." />
             <div className="auth-password-wrapper">
               <input
                 id="password"
+                aria-describedby="password-hint"
                 type={showPassword ? "text" : "password"}
                 name="password"
                 className={`auth-input ${getFieldState('password')}`}

@@ -125,11 +125,11 @@ const Login = () => {
           <div className="auth-form-group">
             <label htmlFor="user_identifier" className="auth-label">
               Email or Username
-              <Tooltip
+            </label>
+            <Tooltip
                 id="user_identifier-hint"
                 text="Enter the email or username you used during registration"
               />
-            </label>
             <input
               id="user_identifier"
               type="text"
