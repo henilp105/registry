@@ -40,7 +40,7 @@ const UserPage = () => {
 
   if (isLoading) {
     return (
-      <Container className="namespace-loading">
+      <Container className="namespace-loading-state">
         <Spinner animation="border" role="status">
           <span className="visually-hidden">Loading...</span>
         </Spinner>
@@ -80,12 +80,7 @@ const UserPage = () => {
                 {email && (
                   <li className="namespace-info-item">
                     <Envelope className="namespace-info-icon" />
-                    <span className="namespace-info-value" style={{ 
-                      fontSize: "0.875rem",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap"
-                    }}>
+                    <span className="namespace-info-value namespace-info-value--truncate">
                       {email}
                     </span>
                   </li>

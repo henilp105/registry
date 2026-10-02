@@ -14,6 +14,13 @@ export {
 } from './apiClient';
 
 export {
+  setAccessToken,
+  getAccessToken,
+  setUnauthorizedHandler,
+  emitUnauthorized,
+} from './session';
+
+export {
   createAsyncActionTypes,
   createAction,
   requestAction,

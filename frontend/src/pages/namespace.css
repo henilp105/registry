@@ -1,64 +1,73 @@
-/* Namespace Page Styles */
+/* Namespace detail page and user profile page (they share a stylesheet).
+ *
+ * Rewritten onto tokens. The file had 31 literal hex values including two more
+ * copies of the #6366f1 -> #8b5cf6 gradient (the .packages-title::before rule
+ * and the .packages-count pill), its own text ramp, and `background: #ffffff`
+ * on both cards - which is the same white-on-dark-page bug the skeleton loaders
+ * had.
+ */
 
 .namespace-container {
-  padding: 2rem 1rem;
-  max-width: 1200px;
+  max-width: var(--content-width);
+  min-height: calc(100vh - var(--header-height));
   margin: 0 auto;
-  min-height: calc(100vh - 120px);
+  padding: var(--space-8) var(--space-4);
 }
 
-/* Sidebar Styles */
 .namespace-sidebar {
   position: sticky;
-  top: 2rem;
+  top: calc(var(--header-height) + var(--space-4));
 }
 
 .namespace-card {
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 2rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e5e7eb;
+  padding: var(--space-8);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
   text-align: center;
 }
 
 .namespace-avatar {
+  display: block;
   width: 120px;
   height: 120px;
-  border-radius: 16px;
+  margin: 0 auto var(--space-6);
+  border: 3px solid var(--primary-50);
+  border-radius: var(--radius-lg);
   object-fit: cover;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
-  margin: 0 auto 1.5rem auto;
-  display: block;
-  border: 3px solid #f0f4ff;
+  box-shadow: var(--shadow-sm);
 }
 
 .namespace-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin-bottom: 0.5rem;
-  word-break: break-word;
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--font-size-xl);
   text-align: center;
+  word-break: break-word;
 }
 
+/* --------------------------------------------------------------------------
+   Info list
+   -------------------------------------------------------------------------- */
+
 .namespace-info-list {
-  list-style: none;
+  margin: var(--space-6) 0 0;
   padding: 0;
-  margin: 1.5rem 0 0 0;
+  list-style: none;
   text-align: left;
 }
 
 .namespace-info-item {
   display: flex;
   align-items: center;
-  padding: 0.875rem 1rem;
-  font-size: 0.95rem;
-  color: #4a4a5a;
-  border-radius: 10px;
-  margin-bottom: 0.5rem;
-  background: #f9fafb;
-  transition: all 0.2s ease;
+  margin-bottom: var(--space-2);
+  padding: 0.875rem var(--space-4);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
 .namespace-info-item:last-child {
@@ -66,239 +75,275 @@
 }
 
 .namespace-info-item:hover {
-  background: #f0f4ff;
+  background-color: var(--primary-50);
 }
 
 .namespace-info-icon {
+  flex-shrink: 0;
   width: 20px;
   height: 20px;
-  margin-right: 12px;
-  color: #6366f1;
-  flex-shrink: 0;
+  margin-right: var(--space-3);
+  color: var(--color-brand-solid);
 }
 
 .namespace-info-label {
-  font-weight: 600;
-  color: #374151;
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
 }
 
 .namespace-info-value {
-  color: #4b5563;
-  font-weight: 500;
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
 }
 
-/* Clickable Info Items */
+/* An email address is a single unbreakable token; in a narrow sidebar it has
+   to ellipsize rather than widen the card. The full value stays in the DOM,
+   so it is still selectable and still announced in full. */
+.namespace-info-value--truncate {
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A row that navigates. :focus-within covers keyboard, which the old
+   :hover-only rules did not. */
 .namespace-info-clickable {
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border-radius: 10px;
   margin: 0;
-  padding: 0.875rem 1rem;
+  padding: 0.875rem var(--space-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
-.namespace-info-clickable:hover {
-  background-color: #eef2ff;
+.namespace-info-clickable:hover,
+.namespace-info-clickable:focus-within {
+  background-color: var(--primary-50);
   transform: translateX(4px);
 }
 
-.namespace-info-clickable:hover .namespace-info-icon {
-  color: #4f46e5;
+.namespace-info-clickable:hover .namespace-info-icon,
+.namespace-info-clickable:focus-within .namespace-info-icon {
+  color: var(--color-brand-solid-hover);
 }
 
 .namespace-info-clickable .chevron-icon {
   margin-left: auto;
+  color: var(--color-brand-solid);
   opacity: 0;
-  transition: opacity 0.2s ease;
-  color: #6366f1;
+  transition: opacity var(--duration-fast) var(--ease-standard);
 }
 
-.namespace-info-clickable:hover .chevron-icon {
+/* The chevron is the only cue that a row is clickable, so it appears for
+   keyboard focus too - otherwise the affordance is mouse-only. */
+.namespace-info-clickable:hover .chevron-icon,
+.namespace-info-clickable:focus-within .chevron-icon {
   opacity: 1;
 }
 
-/* Packages Section */
+@media (prefers-reduced-motion: reduce) {
+  .namespace-info-clickable:hover,
+  .namespace-info-clickable:focus-within {
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Packages
+   -------------------------------------------------------------------------- */
+
 .packages-section {
-  background: #ffffff;
-  border-radius: 16px;
+  min-height: 18rem;
   padding: 1.75rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  border: 1px solid #e5e7eb;
-  min-height: 300px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-md);
 }
 
 .packages-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 2px solid #f3f4f6;
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--color-border-subtle);
 }
 
 .packages-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text);
+  font-size: var(--font-size-xl);
 }
 
+/* The accent bar. Brand ramp, so it inverts with the theme. */
 .packages-title::before {
-  content: '';
+  content: "";
   width: 4px;
   height: 24px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    var(--color-brand-solid),
+    var(--color-brand-solid-hover)
+  );
 }
 
 .packages-count {
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: white;
-  padding: 0.5rem 1.25rem;
-  border-radius: 24px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  padding: var(--space-2) var(--space-5);
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    135deg,
+    var(--color-brand-solid),
+    var(--color-brand-solid-hover)
+  );
+  color: var(--color-on-brand-solid);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-sm);
 }
 
 .packages-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .no-packages-message {
+  padding: var(--space-12) var(--space-8);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-muted);
   text-align: center;
-  padding: 4rem 2rem;
-  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
-  border-radius: 12px;
-  color: #6b7280;
-  border: 2px dashed #e5e7eb;
 }
 
 .no-packages-message p {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #9ca3af;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
 }
 
 .no-packages-icon {
-  color: #d1d5db;
-  margin-bottom: 1rem;
+  margin-bottom: var(--space-4);
+  color: var(--color-border-strong);
 }
 
-/* Loading State */
-.namespace-loading {
+/* --------------------------------------------------------------------------
+   Loading
+   -------------------------------------------------------------------------- */
+
+.namespace-loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 400px;
-  color: #6b7280;
+  min-height: 25rem;
+  color: var(--color-text-muted);
 }
 
-.namespace-loading .spinner-border {
+.namespace-loading-state .spinner-border {
   width: 3rem;
   height: 3rem;
-  color: #6366f1;
+  color: var(--color-brand-solid);
 }
 
 .namespace-loading-text {
-  margin-top: 1rem;
-  font-size: 1rem;
-  font-weight: 500;
+  margin-top: var(--space-4);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
 }
 
-/* Responsive Adjustments */
-@media (max-width: 991px) {
+/* --------------------------------------------------------------------------
+   User page stats
+   -------------------------------------------------------------------------- */
+
+.user-stats-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.user-stat-item {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-sunken);
+  text-align: center;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.user-stat-item:hover {
+  background-color: var(--primary-50);
+}
+
+.user-stat-value {
+  color: var(--color-brand-solid);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.user-stat-label {
+  margin-top: var(--space-1);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+}
+
+/* --------------------------------------------------------------------------
+   Narrow screens
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 62em) {
   .namespace-sidebar {
     position: relative;
     top: 0;
-    margin-bottom: 2rem;
+    margin-bottom: var(--space-8);
   }
-  
+
   .namespace-card {
-    text-align: center;
-    max-width: 400px;
+    max-width: 25rem;
     margin: 0 auto;
+    text-align: center;
   }
-  
-  .namespace-avatar {
-    margin-left: auto;
-    margin-right: auto;
-  }
-  
-  .namespace-info-item {
-    justify-content: flex-start;
-  }
-  
+
   .packages-section {
-    padding: 1.5rem;
+    padding: var(--space-6);
   }
 }
 
-@media (max-width: 576px) {
+@media (max-width: 36em) {
   .namespace-container {
-    padding: 1rem 0.5rem;
+    padding: var(--space-4) var(--space-2);
   }
-  
+
   .namespace-card {
-    padding: 1.5rem;
+    padding: var(--space-6);
   }
-  
+
   .namespace-avatar {
     width: 100px;
     height: 100px;
   }
-  
+
   .packages-header {
     flex-direction: column;
-    gap: 0.75rem;
     align-items: flex-start;
+    gap: var(--space-3);
   }
-  
+
   .packages-section {
-    padding: 1.25rem;
+    padding: var(--space-5);
   }
-}
-
-/* User Page Specific Styles */
-.user-stats-container {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #f3f4f6;
-}
-
-.user-stat-item {
-  text-align: center;
-  padding: 0.75rem;
-  background: #f9fafb;
-  border-radius: 10px;
-  transition: all 0.2s ease;
-}
-
-.user-stat-item:hover {
-  background: #f0f4ff;
-}
-
-.user-stat-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #6366f1;
-  line-height: 1.2;
-}
-
-.user-stat-label {
-  font-size: 0.75rem;
-  color: #9ca3af;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-top: 0.25rem;
 }

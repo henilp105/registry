@@ -42,13 +42,15 @@ const Register = () => {
     if (/\d/.test(password)) strength += 1;
     if (/[^a-zA-Z0-9]/.test(password)) strength += 1;
     
-    const labels = ['Very Weak', 'Weak', 'Fair', 'Good', 'Strong'];
-    const colors = ['#dc3545', '#fd7e14', '#ffc107', '#20c997', '#198754'];
-    
-    return { 
-      strength, 
-      label: labels[Math.min(strength, 4)], 
-      color: colors[Math.min(strength, 4)] 
+    // Five buckets, worst to best. The colour was a hard-coded Bootstrap hex
+    // ramp (#dc3545 ... #198754), which is a fifth palette and does not invert
+    // in the dark theme; .password-strength-fill--<n> reads the semantic tokens
+    // instead. Index 0 is the "no password" case and never renders a bar.
+    const labels = ["Very weak", "Weak", "Fair", "Good", "Strong"];
+
+    return {
+      strength,
+      label: labels[Math.min(strength, 4)],
     };
   }, []);
 
@@ -163,10 +165,12 @@ const Register = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <img 
-            src="https://fortran-lang.org/_static/fortran-logo-256x256.png" 
-            alt="FPM Registry" 
+          <img
+            src={`${process.env.PUBLIC_URL}/brand/fortran-logo-256.png`}
+            alt="FPM Registry"
             className="auth-logo"
+            width={64}
+            height={64}
           />
           <h1 className="auth-title">Create Account</h1>
           <p className="auth-subtitle">Join the fpm Registry community</p>
@@ -270,16 +274,19 @@ const Register = () => {
             {formData.password && !formErrors.password && (
               <div className="password-strength">
                 <div className="password-strength-bar">
-                  <div 
-                    className="password-strength-fill"
-                    style={{ 
-                      width: `${passwordStrength.strength * 20}%`,
-                      backgroundColor: passwordStrength.color
-                    }}
+                  <div
+                    className={`password-strength-fill password-strength-fill--${passwordStrength.strength}`}
+                    style={{ width: `${passwordStrength.strength * 20}%` }}
                   />
                 </div>
-                <span className="password-strength-label" style={{ color: passwordStrength.color }}>
-                  {passwordStrength.label}
+                {/* The strength is a security-relevant fact about what the user
+                    just typed, and it changes on every keystroke, so it is
+                    announced rather than only coloured. */}
+                <span
+                  className={`password-strength-label password-strength-label--${passwordStrength.strength}`}
+                  role="status"
+                >
+                  Password strength: {passwordStrength.label}
                 </span>
               </div>
             )}

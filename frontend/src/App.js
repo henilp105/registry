@@ -18,15 +18,75 @@ import AdminSection from "./pages/admin";
 import Archives from "./pages/archives";
 import ForgotPassword from "./pages/forgotpassword";
 import ResetPassword from "./pages/resetpassword";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import 'bootstrap/dist/css/bootstrap.min.css';
+import SessionGuard from "./components/SessionGuard";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import Container from "react-bootstrap/Container";
 
+// Bootstrap is imported once, in src/index.js, in the position the cascade
+// needs. Importing it here as well would load it *after* theme/base.css and
+// let the vendor sheet win the tie against the token layer.
+
+/**
+ * Restores scroll and focus after a client-side navigation.
+ *
+ * Two separate problems, one hook:
+ *
+ * 1. Scroll. react-router does not reset scroll between routes, so scrolling
+ *    halfway down the archives list and clicking a package leaves you
+ *    halfway down the package page - often past the content you wanted.
+ * 2. Focus. On a route change the browser leaves focus on the link you
+ *    clicked, so the next Tab continues from the navbar rather than from the
+ *    top of the new page, and a screen reader does not announce the new page.
+ *    Moving focus to the main landmark fixes both.
+ *
+ * The initial mount is skipped on purpose: on a fresh load the browser has
+ * already put focus at the top of the document, and stealing it into <main>
+ * would suppress the skip link as the first tab stop.
+ */
+const useRouteChangeReset = () => {
+  const { pathname } = useLocation();
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    window.scrollTo(0, 0);
+    const main = document.getElementById("main-content");
+    if (main) {
+      // preventScroll so this does not fight the scrollTo above.
+      main.focus({ preventScroll: true });
+    }
+  }, [pathname]);
+};
+
+/** Mounts useRouteChangeReset. Needs to be inside <BrowserRouter>. */
+const RouteChangeReset = () => {
+  useRouteChangeReset();
+  return null;
+};
 
 function App() {
   return (
     <BrowserRouter>
+      <SessionGuard />
+      <RouteChangeReset />
+      {/* First tab stop on every page. */}
+      <a className="skip-link" href="#main-content">
+        Skip to main content
+      </a>
       <NavbarComponent />
-      <Routes>
+      {/*
+        One <main> for the whole app, here, rather than one per page. It is
+        the skip-link target and the post-navigation focus target, and having a
+        single definition means no page can forget it. Pages that previously
+        rendered their own <main> now render a <div>; nested <main> elements
+        are invalid and screen readers announce the landmark twice.
+      */}
+      <main id="main-content" tabIndex={-1}>
+        <Routes>
         <Route path="/" exact element={<Home />} />
         <Route path="/archives" element={<Archives />} />
         <Route path="/account/login" element={<Login />} />
@@ -53,7 +113,17 @@ function App() {
         <Route path="/namespaces/:namespace" element={<NamespacePage />} />
         <Route path="/admin" element={<AdminSection />} />
         <Route path="*" element={<NoPage />} />
-      </Routes>
+        </Routes>
+      </main>
+      <footer className="app-footer">
+        <Container className="app-footer__inner">
+          <p className="mb-0">
+            The official registry for{" "}
+            <a href="https://fpm.fortran-lang.org/">fpm</a>, the Fortran Package
+            Manager.
+          </p>
+        </Container>
+      </footer>
     </BrowserRouter>
   );
 }

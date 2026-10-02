@@ -5,6 +5,7 @@ import {
   ratePackage,
   resetErrorMessage,
 } from "../store/actions/ratePackageActions";
+import Icon from "../components/Icon";
 
 const RATING_OPTIONS = [
   { value: 1, label: "1 - Poor" },
@@ -105,8 +106,8 @@ const RatePackageForm = ({ namespace, package: packageName, show, onHide }) => {
 
           {message && (
             <Alert variant={isSuccess ? "success" : "danger"} className="mb-0">
-              {isSuccess && <i className="fas fa-check-circle me-2" />}
-              {!isSuccess && <i className="fas fa-exclamation-circle me-2" />}
+              {isSuccess && <Icon name="check-circle" className="me-2" />}
+              {!isSuccess && <Icon name="exclamation-circle" className="me-2" />}
               {message}
             </Alert>
           )}
@@ -127,12 +128,12 @@ const RatePackageForm = ({ namespace, package: packageName, show, onHide }) => {
               </>
             ) : isSuccess ? (
               <>
-                <i className="fas fa-check me-2" />
+                <Icon name="check" className="me-2" />
                 Rated
               </>
             ) : (
               <>
-                <i className="fas fa-star me-2" />
+                <Icon name="star" className="me-2" />
                 Submit Rating
               </>
             )}

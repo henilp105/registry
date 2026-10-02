@@ -54,30 +54,59 @@ export const login = (userIdentifier, password) => async (dispatch) => {
 };
 
 /**
+ * Purge the persisted `auth` slice from localStorage.
+ *
+ * redux-persist writes `persist:root` under this key. Removing it means a
+ * stale access/refresh token cannot be resurrected by a later page load even if
+ * the logout round-trip itself failed.
+ */
+export const PURGE_PERSISTED_AUTH = "PURGE_PERSISTED_AUTH";
+
+const persistedAuthStorageKey = "persist:root";
+
+/**
  * Logout user
+ *
+ * The local session is always torn down, whether or not the server accepts the
+ * call: the old code only dispatched LOGOUT_SUCCESS when the response carried
+ * `code === 200`, so a network error or a non-200 body left the access and
+ * refresh tokens sitting in localStorage.
  * @param {string} accessToken - JWT access token
  */
 export const logout = (accessToken) => async (dispatch) => {
   dispatch({ type: LOGOUT_REQUEST });
 
+  const tearDown = () => {
+    try {
+      if (typeof window !== "undefined" && window.localStorage) {
+        const raw = window.localStorage.getItem(persistedAuthStorageKey);
+        if (raw) {
+          const persisted = JSON.parse(raw);
+          delete persisted.auth;
+          window.localStorage.setItem(persistedAuthStorageKey, JSON.stringify(persisted));
+        }
+      }
+    } catch {
+      // A blocked or corrupt localStorage must not prevent signing out.
+    }
+    dispatch({ type: PURGE_PERSISTED_AUTH });
+    dispatch({ type: LOGOUT_SUCCESS });
+  };
+
+  if (!accessToken) {
+    tearDown();
+    return;
+  }
+
   try {
-    const result = await apiClient.post("/auth/logout", null, {
+    await apiClient.post("/auth/logout", null, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-
-    if (isSuccessResponse(result)) {
-      dispatch({ type: LOGOUT_SUCCESS });
-    } else {
-      dispatch({
-        type: LOGOUT_FAILURE,
-        payload: { error: result.data.message },
-      });
-    }
+    tearDown();
   } catch (error) {
-    dispatch({
-      type: LOGOUT_FAILURE,
-      payload: { error: getErrorMessage(error) },
-    });
+    // Still sign out locally - the token is being discarded either way.
+    tearDown();
+    dispatch({ type: LOGOUT_FAILURE, payload: { error: getErrorMessage(error) } });
   }
 };
 

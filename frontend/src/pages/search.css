@@ -1,0 +1,119 @@
+/* Search results page. */
+
+.search-page {
+  max-width: var(--content-width);
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4) var(--space-12);
+}
+
+.search-page__status {
+  margin-bottom: 0;
+  color: var(--color-text-muted);
+}
+
+.search-page__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.search-page__sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* --------------------------------------------------------------------------
+   Results list
+   -------------------------------------------------------------------------- */
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Staggered entrance. The delay is driven by a custom property set inline
+   from the item index, so the stagger stays in one place rather than being
+   recomputed as a whole animation string per row. */
+.search-results__item {
+  width: 100%;
+  animation: search-item-in var(--duration-base) var(--ease-decelerate) both;
+  animation-delay: calc(var(--index, 0) * 40ms);
+}
+
+@keyframes search-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-results__item {
+    animation: none;
+  }
+}
+
+.search-pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-6);
+}
+
+/* --------------------------------------------------------------------------
+   Empty state
+   -------------------------------------------------------------------------- */
+
+.search-empty {
+  padding: var(--space-12) var(--space-4);
+  text-align: center;
+}
+
+.search-empty__icon {
+  margin-bottom: var(--space-4);
+  color: var(--color-text-subtle);
+}
+
+.search-empty__title {
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-lg);
+}
+
+.search-empty__body {
+  margin-bottom: var(--space-4);
+  color: var(--color-text-muted);
+}
+
+.search-empty__tips {
+  max-width: 31rem;
+  margin: 0 auto;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  text-align: start;
+}
+
+.search-empty__tips-title {
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.search-empty__tips-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--font-size-sm);
+}

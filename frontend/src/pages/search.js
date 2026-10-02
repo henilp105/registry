@@ -8,6 +8,15 @@ import DropdownButton from "react-bootstrap/DropdownButton";
 import Alert from "react-bootstrap/Alert";
 import { searchPackage, setOrderBy } from "../store/actions/searchActions";
 import { useNavigate } from "react-router-dom";
+import Icon from "../components/Icon";
+import "./search.css";
+
+const dropdownOptions = [
+  { value: "None", label: "Relevance" },
+  { value: "Date last updated", label: "Recently Updated" },
+  { value: "name", label: "Name (A-Z)" },
+  { value: "downloads", label: "Most Downloads" },
+];
 
 const Search = () => {
   const dispatch = useDispatch();
@@ -20,17 +29,13 @@ const Search = () => {
   const query = useSelector((state) => state.search.query);
   const isLoading = useSelector((state) => state.search.isLoading);
 
-  const dropdownOptions = [
-    { value: "None", label: "Relevance" },
-    { value: "Date last updated", label: "Recently Updated" },
-    { value: "name", label: "Name (A-Z)" },
-    { value: "downloads", label: "Most Downloads" }
-  ];
-
-  const onDropDownSelect = useCallback((option) => {
-    dispatch(setOrderBy(option));
-    dispatch(searchPackage(query, 0, option));
-  }, [dispatch, query]);
+  const onDropDownSelect = useCallback(
+    (option) => {
+      dispatch(setOrderBy(option));
+      dispatch(searchPackage(query, 0, option));
+    },
+    [dispatch, query]
+  );
 
   useEffect(() => {
     if (query.length === 0 && !isLoading) {
@@ -41,12 +46,10 @@ const Search = () => {
   // Show skeleton loader while loading
   if (isLoading) {
     return (
-      <div className="container" style={{ paddingTop: "1rem" }}>
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <p className="text-muted mb-0">
-            Searching for "<strong>{query}</strong>"...
-          </p>
-        </div>
+      <div className="search-page">
+        <p className="search-page__status">
+          Searching for &ldquo;<strong>{query}</strong>&rdquo;&hellip;
+        </p>
         <SkeletonPackageList count={5} />
       </div>
     );
@@ -55,9 +58,11 @@ const Search = () => {
   // Show error state
   if (error !== null) {
     return (
-      <div className="container" style={{ paddingTop: "1rem" }}>
-        <Alert variant="danger" className="d-flex align-items-center">
-          <i className="fas fa-exclamation-triangle me-2" />
+      <div className="search-page">
+        {/* role="alert" so a failed search is announced rather than silently
+            replacing the previous results. */}
+        <Alert variant="danger" className="d-flex align-items-center" role="alert">
+          <Icon name="exclamation-triangle" className="me-2" />
           {error}
         </Alert>
       </div>
@@ -67,22 +72,27 @@ const Search = () => {
   // Show empty state
   if (packages !== null && packages.length === 0) {
     return (
-      <div className="container" style={{ paddingTop: "1rem" }}>
+      <div className="search-page">
         <EmptySearchState query={query} />
       </div>
     );
   }
 
-  // Show results
+  // Show results. The count is a live region: it changes as the user pages and
+  // re-sorts, and without that the only feedback is a visual rearrangement.
   if (packages !== null) {
     return (
-      <div className="container" style={{ paddingTop: "1rem" }}>
-        <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-          <p className="text-muted mb-0">
-            Found <strong>{packages.length}</strong> package{packages.length !== 1 ? 's' : ''} for "<strong>{query}</strong>"
+      <div className="search-page">
+        <div className="search-page__controls">
+          <p className="search-page__status" aria-live="polite">
+            Found <strong>{packages.length}</strong> package
+            {packages.length !== 1 ? "s" : ""} for &ldquo;
+            <strong>{query}</strong>&rdquo;
           </p>
           <div className="d-flex align-items-center gap-2">
-            <label htmlFor="sort-dropdown" className="text-muted mb-0 small">Sort by:</label>
+            <label htmlFor="sort-dropdown" className="search-page__sort">
+              Sort by:
+            </label>
             <DropdownSortBy
               orderBy={orderBy}
               dropdownOptions={dropdownOptions}
@@ -106,21 +116,16 @@ export default Search;
 
 // Empty search state with suggestions
 const EmptySearchState = ({ query }) => (
-  <div 
-    className="text-center py-5"
-    role="status"
-    aria-live="polite"
-  >
-    <div className="mb-4">
-      <i className="fas fa-search fa-3x text-muted" />
-    </div>
-    <h4 className="mb-3">No packages found</h4>
-    <p className="text-muted mb-4">
-      We couldn't find any packages matching "<strong>{query}</strong>"
+  <div className="search-empty">
+    <Icon name="search" size={48} className="search-empty__icon" />
+    <h1 className="search-empty__title">No packages found</h1>
+    <p className="search-empty__body">
+      We couldn&rsquo;t find any packages matching &ldquo;
+      <strong>{query}</strong>&rdquo;
     </p>
-    <div className="bg-light rounded p-4 mx-auto" style={{ maxWidth: "500px" }}>
-      <h6 className="mb-3">Search tips:</h6>
-      <ul className="text-start text-muted mb-0">
+    <div className="search-empty__tips">
+      <h2 className="search-empty__tips-title">Search tips</h2>
+      <ul className="search-empty__tips-list">
         <li>Check your spelling</li>
         <li>Try more general keywords</li>
         <li>Try different keywords</li>
@@ -130,42 +135,39 @@ const EmptySearchState = ({ query }) => (
   </div>
 );
 
-// Package list with animation
-const ListView = ({ packages, currentPage, totalPages }) => {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-      {packages.map((packageEntity, index) => (
-        <div 
-          key={packageEntity.name + packageEntity.namespace}
-          style={{
-            animation: `fadeIn 0.3s ease-out ${index * 0.05}s both`,
-            width: "100%"
-          }}
-        >
-          <PackageItem packageEntity={packageEntity} />
-        </div>
-      ))}
-      <div className="mt-4 d-flex justify-content-center">
-        <Pagination currentPage={currentPage} totalPages={totalPages} />
+// Package list with a short staggered entrance
+const ListView = ({ packages, currentPage, totalPages }) => (
+  <div className="search-results">
+    {packages.map((packageEntity, index) => (
+      <div
+        key={`${packageEntity.namespace}/${packageEntity.name}`}
+        className="search-results__item"
+        style={{ "--index": index }}
+      >
+        <PackageItem packageEntity={packageEntity} />
       </div>
+    ))}
+    <div className="search-pagination">
+      <Pagination currentPage={currentPage} totalPages={totalPages} />
     </div>
-  );
-};
+  </div>
+);
 
 // Dropdown sort component
 const DropdownSortBy = ({ orderBy, dropdownOptions, onDropDownSelect }) => {
-  const currentOption = dropdownOptions.find(opt => opt.value === orderBy) || dropdownOptions[0];
-  
+  const currentOption =
+    dropdownOptions.find((opt) => opt.value === orderBy) || dropdownOptions[0];
+
   return (
-    <DropdownButton 
+    <DropdownButton
       id="sort-dropdown"
       title={currentOption.label}
       variant="outline-secondary"
       size="sm"
     >
       {dropdownOptions.map((option) => (
-        <Dropdown.Item 
-          key={option.value} 
+        <Dropdown.Item
+          key={option.value}
           onClick={() => onDropDownSelect(option.value)}
           active={orderBy === option.value}
         >

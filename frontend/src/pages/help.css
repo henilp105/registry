@@ -1,0 +1,100 @@
+/* Help guide.
+ *
+ * The page was 71 `style={styles.x}` references against a JS object holding a
+ * fourth brand colour: a blue ramp (#2b6cb0 heading, #3182ce section title,
+ * #4299e1 bullets and code accent) that matched neither the old purple nor
+ * the current brand. All of it is now tokens.
+ *
+ * The step lists were <div>s with an absolutely positioned <div> standing in
+ * for a bullet. They are real <ul>/<li> now, with the marker drawn in CSS, so
+ * they are announced as lists and the bullets cannot drift out of alignment.
+ */
+
+.help {
+  max-width: var(--content-width-readme);
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-4) var(--space-16);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  text-align: left;
+}
+
+.help__title {
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--color-border-subtle);
+  font-size: var(--font-size-3xl);
+}
+
+.help__layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: var(--space-8) 0;
+}
+
+.help__column {
+  flex: 1;
+  min-width: 20rem;
+}
+
+.help__section-title {
+  margin: var(--space-6) 0 var(--space-4);
+  color: var(--color-brand-solid);
+  font-size: var(--font-size-xl);
+}
+
+.help__section-title:first-child {
+  margin-top: 0;
+}
+
+.help__body {
+  margin-bottom: var(--space-4);
+}
+
+/* Inline emphasis inside a step, e.g. "Tokens expire after 7 days". */
+.help__highlight {
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-info-soft);
+  color: var(--color-info-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.help__code {
+  display: block;
+  width: 100%;
+  margin: var(--space-5) 0;
+  padding: var(--space-4) var(--space-5);
+  border-left: 4px solid var(--color-brand-solid);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-sunken);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  overflow-x: auto;
+  text-align: left;
+}
+
+/* The dashed rule is the "these steps belong together" cue. */
+.help__steps {
+  margin: var(--space-5) 0;
+  padding-left: var(--space-5);
+  border-left: 2px dashed var(--color-border);
+  list-style: none;
+}
+
+.help__step {
+  position: relative;
+  margin: var(--space-3) 0;
+  padding-left: var(--space-5);
+}
+
+.help__step::before {
+  content: "";
+  position: absolute;
+  top: 0.55em;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-brand-solid);
+}

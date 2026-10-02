@@ -38,10 +38,15 @@ export const DEPRECATE_PACKAGE_ERROR = DEPRECATE_PACKAGE_FAILURE;
 
 /**
  * Helper to create admin action payload
+ *
+ * `deleteRelease` is the one endpoint that answers 2xx without a `code` key in
+ * the body, so fall back to the HTTP status in that case. `admin.js` derives
+ * the alert colour from `statuscode`, and `undefined >= 200` would paint a
+ * successful delete as a failure.
  */
 const createPayload = (response) => ({
-  statuscode: response.data.code,
-  message: response.data.message,
+  statuscode: response.data?.code ?? response.status,
+  message: response.data?.message,
 });
 
 /**
@@ -185,7 +190,12 @@ export const deleteRelease = (namespaceName, packageName, version, uuid) => asyn
   try {
     const result = await post(`/packages/${namespaceName}/${packageName}/${version}/delete`, { uuid });
 
-    if (isSuccessResponse(result)) {
+    // POST /packages/{ns}/{pkg}/{ver}/delete answers 200 with a bare
+    // `{ message }` and no `code` key, so `isSuccessResponse` would report a
+    // failure even when the release was actually deleted. Accept any 2xx here
+    // rather than loosening `isSuccessResponse` for the other 45 call sites
+    // that legitimately branch on `code === 200`.
+    if (result.status >= 200 && result.status < 300) {
       dispatch({
         type: DELETE_RELEASE_SUCCESS,
         payload: createPayload(result),

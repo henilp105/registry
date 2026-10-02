@@ -1,26 +1,31 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { Container, InputGroup, FormControl, Button } from "react-bootstrap";
 import { searchPackage, setQuery } from "../store/actions/searchActions";
 
 import "../home.css";
+import Icon from "../components/Icon";
 
 const Home = () => {
   return (
     <Container id="home-container">
+      {/* Vendored in public/brand/ rather than hot-linked from
+          raw.githubusercontent.com, so the hero renders with no third-party
+          request and cannot break when that path moves. */}
       <div id="fpm-logo">
-        <img 
-          src="https://raw.githubusercontent.com/fortran-lang/assets/main/fpm/logo/2-color-alt/png/full-color-alt.png" 
-          alt="Fortran Package Manager Logo" 
-          loading="lazy"
+        <img
+          src={`${process.env.PUBLIC_URL}/brand/fpm-wordmark.png`}
+          alt="Fortran Package Manager"
+          width={328}
+          height={120}
         />
       </div>
 
       <HomeSearchField />
-      
+
       <p id="fpm-subscript">The official registry for fpm packages</p>
-      
+
       <QuickLinks />
     </Container>
   );
@@ -30,18 +35,16 @@ export default Home;
 
 function HomeSearchField() {
   const [localQuery, setLocalQuery] = useState("");
-  const [isFocused, setIsFocused] = useState(false);
   const isLoading = useSelector((state) => state.search.isLoading);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const inputRef = useRef(null);
 
-  // Focus the search input on mount
+  // Focus the search input on mount. A ref rather than getElementById, and no
+  // setTimeout: the delay was there to wait for a paint that is not needed, and
+  // it left a timer running after unmount.
   useEffect(() => {
-    const searchInput = document.getElementById("home-search");
-    if (searchInput) {
-      // Slight delay to ensure smooth page load
-      setTimeout(() => searchInput.focus(), 100);
-    }
+    inputRef.current?.focus();
   }, []);
 
   const handleSearch = useCallback(() => {
@@ -65,20 +68,16 @@ function HomeSearchField() {
   };
 
   return (
-    <div 
-      className={`search-container ${isFocused ? 'search-focused' : ''}`}
-      role="search"
-    >
+    <div className="search-container" role="search">
       <InputGroup className="search-input-group">
         <FormControl
+          ref={inputRef}
           type="search"
           placeholder="Search for Fortran packages..."
           id="home-search"
           value={localQuery}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
           aria-label="Search packages"
           autoComplete="off"
         />
@@ -92,7 +91,7 @@ function HomeSearchField() {
           {isLoading ? (
             <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
           ) : (
-            <i className="fas fa-search" aria-hidden="true" />
+            <Icon name="search" />
           )}
         </Button>
       </InputGroup>
@@ -136,9 +135,9 @@ function QuickLinks() {
   const navigate = useNavigate();
 
   const links = [
-    { icon: "fa-book", label: "Documentation", path: "/help" },
-    { icon: "fa-archive", label: "Browse Archives", path: "/archives" },
-    { icon: "fa-user-plus", label: "Get Started", path: "/account/register" }
+    { icon: "book", label: "Documentation", path: "/help" },
+    { icon: "archive", label: "Browse Archives", path: "/archives" },
+    { icon: "user-plus", label: "Get Started", path: "/account/register" }
   ];
 
   return (
@@ -150,7 +149,7 @@ function QuickLinks() {
           onClick={() => navigate(path)}
           type="button"
         >
-          <i className={`fas ${icon}`} aria-hidden="true" />
+          <Icon name={icon} />
           <span>{label}</span>
         </button>
       ))}

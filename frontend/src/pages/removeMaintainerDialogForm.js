@@ -9,6 +9,7 @@ import {
   removeMaintainer,
   resetMessages,
 } from "../store/actions/addRemoveMaintainerActions";
+import Icon from "../components/Icon";
 
 const RemoveMaintainerFormDialog = ({ namespace, package: packageName, show, onHide }) => {
   const [username, setUsername] = useState("");
@@ -105,13 +106,13 @@ const RemoveMaintainerFormDialog = ({ namespace, package: packageName, show, onH
 
           {successMessage && (
             <Alert variant="success" className="mb-0">
-              <i className="fas fa-check-circle me-2" />
+              <Icon name="check-circle" className="me-2" />
               {successMessage}
             </Alert>
           )}
           {errorMessage && (
             <Alert variant="danger" className="mb-0">
-              <i className="fas fa-exclamation-circle me-2" />
+              <Icon name="exclamation-circle" className="me-2" />
               {errorMessage}
             </Alert>
           )}
@@ -133,7 +134,7 @@ const RemoveMaintainerFormDialog = ({ namespace, package: packageName, show, onH
               </>
             ) : (
               <>
-                <i className="fas fa-user-minus me-2" />
+                <Icon name="user-minus" className="me-2" />
                 Remove Maintainer
               </>
             )}

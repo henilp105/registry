@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Container, Row, Col, Card, Form, Button, Alert, Modal } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
-import { MDBIcon } from "mdb-react-ui-kit";
 import {
   adminAuth,
   deleteUser,
@@ -13,6 +12,7 @@ import {
 } from "../store/actions/adminActions";
 import ViewMalicousReports from "./viewMalicousReports";
 import NoPage from "./404";
+import Icon from "../components/Icon";
 
 const AdminSection = () => {
   const dispatch = useDispatch();
@@ -190,14 +190,14 @@ const AdminSection = () => {
       <Card className="mb-4">
         <Card.Header>
           <h5 className="mb-0">
-            <MDBIcon fas icon="flag" className="me-2" />
+            <Icon name="flag" className="me-2" />
             Malicious Reports
           </h5>
         </Card.Header>
         <Card.Body>
           <p className="text-muted mb-3">View and manage user-submitted malicious package reports.</p>
           <Button onClick={() => handleShowReports(true)}>
-            <MDBIcon fas icon="eye" className="me-2" />
+            <Icon name="eye" className="me-2" />
             View Reports
           </Button>
         </Card.Body>
@@ -208,7 +208,7 @@ const AdminSection = () => {
           <Card className="h-100">
             <Card.Header className="bg-danger text-white">
               <h5 className="mb-0">
-                <MDBIcon fas icon="trash-alt" className="me-2" />
+                <Icon name="trash-alt" className="me-2" />
                 Delete Package
               </h5>
             </Card.Header>
@@ -244,7 +244,7 @@ const AdminSection = () => {
           <Card className="h-100">
             <Card.Header className="bg-danger text-white">
               <h5 className="mb-0">
-                <MDBIcon fas icon="tag" className="me-2" />
+                <Icon name="tag" className="me-2" />
                 Delete Release
               </h5>
             </Card.Header>
@@ -290,7 +290,7 @@ const AdminSection = () => {
           <Card className="h-100">
             <Card.Header className="bg-warning">
               <h5 className="mb-0">
-                <MDBIcon fas icon="archive" className="me-2" />
+                <Icon name="archive" className="me-2" />
                 Deprecate Package
               </h5>
             </Card.Header>
@@ -326,7 +326,7 @@ const AdminSection = () => {
           <Card className="h-100">
             <Card.Header className="bg-danger text-white">
               <h5 className="mb-0">
-                <MDBIcon fas icon="folder-minus" className="me-2" />
+                <Icon name="folder-minus" className="me-2" />
                 Delete Namespace
               </h5>
             </Card.Header>
@@ -352,7 +352,7 @@ const AdminSection = () => {
           <Card className="h-100">
             <Card.Header className="bg-danger text-white">
               <h5 className="mb-0">
-                <MDBIcon fas icon="user-minus" className="me-2" />
+                <Icon name="user-minus" className="me-2" />
                 Delete User
               </h5>
             </Card.Header>
@@ -380,13 +380,22 @@ const AdminSection = () => {
         onHide={() => handleShowReports(false)}
       />
 
-      <Modal show={modalData.showModal} onHide={closeModal} centered>
+      {/* aria-labelledby gives the dialog an accessible name; without it the
+          title is visible but unannounced. */}
+      <Modal
+        show={modalData.showModal}
+        onHide={closeModal}
+        centered
+        aria-labelledby="admin-confirm-modal"
+      >
         <Modal.Header closeButton>
-          <Modal.Title>{modalData.modalTitle}</Modal.Title>
+          <Modal.Title id="admin-confirm-modal">
+            {modalData.modalTitle}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <div className="d-flex align-items-center">
-            <MDBIcon fas icon="exclamation-triangle" className="text-warning me-3" size="2x" />
+            <Icon name="exclamation-triangle" className="text-warning me-3" />
             <span>{modalData.modalMessage}</span>
           </div>
         </Modal.Body>

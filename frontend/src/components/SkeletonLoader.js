@@ -6,16 +6,21 @@ import './SkeletonLoader.css';
  * Shows animated placeholders while content is loading.
  */
 
-// Basic skeleton shape
-export const Skeleton = ({ 
-  width = '100%', 
-  height = '1rem', 
-  borderRadius = '4px',
-  className = '' 
+// Basic skeleton shape.
+//
+// The width/height/borderRadius props are genuinely per-call-site (a 300px
+// title bar is not a 100% one), so they stay inline; the colours, motion and
+// everything else live in SkeletonLoader.css. `fill` was a JS default that no
+// caller ever passed, so the default radius comes from CSS now.
+export const Skeleton = ({
+  width = '100%',
+  height = '1rem',
+  className = '',
+  circle = false
 }) => (
-  <div 
-    className={`skeleton ${className}`}
-    style={{ width, height, borderRadius }}
+  <div
+    className={`skeleton${circle ? ' skeleton--circle' : ''} ${className}`}
+    style={{ width, height }}
     aria-hidden="true"
   />
 );
@@ -36,10 +41,10 @@ export const SkeletonText = ({ lines = 1, lastLineWidth = '60%' }) => (
 
 // Avatar skeleton
 export const SkeletonAvatar = ({ size = 60 }) => (
-  <Skeleton 
-    width={`${size}px`} 
-    height={`${size}px`} 
-    borderRadius="50%" 
+  <Skeleton
+    width={`${size}px`}
+    height={`${size}px`}
+    circle
   />
 );
 
@@ -57,9 +62,9 @@ export const SkeletonPackageCard = () => (
       <SkeletonText lines={2} lastLineWidth="80%" />
     </div>
     <div className="skeleton-package-tags">
-      <Skeleton width="60px" height="24px" borderRadius="12px" />
-      <Skeleton width="80px" height="24px" borderRadius="12px" />
-      <Skeleton width="50px" height="24px" borderRadius="12px" />
+      <Skeleton className="skeleton--pill" width="60px" height="24px" />
+      <Skeleton className="skeleton--pill" width="80px" height="24px" />
+      <Skeleton className="skeleton--pill" width="50px" height="24px" />
     </div>
   </div>
 );
@@ -83,18 +88,21 @@ export const SkeletonDashboardCard = () => (
       <SkeletonText lines={2} />
     </div>
     <div className="skeleton-card-actions mt-3">
-      <Skeleton width="120px" height="32px" borderRadius="16px" />
-      <Skeleton width="120px" height="32px" borderRadius="16px" />
+      <Skeleton className="skeleton--pill" width="120px" height="32px" />
+      <Skeleton className="skeleton--pill" width="120px" height="32px" />
     </div>
   </div>
 );
 
 // Table row skeleton
+//
+// The column widths were randomised with Math.random() in render, so the
+// layout shifted on every re-render. Derived from the index instead.
 export const SkeletonTableRow = ({ columns = 4 }) => (
   <tr className="skeleton-table-row">
     {Array.from({ length: columns }).map((_, index) => (
       <td key={index}>
-        <Skeleton width={`${60 + Math.random() * 30}%`} height="1rem" />
+        <Skeleton width={`${60 + ((index * 13) % 30)}%`} height="1rem" />
       </td>
     ))}
   </tr>

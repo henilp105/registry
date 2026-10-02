@@ -1,0 +1,85 @@
+/* Search-results pagination.
+ *
+ * Rebuilt as a plain <nav><ul><button> list. It was previously assembled from
+ * MDBPagination / MDBPaginationItem / MDBPaginationLink, which are anchors with
+ * no href, so nothing was reachable by keyboard and the disabled state was
+ * carried by a conditional `style` cursor rather than the attribute. Real
+ * <button disabled> gets focus handling, activation and assistive-tech state
+ * for free.
+ */
+
+.pagination {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.pagination__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pagination__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.pagination__link:hover:not(:disabled) {
+  background-color: var(--color-surface-sunken);
+  border-color: var(--color-border-strong);
+  color: var(--color-link);
+}
+
+.pagination__link:disabled {
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+.pagination__link--active,
+.pagination__link--active:hover {
+  border-color: var(--color-brand-solid);
+  background-color: var(--color-brand-solid);
+  color: var(--color-on-brand-solid);
+  cursor: default;
+}
+
+/* The "…" separators carry no information a screen reader needs; they are
+   marked aria-hidden at the call site. */
+.pagination__gap {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0 var(--space-1);
+  color: var(--color-text-subtle);
+}
+
+.pagination__status {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-xs);
+}

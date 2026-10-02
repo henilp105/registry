@@ -10,6 +10,7 @@ import {
   generatePackageToken,
   resetMessages,
 } from "../store/actions/generatePackageTokenActions";
+import Icon from "../components/Icon";
 
 const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show, onHide }) => {
   const [copied, setCopied] = useState(false);
@@ -74,7 +75,7 @@ const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show,
         {uploadToken && (
           <div className="mb-3">
             <Form.Label className="text-success">
-              <i className="fas fa-check-circle me-2" />
+              <Icon name="check-circle" className="me-2" />
               Token Generated Successfully
             </Form.Label>
             <InputGroup>
@@ -89,9 +90,9 @@ const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show,
                 onClick={handleCopy}
               >
                 {copied ? (
-                  <><i className="fas fa-check me-1" /> Copied</>
+                  <><Icon name="check" className="me-1" /> Copied</>
                 ) : (
-                  <><i className="fas fa-copy me-1" /> Copy</>
+                  <><Icon name="copy" className="me-1" /> Copy</>
                 )}
               </Button>
             </InputGroup>
@@ -103,13 +104,13 @@ const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show,
 
         {successMessage && !uploadToken && (
           <Alert variant="success" className="mb-0">
-            <i className="fas fa-check-circle me-2" />
+            <Icon name="check-circle" className="me-2" />
             {successMessage}
           </Alert>
         )}
         {errorMessage && (
           <Alert variant="danger" className="mb-0">
-            <i className="fas fa-exclamation-circle me-2" />
+            <Icon name="exclamation-circle" className="me-2" />
             {errorMessage}
           </Alert>
         )}
@@ -131,7 +132,7 @@ const GeneratePackageTokenDialogForm = ({ namespace, package: packageName, show,
               </>
             ) : (
               <>
-                <i className="fas fa-key me-2" />
+                <Icon name="key" className="me-2" />
                 Generate Token
               </>
             )}

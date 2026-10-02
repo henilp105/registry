@@ -1,0 +1,139 @@
+/* Registry archives page.
+ *
+ * Same situation as help.js: a `styles` object holding the old Chakra blue
+ * ramp (#2b6cb0 / #3182ce / #718096 / #e2e8f0). Now tokens.
+ */
+
+.archives {
+  max-width: var(--content-width-readme);
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-4) var(--space-16);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  text-align: left;
+}
+
+.archives__title {
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--color-border-subtle);
+  font-size: var(--font-size-3xl);
+}
+
+.archives__section-title {
+  margin: var(--space-6) 0 var(--space-4);
+  color: var(--color-brand-solid);
+  font-size: var(--font-size-xl);
+}
+
+.archives__section-title:first-child {
+  margin-top: 0;
+}
+
+.archives__body {
+  margin-bottom: var(--space-4);
+  padding-left: var(--space-6);
+}
+
+.archives__body--plain {
+  padding-left: 0;
+}
+
+.archives__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-5);
+  margin: var(--space-6) 0;
+}
+
+.archives__card {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-xs);
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard);
+}
+
+/* :focus-within so the card lifts for keyboard users tabbing to its link,
+   not only on mouse hover. The old style object tried to do this with a
+   nested "&:hover" key, which is styled-components syntax and did nothing at
+   all in a React style prop. */
+.archives__card:hover,
+.archives__card:focus-within {
+  transform: translateY(-3px);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .archives__card:hover,
+  .archives__card:focus-within {
+    transform: none;
+  }
+}
+
+.archives__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-link);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.archives__link:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}
+
+.archives__icon {
+  flex-shrink: 0;
+  color: var(--color-brand-solid);
+}
+
+.archives__meta {
+  margin-top: var(--space-2);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-sm);
+}
+
+.archives__note {
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-sunken);
+}
+
+.archives__note-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-text-muted);
+}
+
+.archives__highlight {
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-warning-soft);
+  color: var(--color-warning-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.archives__empty {
+  padding: var(--space-10) var(--space-4);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.archives__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 60vh;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}

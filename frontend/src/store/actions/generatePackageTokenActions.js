@@ -33,7 +33,10 @@ export const generatePackageToken = (data) => async (dispatch) => {
         type: GENERATE_PACKAGE_TOKEN_SUCCESS,
         payload: {
           message: result.data.message,
-          uploadToken: result.data.uploadToken,
+          // The package token endpoint answers `upload_token` while the
+          // namespace one answers `uploadToken` (docs/API_CONTRACT.md §7.4).
+          // Read both so the dialog works against either spelling.
+          uploadToken: result.data.upload_token ?? result.data.uploadToken,
         },
       });
     } else {

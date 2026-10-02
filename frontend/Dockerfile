@@ -20,6 +20,11 @@ COPY . .
 # Set production mode for build
 ENV NODE_ENV=production
 
+# REACT_APP_REGISTRY_API_URL is inlined by DefinePlugin, so it has to be present
+# before `npm run build` runs. Defaults to whatever .env.production holds.
+ARG REACT_APP_REGISTRY_API_URL=https://registry.fortran-lang.org
+ENV REACT_APP_REGISTRY_API_URL=${REACT_APP_REGISTRY_API_URL}
+
 # Build the production bundle
 RUN npm run build
 

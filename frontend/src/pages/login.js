@@ -5,10 +5,21 @@ import { login, resetErrorMessage } from "../store/actions/authActions";
 import { InfoCircle, ExclamationCircleFill, Eye, EyeSlash } from "react-bootstrap-icons";
 import "./auth.css";
 
-const Tooltip = ({ text }) => (
-  <span className="auth-tooltip">
-    <InfoCircle className="auth-tooltip-icon" />
-    <span className="auth-tooltip-text">{text}</span>
+/** Inline hint attached to a field label.
+ *
+ *  The visible bubble is aria-hidden and the text is exposed once via
+ *  aria-describedby on the input instead. Without that, a screen reader
+ *  announced the same hint twice (once from the bubble, once from the
+ *  describedby) - and the bubble was hover-only, so it could not be reached
+ *  by keyboard at all. The .auth-tooltip-text CSS now also opens on
+ *  :focus-within, so sighted keyboard users see it too.
+ */
+const Tooltip = ({ text, id }) => (
+  <span className="auth-tooltip" tabIndex={0}>
+    <InfoCircle className="auth-tooltip-icon" aria-hidden="true" />
+    <span className="auth-tooltip-text" id={id} role="tooltip">
+      {text}
+    </span>
   </span>
 );
 
@@ -94,9 +105,9 @@ const Login = () => {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <img 
-            src="https://fortran-lang.org/_static/fortran-logo-256x256.png" 
-            alt="FPM Registry" 
+          <img
+            src={`${process.env.PUBLIC_URL}/brand/fortran-logo-256.png`}
+            alt="FPM Registry"
             className="auth-logo"
           />
           <h1 className="auth-title">Welcome Back</h1>
@@ -104,7 +115,7 @@ const Login = () => {
         </div>
         
         {errorMessage && (
-          <div className="auth-alert auth-alert-error">
+          <div className="auth-alert auth-alert-error" role="alert">
             <ExclamationCircleFill className="auth-alert-icon" />
             <span>{errorMessage}</span>
           </div>
@@ -114,7 +125,10 @@ const Login = () => {
           <div className="auth-form-group">
             <label htmlFor="user_identifier" className="auth-label">
               Email or Username
-              <Tooltip text="Enter the email or username you used during registration" />
+              <Tooltip
+                id="user_identifier-hint"
+                text="Enter the email or username you used during registration"
+              />
             </label>
             <input
               id="user_identifier"
@@ -127,6 +141,8 @@ const Login = () => {
               onBlur={() => handleBlur('user_identifier')}
               autoComplete="username"
               autoFocus
+              aria-describedby="user_identifier-hint"
+              aria-invalid={!!(touched.user_identifier && formValidationErrors.user_identifier)}
             />
             {touched.user_identifier && formValidationErrors.user_identifier && (
               <div className="auth-error">
@@ -151,11 +167,16 @@ const Login = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 onBlur={() => handleBlur('password')}
                 autoComplete="current-password"
+                aria-invalid={!!(touched.password && formValidationErrors.password)}
               />
+              {/* aria-pressed, because this is a toggle: the state is which
+                  mode the field is in, and it is not conveyed by the label
+                  alone ("Show password" while it is already showing). */}
               <button
                 type="button"
                 onClick={togglePasswordVisibility}
                 className="auth-password-toggle"
+                aria-pressed={showPassword}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
@@ -169,10 +190,8 @@ const Login = () => {
             )}
           </div>
 
-          <div style={{ textAlign: 'right', marginBottom: '1rem' }}>
-            <Link to="/account/forgot-password" style={{ color: '#6366f1', fontSize: '0.875rem', textDecoration: 'none' }}>
-              Forgot password?
-            </Link>
+          <div className="auth-forgot">
+            <Link to="/account/forgot-password">Forgot password?</Link>
           </div>
 
           <button 
@@ -193,7 +212,8 @@ const Login = () => {
 
         <div className="auth-links">
           <p>
-            Don't have an account? <Link to="/account/register">Create one</Link>
+            Don&rsquo;t have an account?{" "}
+            <Link to="/account/register">Create one</Link>
           </p>
         </div>
       </div>

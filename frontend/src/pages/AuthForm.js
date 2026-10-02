@@ -16,6 +16,8 @@ import {
   InputGroup
 } from "react-bootstrap";
 import { Eye, EyeSlash } from "react-bootstrap-icons";
+import Icon from "../components/Icon";
+import "./AuthForm.css";
 
 const AuthForm = ({ isLogin }) => {
   const [formData, setFormData] = useState({
@@ -105,25 +107,11 @@ const AuthForm = ({ isLogin }) => {
   const passwordStrength = getPasswordStrength(formData.password);
 
   return (
-    <Container 
-      className="min-vh-10 d-flex align-items-center justify-content-center p-4"
-      style={{
-        // background: "linear-gradient(to bottom right, #dbeafe, white, #f5f3ff)"
-      }}
-    >
-      <div className="w-100" style={{ maxWidth: "450px" }}>
+    <Container className="authform-page">
+      <div className="authform-page__inner">
         {/* Logo and Header */}
         <div className="text-center mb-4">
-          <h1 
-            className="fw-bold mb-2"
-            style={{
-              background: "linear-gradient(to right, #3b82f6, #8b5cf6)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent"
-            }}
-          >
-            fpm registry
-          </h1>
+          <h1 className="authform-page__title">fpm registry</h1>
           <p className="text-muted">
             {isLogin 
               ? "Welcome back! Sign in to your account" 
@@ -131,18 +119,12 @@ const AuthForm = ({ isLogin }) => {
           </p>
         </div>
 
-        <Card 
-          className="shadow-lg border-0 overflow-hidden"
-          style={{
-            background: "rgba(255, 255, 255, 0.8)",
-            backdropFilter: "blur(4px)"
-          }}
-        >
-          <Card.Header className="bg-white border-0 pb-0">
-            <Card.Title className="text-center fs-3 fw-semibold">
+        <Card className="authform-card overflow-hidden">
+          <Card.Header className="border-0 pb-0 bg-transparent">
+            <Card.Title className="authform-card__title">
               {isLogin ? "Sign In" : "Create Account"}
             </Card.Title>
-            <Card.Text className="text-center text-muted">
+            <Card.Text className="authform-card__subtitle">
               {isLogin
                 ? "Enter your credentials to access your account"
                 : "Fill in your information to create a new account"}
@@ -153,14 +135,14 @@ const AuthForm = ({ isLogin }) => {
             {/* Alert Messages */}
             {error && (
               <Alert variant="danger" className="d-flex align-items-center py-2">
-                <i className="bi bi-exclamation-circle me-2"></i>
+                <Icon name="exclamation-circle" className="me-2" />
                 <span>{error}</span>
               </Alert>
             )}
 
             {message && (
               <Alert variant="success" className="d-flex align-items-center py-2">
-                <i className="bi bi-check-circle me-2"></i>
+                <Icon name="check-circle" className="me-2" />
                 <span>{message}</span>
               </Alert>
             )}
@@ -180,7 +162,7 @@ const AuthForm = ({ isLogin }) => {
                     className={`${errors.username ? "border-danger" : "border-primary"} w-100 fw-medium py-2`}
                   />
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
-                    <i className="bi bi-exclamation-circle me-1"></i>
+                    <Icon name="exclamation-circle" className="me-1" size={13} />
                     {errors.username}
                   </Form.Control.Feedback>
                 </Form.Group>
@@ -200,7 +182,7 @@ const AuthForm = ({ isLogin }) => {
                     className={`${errors.user_identifier ? "border-danger" : "border-primary"} w-100 fw-medium py-2`}
                   />
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
-                    <i className="bi bi-exclamation-circle me-1"></i>
+                    <Icon name="exclamation-circle" className="me-1" size={13} />
                     {errors.user_identifier}
                   </Form.Control.Feedback>
                 </Form.Group>
@@ -217,7 +199,7 @@ const AuthForm = ({ isLogin }) => {
                     className={`${errors.email ? "border-danger" : "border-primary"} w-100 fw-medium py-2`}
                   />
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
-                    <i className="bi bi-exclamation-circle me-1"></i>
+                    <Icon name="exclamation-circle" className="me-1" size={13} />
                     {errors.email}
                   </Form.Control.Feedback>
                 </Form.Group>
@@ -250,35 +232,26 @@ const AuthForm = ({ isLogin }) => {
 
                 {/* Password strength indicator for signup */}
                 {!isLogin && formData.password && (
-                  <div className="mt-2">
-                    <div className="d-flex gap-1">
+                  <div>
+                    <div className="authform-strength">
                       {[1, 2, 3].map((level) => (
                         <div
                           key={level}
-                          className="flex-grow-1 rounded"
-                          style={{
-                            height: "4px",
-                            backgroundColor: passwordStrength.strength >= level
-                              ? level === 1
-                                ? "#ef4444"
-                                : level === 2
-                                  ? "#f59e0b"
-                                  : "#10b981"
-                              : "#e5e7eb",
-                          }}
+                          className={`authform-strength__bar${
+                            passwordStrength.strength >= level
+                              ? ` authform-strength__bar--filled-${
+                                  ["", "weak", "medium", "strong"][level]
+                                }`
+                              : ""
+                          }`}
                         />
                       ))}
                     </div>
                     {passwordStrength.label && (
-                      <div 
-                        className="small mt-1"
-                        style={{
-                          color: passwordStrength.strength === 1
-                            ? "#ef4444"
-                            : passwordStrength.strength === 2
-                              ? "#f59e0b"
-                              : "#10b981"
-                        }}
+                      <div
+                        className={`authform-strength__label authform-strength__label--${
+                          ["", "weak", "medium", "strong"][passwordStrength.strength]
+                        }`}
                       >
                         Password strength: {passwordStrength.label}
                       </div>
@@ -288,23 +261,18 @@ const AuthForm = ({ isLogin }) => {
 
                 {errors.password && (
                   <Form.Control.Feedback type="invalid" className="d-flex align-items-center">
-                    <i className="bi bi-exclamation-circle me-1"></i>
+                    <Icon name="exclamation-circle" className="me-1" size={13} />
                     {errors.password}
                   </Form.Control.Feedback>
                 )}
               </Form.Group>
 
               {/* Submit Button */}
-              <Button 
+              <Button
                 variant="primary"
-                type="submit" 
-                className="w-100 fw-medium py-2"
+                type="submit"
+                className="authform-submit py-2"
                 disabled={isLoading}
-                style={{
-                  background: "linear-gradient(to right, #3b82f6, #8b5cf6)",
-                  border: "none",
-                  transition: "all 0.2s"
-                }}
               >
                 {isLoading ? (
                   <>
@@ -327,15 +295,14 @@ const AuthForm = ({ isLogin }) => {
             </Form>
 
             {/* Toggle between login/signup */}
-            <div className="text-center mt-4 pt-3 border-top">
-              <p className="text-muted mb-0">
-                {isLogin 
-                  ? "Don't have an account?" 
+            <div className="authform-switch">
+              <p className="mb-0">
+                {isLogin
+                  ? "Don\u2019t have an account?"
                   : "Already have an account?"}{" "}
-                <Link 
-                  to={isLogin ? "/account/register" : "/account/login"} 
-                  className="text-decoration-none fw-medium"
-                  style={{ color: "#3b82f6" }}
+                <Link
+                  to={isLogin ? "/account/register" : "/account/login"}
+                  className="authform-switch__link"
                 >
                   {isLogin ? "Sign up" : "Sign in"}
                 </Link>
@@ -344,22 +311,16 @@ const AuthForm = ({ isLogin }) => {
           </Card.Body>
         </Card>
 
-        {/* Footer */}
+        {/* Footer. /terms and /privacy are not routes in this app - both
+            resolve to the 404 page. Left as-is rather than removed, since
+            dropping the links is a product decision, not a styling one. */}
         <p className="text-center text-muted small mt-4">
           By continuing, you agree to our{" "}
-          <Link 
-            to="/terms" 
-            className="text-decoration-none"
-            style={{ color: "#4b5563" }}
-          >
+          <Link to="/terms" className="authform-switch__link">
             Terms of Service
           </Link>{" "}
           and{" "}
-          <Link 
-            to="/privacy" 
-            className="text-decoration-none"
-            style={{ color: "#4b5563" }}
-          >
+          <Link to="/privacy" className="authform-switch__link">
             Privacy Policy
           </Link>
         </p>

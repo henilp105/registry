@@ -1,0 +1,147 @@
+/* Package detail page. */
+
+.package-page {
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-12);
+}
+
+/* --------------------------------------------------------------------------
+   Title block
+   -------------------------------------------------------------------------- */
+
+.package-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-2xl);
+}
+
+.package-title__namespace {
+  color: var(--color-brand-solid);
+  text-decoration: none;
+}
+
+.package-title__namespace:hover {
+  color: var(--color-brand-solid-hover);
+  text-decoration: underline;
+}
+
+.package-title__separator {
+  color: var(--color-text-subtle);
+}
+
+.package-subtitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.package-section-title {
+  margin-bottom: var(--space-5);
+  font-size: var(--font-size-lg);
+  text-align: left;
+}
+
+/* --------------------------------------------------------------------------
+   Tabs
+   -------------------------------------------------------------------------- */
+
+.package-tabs {
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.package-tabs__link {
+  display: flex;
+  align-items: center;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.package-tabs__link:hover {
+  border-bottom-color: var(--color-brand-outline);
+  color: var(--color-brand-solid);
+}
+
+.package-tabs__link.active {
+  border-bottom-color: var(--color-brand-solid);
+  background-color: transparent;
+  color: var(--color-brand-solid);
+}
+
+/* --------------------------------------------------------------------------
+   Versions table
+   -------------------------------------------------------------------------- */
+
+.package-versions td:first-child,
+.package-versions td:nth-child(2) {
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Sidebar
+   -------------------------------------------------------------------------- */
+
+.package-sidebar__heading {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-widest);
+  text-transform: uppercase;
+}
+
+.package-sidebar__value {
+  font-size: var(--font-size-sm);
+}
+
+/* The install snippet is machine-shaped and has to survive a narrow column
+   without pushing the page sideways. */
+.package-install-command {
+  display: block;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-sunken);
+  font-size: var(--font-size-xs);
+  word-break: break-all;
+}
+
+.package-install-command__copy {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+}
+
+/* --------------------------------------------------------------------------
+   Empty / not-found state
+   -------------------------------------------------------------------------- */
+
+.package-empty {
+  padding-top: var(--space-16);
+  padding-bottom: var(--space-12);
+  text-align: center;
+}
+
+.package-empty__icon {
+  margin-bottom: var(--space-3);
+  color: var(--color-warning-solid);
+}
+
+.package-empty__title {
+  font-size: var(--font-size-xl);
+}

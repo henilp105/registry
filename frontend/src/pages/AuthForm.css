@@ -1,0 +1,161 @@
+/* Login / register form (AuthForm).
+ *
+ * Scoped with an `authform-` prefix on purpose. The stylesheet is global, and
+ * auth.css already defines `.auth-card`, `.auth-title` and friends for the
+ * other four auth pages - an unprefixed `.auth-card` here silently restyled
+ * those too, depending on which sheet happened to be imported last.
+ *
+ * The page previously painted a blue-to-violet gradient (#3b82f6 -> #8b5cf6)
+ * on the heading and the submit button, and used a translucent white card over
+ * a hard-coded gradient background. Neither could survive a dark theme, and
+ * the gradient was a different brand colour from the one the rest of the app
+ * uses. The heading and button now use the brand ramp, so light and dark are
+ * the same hue at different lightness.
+ */
+
+.authform-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - var(--header-height));
+  padding: var(--space-6) var(--space-4);
+}
+
+.authform-page__inner {
+  width: 100%;
+  max-width: 28rem;
+}
+
+.authform-page__title {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  /* The gradient-text effect, but built from the brand ramp rather than a
+     fixed blue/violet pair. background-clip needs a transparent fill for the
+     gradient to show through. */
+  background: linear-gradient(
+    to right,
+    var(--primary-600),
+    var(--primary-400)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Solid, not translucent: a backdrop-filter over an unknown backdrop is
+   unreadable in dark mode, and this is the card the form lives in. */
+.authform-card {
+  border: 0;
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.authform-card__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.authform-card__subtitle {
+  margin-bottom: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Password strength meter
+   -------------------------------------------------------------------------- */
+
+.authform-strength {
+  display: flex;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.authform-strength__bar {
+  flex: 1;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-inset);
+  transition: background-color var(--duration-base) var(--ease-standard);
+}
+
+.authform-strength__bar--filled-weak {
+  background-color: var(--color-danger-solid);
+}
+
+.authform-strength__bar--filled-medium {
+  background-color: var(--color-warning-solid);
+}
+
+.authform-strength__bar--filled-strong {
+  background-color: var(--color-success-solid);
+}
+
+.authform-strength__label {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-xs);
+}
+
+.authform-strength__label--weak {
+  color: var(--color-danger-text);
+}
+
+.authform-strength__label--medium {
+  color: var(--color-warning-text);
+}
+
+.authform-strength__label--strong {
+  color: var(--color-success-text);
+}
+
+/* --------------------------------------------------------------------------
+   Submit
+   -------------------------------------------------------------------------- */
+
+.authform-submit {
+  width: 100%;
+  border: 0;
+  font-weight: var(--font-weight-medium);
+  background: linear-gradient(
+    to right,
+    var(--color-brand-solid),
+    var(--color-brand-solid-hover)
+  );
+  transition: filter var(--duration-base) var(--ease-standard);
+}
+
+.authform-submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.authform-submit:disabled {
+  filter: none;
+  opacity: 0.65;
+}
+
+/* --------------------------------------------------------------------------
+   Switch between login and register
+   -------------------------------------------------------------------------- */
+
+.authform-switch {
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.authform-switch__link {
+  color: var(--color-link);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.authform-switch__link:hover {
+  color: var(--color-link-hover);
+  text-decoration: underline;
+}

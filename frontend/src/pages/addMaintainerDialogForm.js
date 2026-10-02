@@ -9,6 +9,7 @@ import {
   addMaintainer,
   resetMessages,
 } from "../store/actions/addRemoveMaintainerActions";
+import Icon from "../components/Icon";
 
 const AddMaintainerFormDialog = ({ namespace, package: packageName, show, onHide }) => {
   const [username, setUsername] = useState("");
@@ -105,13 +106,13 @@ const AddMaintainerFormDialog = ({ namespace, package: packageName, show, onHide
 
           {successMessage && (
             <Alert variant="success" className="mb-0">
-              <i className="fas fa-check-circle me-2" />
+              <Icon name="check-circle" className="me-2" />
               {successMessage}
             </Alert>
           )}
           {errorMessage && (
             <Alert variant="danger" className="mb-0">
-              <i className="fas fa-exclamation-circle me-2" />
+              <Icon name="exclamation-circle" className="me-2" />
               {errorMessage}
             </Alert>
           )}
@@ -133,7 +134,7 @@ const AddMaintainerFormDialog = ({ namespace, package: packageName, show, onHide
               </>
             ) : (
               <>
-                <i className="fas fa-plus me-2" />
+                <Icon name="plus" className="me-2" />
                 Add Maintainer
               </>
             )}

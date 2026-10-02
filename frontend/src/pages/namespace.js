@@ -66,7 +66,7 @@ const NamespacePage = () => {
 
   if (isLoading) {
     return (
-      <Container className="namespace-loading">
+      <Container className="namespace-loading-state">
         <Spinner animation="border" role="status">
           <span className="visually-hidden">Loading...</span>
         </Spinner>
