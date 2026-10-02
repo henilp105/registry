@@ -83,14 +83,14 @@ export async function handleTarballRoutes(
   if (method !== "GET" && method !== "HEAD") return null;
 
   if (prefix === "tarballs" && segments.length === 4) {
-    return serveTarball(env, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
+    return serveTarball(env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
   }
   if (prefix === "download" && segments.length === 4) {
-    return serveTarball(env, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
+    return serveTarball(env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
   }
   if (prefix === "tarballs" && segments.length === 5) {
     // /tarballs/{ns}/{pkg}/{version}/{artifact}
-    return serveTarball(env, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
+    return serveTarball(env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
   }
 
   void url;
@@ -112,10 +112,14 @@ function stripExt(value: string): string {
  */
 async function serveTarball(
   env: Env,
+  ctx: ExecutionContext,
   namespace: string,
   packageName: string,
   version: string,
 ): Promise<Response> {
+  // Count the fetch without making the download wait on a DB write: the
+  // increment rides along on ctx.waitUntil after the response is produced.
+  ctx.waitUntil(recordDownload(env, { name: packageName, namespace_name: namespace }));
   if (!SEGMENT.test(namespace) || !SEGMENT.test(packageName) || !SEGMENT.test(version)) {
     return jsonError(400, "Invalid tarball path");
   }
@@ -174,12 +178,19 @@ async function serveTarball(
  * the stored figure. A registry needs an approximate count, not an exact one
  * that costs a write per fetch.
  */
-export async function recordDownload(env: Env, packageId: unknown): Promise<void> {
+export async function recordDownload(env: Env, packageIdOrName: unknown): Promise<void> {
   try {
+    // D81: this was never called, so `download_count` stayed 0 and
+    // `sorted_by=downloads` silently did nothing. Wired from serveTarball via
+    // ctx.waitUntil -- the download response never waits on it.
+    const filter =
+      typeof packageIdOrName === "object" && packageIdOrName !== null && "namespace" in (packageIdOrName as Record<string, unknown>)
+        ? (packageIdOrName as Record<string, unknown>)
+        : { _id: packageIdOrName };
     await db(env, {
       kind: "updateOne",
       collection: "packages",
-      filter: { _id: packageId },
+      filter,
       update: { $inc: { download_count: 1 } },
     });
   } catch (err) {
