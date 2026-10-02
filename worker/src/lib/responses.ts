@@ -20,6 +20,16 @@ export type Envelope = {
   [key: string]: unknown;
 };
 
+/**
+ * Body shape accepted by `jsonOk` / `jsonError`.
+ *
+ * `code` is deliberately absent: these helpers *supply* it, and letting a
+ * caller also pass one is how the HTTP status and the body `code` drift apart
+ * — which is exactly defect D14 in the Flask app, where nine error paths
+ * returned HTTP 200 with a 401/404/500 in the body.
+ */
+export type BodyWithoutCode = Record<string, unknown> & { message?: string };
+
 /** Successful response. Always `code: 200` plus the given fields. */
 export function ok(data: Record<string, unknown> = {}, message = ""): Envelope {
   return { code: 200, message, ...data };
@@ -45,12 +55,17 @@ export function json(status: number, body: unknown, headers: Record<string, stri
   });
 }
 
-export function jsonOk(body: Envelope, headers?: Record<string, string>): Response {
-  return json(200, body, headers);
+export function jsonOk(body: BodyWithoutCode = {}, headers?: Record<string, string>): Response {
+  return json(200, { code: 200, ...body }, headers);
 }
 
-export function jsonError(status: number, message: string, extra?: Record<string, unknown>): Response {
-  return json(status, fail(status, message, extra));
+export function jsonError(
+  status: number,
+  message: string,
+  extra: Record<string, unknown> = {},
+  headers?: Record<string, string>,
+): Response {
+  return json(status, { code: status, message, ...extra }, headers);
 }
 
 /**

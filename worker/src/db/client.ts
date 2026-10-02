@@ -26,6 +26,13 @@ export type Env = PoolEnv & {
   HOST: string;
   ALLOWED_ORIGINS: string;
   JWT_SECRET_KEY: string;
+  /**
+   * Only used to bootstrap the *first* admin on an empty database, and only
+   * while the users collection is empty. See the defect D1 note in
+   * src/routes/auth.ts — this is deliberately a one-shot latch, not a
+   * permanent skeleton key.
+   */
+  SUDO_PASSWORD?: string;
   // Optional — only needed in production. See src/lib/mail.ts.
   BREVO_API_KEY?: string;
   BREVO_SENDER_EMAIL?: string;
