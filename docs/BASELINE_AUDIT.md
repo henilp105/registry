@@ -762,3 +762,134 @@ global, not per client.
 removing the window reset, widening the upload bucket to all writes, allowing
 `remaining` to go negative.
 
+
+---
+
+## D65 — every non-admin was logged out one second after logging in
+
+**Severity: critical. Found by driving the login form, which nothing had ever done.**
+
+### What it looked like from outside
+
+Log in as any ordinary user. The navbar fills in with your username, a spinner
+appears ("Loading your dashboard…"), and then the session evaporates and you are
+back at the sign-in card with the fields still filled. Sign in again, and the
+same thing. Repeatable, and total: **only a user whose `roles` contains `admin`
+could stay signed in at all.**
+
+### Why
+
+Three pieces, each individually reasonable:
+
+1. `NavBar` runs an effect on sign-in: `if (isAuthenticated && accessToken)
+   dispatch(adminAuth(accessToken))`, to decide whether to show the admin menu
+   item. That is `POST /users/admin`.
+2. The API answers **401** to a caller who authenticated successfully but is not
+   an admin. It has answered 401 since `v2.0.1`; the status is frozen by
+   `scripts/check_api_compat.py`, and `worker/src/routes/users.ts:250` documents
+   returning the *string* `"true"` precisely because the frontend's comparison of
+   that response is contract-bound.
+3. `apiClient`'s response interceptor ends the session on any 401 that arrived on
+   a request carrying an `Authorization` header, commented as: *"Only responses to
+   requests that actually carried a token are treated as session expiry."*
+
+Step 3's reasoning is the defect. It assumes a 401 means the token was rejected,
+and reasons from the presence of the header. But the API also answers 401 to a
+caller whose token is **fine** and who simply lacks the permission. The navbar
+probes for admin rights the instant you sign in, that probe returns 401 by
+design, and the interceptor concluded the session had expired — clearing the
+token and navigating back to `/account/login`.
+
+### Why nothing caught it
+
+Every previous check tested one side or the other:
+
+- the API harnesses called the API, and a 401 from `/users/admin` is the correct
+  answer, so they passed;
+- the review pass rendered all 21 routes, but **signed out** — the navbar's admin
+  probe never runs, so the trap never arms;
+- `scripts/frontend_review.cjs` injected API failures into pages, never into the
+  session lifecycle.
+
+Nobody had put a real login into the browser. The gap was the journey, not the
+code.
+
+### The fix
+
+Status stays **401**; the body gains a marker. `v2.0.1` answered every
+authorisation failure with 401 and the contract is frozen, so changing the status
+would break every existing client to buy nothing — what a client needs is to know
+*which kind* of 401 it is, and that fits in the body.
+
+- `worker/src/lib/responses.ts`: new `jsonForbidden()`, which is
+  `jsonError(401, message, { reason: "forbidden" })`.
+- 16 permission checks across `packages.ts`, `namespaces.ts`, `users.ts` and
+  `ratings.ts` now answer with it — every site where a user has been resolved and
+  the denial is about rights rather than identity.
+- `frontend/src/store/utils/apiClient.js`: the interceptor skips `emitUnauthorized()`
+  when `reason === "forbidden"`.
+
+Additive: a client that does not know the field behaves exactly as before, so
+`scripts/check_api_compat.py` is unaffected (still the one pre-existing D28 warn,
+the one justified removal).
+
+### The wider blast radius, which is why it was marked everywhere
+
+The navbar probe is only the first place a signed-in user meets a 401 they are
+still alive to receive. Every one of these is a normal thing to attempt:
+
+| Attempt | Answer before the fix |
+|---|---|
+| non-admin opening any admin-gated view | 401 → signed out |
+| maintainer deleting a package they do not own | 401 → signed out |
+| maintainer removing another maintainer | 401 → signed out |
+| namespace author granting admin without the right | 401 → signed out |
+| user editing another user's account | 401 → signed out |
+
+Each would have logged the user out at the moment they were told "no", which is
+also the moment they are most likely to try something else.
+
+### Guards
+
+- `worker/test/forbidden-marker.test.ts` — `jsonForbidden()` keeps the 401 status,
+  marks the body, and preserves a custom message; a plain `jsonError(401)` stays
+  unmarked, so absence still means "session over". The second test scans the route
+  sources and fails if any permission guard answers with an unmarked 401, which is
+  what catches a site missed in the sweep. A third test asserts the marker is
+  reached at least 16 times, so the scanner cannot rot into a no-op by quietly
+  ceasing to match. **Verified by mutation**: reverting the `isSiteAdmin` site in
+  `users.ts` to `jsonError(401, …)` fails two of the three.
+- `scripts/auth_journey.cjs`, 27/27 — signs a real account in and asserts the token
+  is persisted, rehydrated after a reload, still sent on authenticated requests,
+  and cleared on sign-out. Before the fix this reported **9/21**.
+
+---
+
+## D66 — the skip link was never the first tab stop
+
+**Severity: minor. Found by the same journey, in its keyboard pass.**
+
+`HomeSearchField` called `inputRef.current?.focus()` on mount, putting the caret in
+the home page's search box before the user had asked for anything.
+
+`App.js` implements a skip link as the first element of the tree and documents
+this exact hazard in `useRouteChangeReset`: *"stealing it into `<main>` would
+suppress the skip link as the first tab stop."* The home page suppressed it a
+different way. Measured, the first five tab stops on `/` were:
+
+```
+search-suggestion, search-suggestion, search-suggestion, search-suggestion, quick-link
+```
+
+Two further consequences beyond the wasted keystroke: a screen reader announced a
+text box rather than the page heading, so the landing page opened on a form field
+with no context; and on a phone the on-screen keyboard rose over the hero before
+any input was intended.
+
+Removed. The hero invites the search; it does not perform it. The ref is kept — it
+is the natural handle for that input — but nothing moves focus on mount. First five
+tab stops now:
+
+```
+skip-link, d-flex, dropdown-toggle, theme-toggle, form-control
+```

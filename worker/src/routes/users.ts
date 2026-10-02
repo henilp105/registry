@@ -21,7 +21,11 @@
 
 import { db, toJsonSafe } from "../db/client";
 import type { Env } from "../db/client";
-import { jsonError, jsonOk } from "../lib/responses";
+import {
+  jsonError,
+  jsonForbidden,
+  jsonOk,
+} from "../lib/responses";
 import { authenticate } from "../lib/auth";
 import type { AuthContext } from "../lib/auth";
 import {
@@ -252,7 +256,7 @@ async function isAdmin(env: Env, auth: AuthContext | null): Promise<Response> {
 
   const user = await resolveViewer(env, auth);
   if (!user) return jsonError(404, "User not found");
-  if (!isSiteAdmin(user)) return jsonError(401, "Unauthorized");
+  if (!isSiteAdmin(user)) return jsonForbidden();
 
   // The string "true", not a boolean. The frontend compares it as a string and
   // changing it would break the admin menu (defect D32).
@@ -278,7 +282,7 @@ async function deleteUser(
 
   const viewer = await resolveViewer(env, auth);
   if (!viewer) return jsonError(404, "User not found");
-  if (!isSiteAdmin(viewer)) return jsonError(401, "Unauthorized");
+  if (!isSiteAdmin(viewer)) return jsonForbidden();
 
   const body = await readBody(request);
   const username = body.get("username");
@@ -373,7 +377,7 @@ async function gate(
   const actor = await resolveViewer(env, auth);
   if (!actor) return { ok: false, response: jsonError(404, "User not found") };
   if (!managesOnlySelf(String(actor.username), pathUsername)) {
-    return { ok: false, response: jsonError(401, "Unauthorized") };
+    return { ok: false, response: jsonForbidden() };
   }
   return { ok: true, actor };
 }
@@ -422,7 +426,7 @@ async function addPackageMaintainer(
   if (!pkg) return jsonError(404, "Package not found");
 
   if (!canPublishPackage(g.actor, (ns as { namespace: NamespaceLike }).namespace, pkg)) {
-    return jsonError(401, "Unauthorized");
+    return jsonForbidden();
   }
 
   const target = await findUserByUsername(env, targetUsername);
@@ -483,7 +487,7 @@ async function removePackageMaintainer(
   // asymmetry with the add path and is preserved.
   if (!isNamespaceAdmin(g.actor, (ns as { namespace: NamespaceLike }).namespace) &&
       !isNamespaceMaintainer(g.actor, (ns as { namespace: NamespaceLike }).namespace)) {
-    return jsonError(401, "Unauthorized");
+    return jsonForbidden();
   }
 
   const target = await findUserByUsername(env, targetUsername);
@@ -528,7 +532,7 @@ async function addNamespaceMaintainer(
   const namespace = (ns as { namespace: NamespaceLike }).namespace;
 
   if (!isNamespaceAdmin(g.actor, namespace) && !isNamespaceMaintainer(g.actor, namespace)) {
-    return jsonError(401, "Unauthorized");
+    return jsonForbidden();
   }
 
   const target = await findUserByUsername(env, targetUsername);
@@ -567,7 +571,7 @@ async function removeNamespaceMaintainer(
 
   // v2.0.1 requires namespace admin for removal, even though any maintainer
   // may add. Preserved.
-  if (!isNamespaceAdmin(g.actor, namespace)) return jsonError(401, "Unauthorized");
+  if (!isNamespaceAdmin(g.actor, namespace)) return jsonForbidden();
 
   const target = await findUserByUsername(env, targetUsername);
   if (!target) return jsonError(404, "User not found");
@@ -611,7 +615,7 @@ async function addNamespaceAdmin(
 
   // Namespace admin OR namespace author may grant admin.
   if (!isNamespaceAdmin(g.actor, namespace) && !isNamespaceAuthor(g.actor, namespace)) {
-    return jsonError(401, "Unauthorized");
+    return jsonForbidden();
   }
 
   const target = await findUserByUsername(env, targetUsername);
@@ -649,7 +653,7 @@ async function removeNamespaceAdmin(
   const namespace = (ns as { namespace: NamespaceLike }).namespace;
 
   if (!isNamespaceAdmin(g.actor, namespace) && !isNamespaceAuthor(g.actor, namespace)) {
-    return jsonError(401, "Unauthorized");
+    return jsonForbidden();
   }
 
   const target = await findUserByUsername(env, targetUsername);

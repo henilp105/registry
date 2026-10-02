@@ -69,6 +69,38 @@ export function jsonError(
 }
 
 /**
+ * A refusal for someone who *is* authenticated but is not allowed to do this.
+ *
+ * ── Why this is not a 403 ────────────────────────────────────────────────────
+ * The status stays **401**. `v2.0.1` answered every authorisation failure with
+ * 401, `docs/API_CONTRACT.md` froze that, and `scripts/check_api_compat.py`
+ * enforces it. Changing the status would break every existing client for no gain:
+ * the information the client actually needs is *which kind* of 401 this is, and
+ * that fits in the body.
+ *
+ * ── Why the distinction is load-bearing ─────────────────────────────────────
+ * Defect D65. The frontend ends the session on any 401 that arrived on a request
+ * carrying an `Authorization` header, reasoning that an unauthenticated caller
+ * would not have sent one. That reasoning is wrong, because the API also answers
+ * **401 to authenticated callers who simply lack the permission** -- a non-admin
+ * probing `POST /users/admin` is the common case.
+ *
+ * So every non-admin was logged out within a second of logging in: the navbar
+ * probes for admin rights immediately after sign-in, that probe returns 401, and
+ * the interceptor concluded the token had expired. Nobody could stay signed in
+ * except an admin. The same trap waited at every permission check -- deleting
+ * someone else's package, removing a namespace maintainer -- each of which is a
+ * normal thing for a signed-in user to attempt and be refused.
+ *
+ * `reason: "forbidden"` lets the client tell "your session is over" from "you
+ * may not do that" without guessing. It is additive: a client that does not know
+ * the field behaves exactly as before.
+ */
+export function jsonForbidden(message = "Unauthorized"): Response {
+  return jsonError(401, message, { reason: "forbidden" });
+}
+
+/**
  * Security headers. Ports the v2.0.1 `after_request` hook so behaviour is
  * preserved across the migration.
  */

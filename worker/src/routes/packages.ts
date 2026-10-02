@@ -33,7 +33,11 @@
 
 import { db, toJsonSafe } from "../db/client";
 import type { Env } from "../db/client";
-import { jsonError, jsonOk } from "../lib/responses";
+import {
+  jsonError,
+  jsonForbidden,
+  jsonOk,
+} from "../lib/responses";
 import type { AuthContext } from "../lib/auth";
 import { canPublishPackage, isSiteAdmin, strId } from "../lib/permissions";
 import { isDuplicateKeyError, versionAppendFilter } from "../lib/publish";
@@ -568,7 +572,7 @@ async function deleteVersion(
   if (!auth) return jsonError(401, "Unauthorized");
   const actor = await findUser(env, auth.uuid);
   if (!actor) return jsonError(404, "User not found");
-  if (!isSiteAdmin(actor)) return jsonError(401, "Unauthorized");
+  if (!isSiteAdmin(actor)) return jsonForbidden();
 
   const target = await resolvePackageTarget(env, namespaceName, packageName);
   if (!target.ok) return target.response;
@@ -622,7 +626,7 @@ async function deletePackage(
   if (!auth) return jsonError(401, "Unauthorized");
   const actor = await findUser(env, auth.uuid);
   if (!actor) return jsonError(404, "User not found");
-  if (!isSiteAdmin(actor)) return jsonError(401, "Unauthorized");
+  if (!isSiteAdmin(actor)) return jsonForbidden();
 
   const target = await resolvePackageTarget(env, namespaceName, packageName);
   if (!target.ok) return target.response;
@@ -684,7 +688,7 @@ async function createPackageUploadToken(
   if (!target.ok) return target.response;
 
   if (!canPublishPackage(actor, target.namespace, target.package)) {
-    return jsonError(401, "Unauthorized");
+    return jsonForbidden();
   }
 
   const { issueUploadToken } = await import("../lib/upload-tokens");
@@ -735,7 +739,7 @@ async function deprecatePackage(
   if (!target.ok) return target.response;
 
   if (!canPublishPackage(actor, target.namespace, target.package)) {
-    return jsonError(401, "Unauthorized");
+    return jsonForbidden();
   }
 
   // The frontend sends the literal string "true". Accept "false" too, which is

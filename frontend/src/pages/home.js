@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { Container, InputGroup, FormControl, Button } from "react-bootstrap";
@@ -40,12 +40,25 @@ function HomeSearchField() {
   const dispatch = useDispatch();
   const inputRef = useRef(null);
 
-  // Focus the search input on mount. A ref rather than getElementById, and no
-  // setTimeout: the delay was there to wait for a paint that is not needed, and
-  // it left a timer running after unmount.
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  // Deliberately NOT autofocused (defect D66).
+  //
+  // This used to call `inputRef.current?.focus()` on mount, which put the caret in
+  // the search box before the user had asked for anything. Three consequences:
+  //
+  //  - It defeated the skip link. The skip link is the first element in `App.js`
+  //    and the first tab stop *by design*, but focus had already been moved past
+  //    it, so the first Tab went to a suggestion chip instead. `App.js` documents
+  //    this exact hazard in `useRouteChangeReset` -- "stealing it into <main>
+  //    would suppress the skip link as the first tab stop" -- and then the home
+  //    page suppressed it a different way.
+  //  - A screen reader announced a text box rather than the page heading, so the
+  //    landing page opened on a form field with no context.
+  //  - On a phone it raised the on-screen keyboard over the hero before any
+  //    input was intended.
+  //
+  // The ref is kept because it is the natural handle for this input, but nothing
+  // moves focus on mount any more. The hero invites the search; it does not
+  // perform it.
 
   const handleSearch = useCallback(() => {
     const trimmedQuery = localQuery.trim();

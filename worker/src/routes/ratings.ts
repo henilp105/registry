@@ -18,7 +18,11 @@
 
 import { db, toJsonSafe } from "../db/client";
 import type { Env } from "../db/client";
-import { jsonError, jsonOk } from "../lib/responses";
+import {
+  jsonError,
+  jsonForbidden,
+  jsonOk,
+} from "../lib/responses";
 import type { AuthContext } from "../lib/auth";
 import { isSiteAdmin, strId } from "../lib/permissions";
 import { readBody, findUser, resolvePackageTarget } from "./namespaces-shared";
@@ -242,7 +246,7 @@ async function viewReports(env: Env, auth: AuthContext | null): Promise<Response
 
   const viewer = await findUser(env, auth.uuid);
   if (!viewer) return jsonError(404, "User not found");
-  if (!isSiteAdmin(viewer)) return jsonError(401, "Unauthorized");
+  if (!isSiteAdmin(viewer)) return jsonForbidden();
 
   const pending = (await db<Record<string, unknown>[]>(env, {
     kind: "find",

@@ -29,7 +29,11 @@
 
 import { db, toJsonSafe } from "../db/client";
 import type { Env } from "../db/client";
-import { jsonError, jsonOk } from "../lib/responses";
+import {
+  jsonError,
+  jsonForbidden,
+  jsonOk,
+} from "../lib/responses";
 import type { AuthContext } from "../lib/auth";
 import { validateNamespaceName } from "../lib/validators";
 import { issueUploadToken, revokeUploadToken, DEFAULT_TTL_DAYS } from "../lib/upload-tokens";
@@ -170,7 +174,7 @@ async function createUploadToken(env: Env, auth: AuthContext | null, namespaceNa
   // Namespace admin or namespace maintainer. The original's
   // `checkUserUnauthorizedForNamespaceTokenCreation` is exactly this union.
   if (!isNamespaceAdmin(user, namespace) && !isNamespaceMaintainer(user, namespace)) {
-    return jsonError(401, "Unauthorized");
+    return jsonForbidden();
   }
 
   const issued = await issueUploadToken(env, {
@@ -334,7 +338,7 @@ async function deleteNamespace(
 
   const user = await findUser(env, auth.uuid);
   if (!user) return jsonError(404, "User not found");
-  if (!user.roles.includes("admin")) return jsonError(401, "Unauthorized");
+  if (!user.roles.includes("admin")) return jsonForbidden();
 
   const namespace = (await db<NamespaceDoc | null>(env, {
     kind: "findOne",

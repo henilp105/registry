@@ -33,20 +33,39 @@ apiClient.interceptors.request.use((config) => {
 });
 
 /**
- * End the session on 401.
+ * End the session on 401 -- but only when the session really is over.
  *
- * There is no refresh endpoint on the backend, so an expired or revoked access
- * token cannot be renewed. Only responses to requests that actually carried a
- * token are treated as session expiry - this deliberately excludes 401s from
- * endpoints that reject anonymous callers (e.g. a wrong password on
- * `POST /auth/login`), which must surface their own error message.
+ * There is no refresh endpoint, so an expired or revoked token cannot be renewed
+ * and signing out is the only correct response.
+ *
+ * Two kinds of 401 have to be told apart, and conflating them breaks login
+ * entirely (defect D65):
+ *
+ *  - **The token is no longer accepted.** Sign out.
+ *  - **The token was fine, you just may not do that.** The API answers 401 here
+ *    too, and has done so since `v2.0.1` -- changing it to 403 would break every
+ *    existing client and the frozen contract. So a non-admin probing
+ *    `POST /users/admin`, a maintainer deleting a package they do not own, a
+ *    user removing a namespace maintainer: all 401, all with a perfectly valid
+ *    session.
+ *
+ * The old guard was "401 on a request that carried a token", reasoning that an
+ * anonymous caller would not have sent one. That reasoning is false for exactly
+ * the cases above, and the navbar probes for admin rights immediately after
+ * sign-in -- so **every non-admin was logged out about a second after logging
+ * in**, and nobody but an admin could stay signed in at all.
+ *
+ * The backend now sends `reason: "forbidden"` on the second kind. A client that
+ * does not know the field is unaffected; this one uses it.
  */
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
     const sentToken = error?.config?.headers?.Authorization;
-    if (status === 401 && sentToken) {
+    const isForbidden = error?.response?.data?.reason === "forbidden";
+
+    if (status === 401 && sentToken && !isForbidden) {
       emitUnauthorized();
     }
     return Promise.reject(error);
