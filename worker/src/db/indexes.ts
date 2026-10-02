@@ -80,29 +80,26 @@ export const INDEX_SPEC: IndexSpec[] = [
     // Defect D4: upload tokens move out of embedded arrays on
     // `namespaces.upload_tokens[]` into their own collection so they can be
     // single-use, revocable, hashed at rest, and swept by a cron trigger.
-    {
-      collection: "upload_tokens",
-      indexes: [
-        // Store the SHA-256 of the token, never the token itself.
-        { key: { token_hash: 1 }, name: "upload_tokens_hash_unique", unique: true },
-        // Drives the expiry sweep.
-        { key: { expires_at: 1 }, name: "upload_tokens_expires_at" },
-        { key: { namespace_id: 1 }, name: "upload_tokens_namespace" },
-        { key: { package_id: 1 }, name: "upload_tokens_package" },
-        { key: { created_by: 1 }, name: "upload_tokens_created_by" },
-      ],
-    },
+    collection: "upload_tokens",
+    indexes: [
+      // Store the SHA-256 of the token, never the token itself.
+      { key: { token_hash: 1 }, name: "upload_tokens_hash_unique", unique: true },
+      // Drives the expiry sweep.
+      { key: { expires_at: 1 }, name: "upload_tokens_expires_at" },
+      { key: { namespace_id: 1 }, name: "upload_tokens_namespace" },
+      { key: { package_id: 1 }, name: "upload_tokens_package" },
+      { key: { created_by: 1 }, name: "upload_tokens_created_by" },
+    ],
+  },
   {
     // Defect D13: malicious reports leave the package document so `/report/view`
     // can actually flip triage state instead of re-returning the same reports.
-    {
-      collection: "malicious_reports",
-      indexes: [
-        { key: { package_id: 1, is_viewed: 1 }, name: "reports_pkg_viewed" },
-        { key: { reported_by: 1 }, name: "reports_reported_by" },
-        { key: { created_at: -1 }, name: "reports_created_at" },
-      ],
-    },
+    collection: "malicious_reports",
+    indexes: [
+      { key: { package_id: 1, is_viewed: 1 }, name: "reports_pkg_viewed" },
+      { key: { reported_by: 1 }, name: "reports_reported_by" },
+      { key: { created_at: -1 }, name: "reports_created_at" },
+    ],
   },
   {
     collection: "tarballs.files",

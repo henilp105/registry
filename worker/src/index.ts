@@ -12,6 +12,7 @@
 
 import { MongoPool, POOL_NAME } from "./db/mongo-pool";
 import type { Env } from "./db/client";
+import { INDEX_SPEC, EXPECTED_COLLECTIONS } from "./db/indexes";
 import { corsHeaders, handlePreflight } from "./lib/cors";
 import { json, jsonError, jsonOk, ok, securityHeaders } from "./lib/responses";
 import { route } from "./router";
@@ -98,25 +99,42 @@ async function healthResponse(env: Env, cors: Record<string, string>): Promise<R
   return json(200, body, cors);
 }
 
-/** Dispatch the five free Cron Triggers. Phases 7-8 fill in the real work. */
+/** Dispatch the four free Cron Triggers. Phases 7-8 fill in the real work. */
 async function handleCron(cron: string, env: Env): Promise<void> {
-  switch (cron) {
-    case "17 * * * *":
-    case "*/30 * * * *":
-    case "0 3 * * *":
-    case "0 4 * * 0": {
-      // Warm the pool outside a request so the first real user request does
-      // not pay the SCRAM + TLS handshake inside a 10 ms budget.
-      try {
-        const id = env.MONGO_POOL.idFromName(POOL_NAME);
-        await env.MONGO_POOL.get(id, { locationHint: "apac" }).warm();
-      } catch (err) {
-        console.error(`cron ${cron}: pool warm failed`, err instanceof Error ? err.message : err);
+  try {
+    // Every cron starts by warming the pool, so the first real user request
+    // never pays the SCRAM + TLS handshake inside a 10 ms budget.
+    const id = env.MONGO_POOL.idFromName(POOL_NAME);
+    const pool = env.MONGO_POOL.get(id, { locationHint: "apac" });
+    await pool.warm();
+
+    switch (cron) {
+      case "17 * * * *": {
+        // Hourly: make collections and indexes self-healing. Idempotent, so
+        // this also repairs drift if a deploy ever lands out of order.
+        const result = await pool.execute({
+          op: { kind: "bootstrap", collections: [...EXPECTED_COLLECTIONS], spec: INDEX_SPEC },
+        });
+        console.log("cron bootstrap", JSON.stringify(result));
+        return;
       }
-      return;
+      case "*/30 * * * *": {
+        // Phase 7 rebuilds the search index here.
+        return;
+      }
+      case "0 3 * * *": {
+        // Phase 8: sweep expired upload tokens (defect D4).
+        return;
+      }
+      case "0 4 * * 0": {
+        // Phase 6: prune orphaned tarballs from R2 (defect D12).
+        return;
+      }
+      default:
+        console.warn(`unhandled cron: ${cron}`);
     }
-    default:
-      console.warn(`unhandled cron: ${cron}`);
+  } catch (err) {
+    console.error(`cron ${cron} failed`, err instanceof Error ? err.message : err);
   }
 }
 

@@ -64,6 +64,8 @@ export type MongoOp =
   | { kind: "aggregate"; collection: string; pipeline: Document[] }
   /** Multi-step atomic unit — used by the Phase 2b cascade deletes. */
   | { kind: "transaction"; steps: TransactionStep[] }
+  /** Create collections if absent, then apply indexes. Idempotent. */
+  | { kind: "bootstrap"; collections: string[]; spec: IndexSpec[] }
   | { kind: "ensureIndexes"; spec: IndexSpec[] };
 
 export type TransactionStep =
@@ -280,6 +282,48 @@ export class MongoPool extends DurableObject<PoolEnv> {
 
   // ── internals ────────────────────────────────────────────────────────────
 
+  /**
+   * Create every collection, then apply the index set.
+   *
+   * The ordering is not optional. On an Atlas M0 (free) cluster `createIndexes`
+   * against a namespace that does not exist yet fails with
+   * `Expected 'createIndexes' to be string, but got <nil>`, so the collections
+   * have to be materialised first. Both steps are idempotent, which is what
+   * lets the hourly cron re-run this as a self-healing drift repair.
+   */
+  async #bootstrap(collections: string[], spec: IndexSpec[]): Promise<{ collections: string[]; indexes: string[] }> {
+    const client = await this.#connect();
+    const db = client.db(this.env.MONGO_DB_NAME);
+
+    const existing = new Set(
+      (await db.listCollections({}, { nameOnly: true }).toArray()).map((c) => c.name),
+    );
+
+    const created: string[] = [];
+    for (const name of collections) {
+      if (existing.has(name)) continue;
+      try {
+        await db.createCollection(name);
+        created.push(name);
+      } catch (err) {
+        // NamespaceExists (48) means another isolate won the race — fine.
+        if ((err as { code?: number }).code !== 48) throw err;
+      }
+    }
+
+    return { collections: created, indexes: await this.#ensureIndexes(spec) };
+  }
+
+  async #ensureIndexes(spec: IndexSpec[]): Promise<string[]> {
+    const client = await this.#connect();
+    const db = client.db(this.env.MONGO_DB_NAME);
+    const applied: string[] = [];
+    for (const entry of spec) {
+      applied.push(...(await db.collection(entry.collection).createIndexes(entry.indexes as IndexDescription[])));
+    }
+    return applied;
+  }
+
   async #run(op: MongoOp): Promise<unknown> {
     const client = await this.#connect();
 
@@ -291,16 +335,10 @@ export class MongoPool extends DurableObject<PoolEnv> {
       return this.#transaction(op.steps);
     }
     if (op.kind === "ensureIndexes") {
-      const applied: string[] = [];
-      for (const entry of op.spec) {
-        applied.push(
-          ...(await client
-            .db(this.env.MONGO_DB_NAME)
-            .collection(entry.collection)
-            .createIndexes(entry.indexes as IndexDescription[])),
-        );
-      }
-      return { applied };
+      return this.#ensureIndexes(op.spec);
+    }
+    if (op.kind === "bootstrap") {
+      return this.#bootstrap(op.collections, op.spec);
     }
 
     const c = this.#dbFor(client).collection(op.collection);
