@@ -23,7 +23,13 @@ const SORT_OPTIONS = {
  * @param {string} sortedBy - Sort option key
  */
 export const searchPackage = (query, page, sortedBy = "") => async (dispatch) => {
-  dispatch({ type: SEARCH_REQUEST });
+  // Defect D83: without sequencing, a stale response overwrites a fresh one.
+  // Search for page 3, then change the sort: if page 3's response lands
+  // second, it clobbers the page-0 result with content under the wrong
+  // ordering. A monotonically increasing request id lets the reducer drop any
+  // response that is no longer the newest request.
+  const id = nextSearchId++;
+  dispatch({ type: SEARCH_REQUEST, payload: { id } });
 
   // Map sort option to API parameter
   const sortParam = SORT_OPTIONS[sortedBy] ?? sortedBy;
@@ -38,6 +44,7 @@ export const searchPackage = (query, page, sortedBy = "") => async (dispatch) =>
     dispatch({
       type: SEARCH_SUCCESS,
       payload: {
+        id,
         packages: result.data.packages,
         totalPages: result.data.total_pages,
         currentPage: page,
@@ -47,11 +54,14 @@ export const searchPackage = (query, page, sortedBy = "") => async (dispatch) =>
     dispatch({
       type: SEARCH_FAILURE,
       payload: {
+        id,
         error: getErrorMessage(error),
       },
     });
   }
 };
+
+let nextSearchId = 1;
 
 export const SET_QUERY = "SET_QUERY";
 export const SET_ORDER_BY = "SET_ORDER_BY";

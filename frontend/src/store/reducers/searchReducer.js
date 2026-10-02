@@ -15,6 +15,8 @@ const initialState = {
   query: "",
   orderBy: "None",
   isLoading: false,
+  // The id of the newest request; older responses are dropped (defect D83).
+  latestId: 0,
 };
 
 const searchReducer = (state = initialState, action) => {
@@ -24,9 +26,11 @@ const searchReducer = (state = initialState, action) => {
         ...state,
         isLoading: true,
         error: null,
+        latestId: action.payload?.id ?? state.latestId,
       };
 
     case SEARCH_SUCCESS:
+      if ((action.payload?.id ?? 0) < state.latestId) return state; // stale
       return {
         ...state,
         isLoading: false,
@@ -37,10 +41,10 @@ const searchReducer = (state = initialState, action) => {
       };
 
     case SEARCH_FAILURE:
+      if ((action.payload?.id ?? 0) < state.latestId) return state; // stale
       return {
         ...state,
         isLoading: false,
-        packages: null,
         error: action.payload.error,
       };
 
