@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// ESM has no `require`, but the credential helper is CommonJS so that the .cjs
+// harnesses can share it. `createRequire` is the bridge.
+import { createRequire } from "node:module";
+const { mongoUri } = createRequire(import.meta.url)("./_env.cjs");
 /**
  * Adversarial and concurrency probes for the upload and rating paths.
  *
@@ -26,8 +30,7 @@
 import { MongoClient } from "mongodb";
 
 const API = process.argv[2] ?? "http://127.0.0.1:8787";
-const URI =
-  "mongodb+srv://henilp105_db_user:FsPIM1HkOairYjZj@cluster0.kdreahb.mongodb.net/?appName=Cluster0";
+const URI = mongoUri("write_path_fuzz.mjs");
 const DB = "fpmregistry_local";
 
 let passed = 0;

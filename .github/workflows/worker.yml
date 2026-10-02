@@ -209,6 +209,16 @@ jobs:
           [ "$fail" -eq 0 ] && echo "all harness imports present"
           exit "$fail"
 
+      - name: No credential in tracked source
+        run: |
+          set -euo pipefail
+          # Defect D71: seven harnesses carried the production MongoDB URI, password
+          # included, in a *public* repository, so the Atlas cluster's read/write
+          # credential was world-readable. Nothing else in the pipeline noticed --
+          # typecheck, lint, 337 tests, five CI jobs and six harnesses all passed
+          # with a live credential in the tree. This is the only check that can.
+          node scripts/check_no_secrets.mjs
+
       - name: Frontend Redux helpers behave
         run: |
           set -euo pipefail
@@ -222,6 +232,15 @@ jobs:
           # is a large dependency decision. The real source is imported as written
           # instead, so this guards what ships rather than a copy of it.
           node scripts/check_store_helpers.mjs
+
+      # Not a deploy gate in CI -- the KV ids legitimately do not exist until
+      # someone creates the namespaces -- so it runs in report mode and the log
+      # records exactly what is outstanding. Turn it into a hard gate by adding
+      # `--strict` once the ids are in place.
+      - name: Deploy readiness (report only)
+        run: |
+          set -uo pipefail
+          node scripts/check_deploy_ready.mjs production || true
 
       - name: Python scripts parse
         run: |

@@ -53,12 +53,12 @@ function iterations(env: Env): number {
  * return error 1102 on every signup and login. The DO has 30 s of CPU per
  * request on the Free plan. See the `hashPassword` op in mongo-pool.ts.
  */
-async function hashPassword(env: Env, password: string): Promise<string> {
+async function hashPasswordInPool(env: Env, password: string): Promise<string> {
   return (await db<string>(env, { kind: "hashPassword", password })) as string;
 }
 
 /** Verify a password against a stored hash, also inside the DO. */
-async function verifyPassword(env: Env, password: string, stored: string): Promise<boolean> {
+async function verifyPasswordInPool(env: Env, password: string, stored: string): Promise<boolean> {
   return (await db<boolean>(env, {
     kind: "verifyPassword",
     password,
@@ -145,7 +145,7 @@ async function login(request: Request, env: Env): Promise<Response> {
   const invalid = jsonError(401, "Invalid email or password");
   if (!user) return invalid;
 
-  if (!(await verifyPassword(env, password, String(user.password)))) return invalid;
+  if (!(await verifyPasswordInPool(env, password, String(user.password)))) return invalid;
 
   // Defect S8: `v2.0.1` skipped this whenever IS_CI was set, so any environment
   // that could set that variable disabled verification entirely.
@@ -153,7 +153,7 @@ async function login(request: Request, env: Env): Promise<Response> {
 
   // Defect D15-adjacent: upgrade the stored hash when the KDF cost has moved on.
   if (needsRehash(String(user.password), iterations(env))) {
-    const rehashed = await hashPassword(env, password);
+    const rehashed = await hashPasswordInPool(env, password);
     await db(env, {
       kind: "updateOne",
       collection: "users",
@@ -240,7 +240,7 @@ async function signup(request: Request, env: Env, ctx: ExecutionContext): Promis
   const doc = {
     username: safeUsername,
     email: safeEmail,
-    password: await hashPassword(env, safePassword),
+    password: await hashPasswordInPool(env, safePassword),
     uuid,
     isVerified: false,
     newEmail: "",
@@ -400,7 +400,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     if (!user) return jsonError(404, "User not found");
 
     if (oldPassword !== undefined) {
-      if (!(await verifyPassword(env, oldPassword, String(user.password)))) {
+      if (!(await verifyPasswordInPool(env, oldPassword, String(user.password)))) {
         return jsonError(401, "Invalid old password");
       }
     }
@@ -409,7 +409,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
       kind: "updateOne",
       collection: "users",
       filter: { uuid: user.uuid },
-      update: { $set: { password: await hashPassword(env, password) } },
+      update: { $set: { password: await hashPasswordInPool(env, password) } },
     });
     return jsonOk({ message: "Password reset successful" });
   }
@@ -424,7 +424,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     kind: "updateOne",
     collection: "users",
     filter: { uuid: consumed.user_uuid },
-    update: { $set: { password: await hashPassword(env, password) } },
+    update: { $set: { password: await hashPasswordInPool(env, password) } },
   });
 
   return jsonOk({ message: "Password reset successful" });

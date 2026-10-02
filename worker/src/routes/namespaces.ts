@@ -38,6 +38,21 @@ import type { AuthContext } from "../lib/auth";
 import { validateNamespaceName } from "../lib/validators";
 import { issueUploadToken, revokeUploadToken, DEFAULT_TTL_DAYS } from "../lib/upload-tokens";
 import { logger } from "../lib/logger";
+// ── deduplicated (defect D73) ─────────────────────────────────────────────────
+//
+// `readBody` and `findUser` used to be defined here *and* exported from
+// `./namespaces-shared`, which `packages.ts` and `ratings.ts` import. Two copies of
+// the same helper is what produced D68, where a local `contains` was called with
+// its arguments swapped so that every namespace-admin flag read false forever --
+// the signature sat a few lines below the use, so nothing on that page looked
+// wrong.
+//
+// The shared `readBody` was byte-identical. The shared `findUser` is strictly
+// better: it rejects an empty `uuid` before querying, and asks for `_id`
+// explicitly instead of relying on Mongo including it by default in an inclusion
+// projection. One implementation now serves all three route modules.
+import { readBody, findUser } from "./namespaces-shared";
+
 import {
   isNamespaceAdmin,
   isNamespaceAuthor,
@@ -45,7 +60,6 @@ import {
   strId,
   containsId,
   type NamespaceLike,
-  type UserLike,
 } from "../lib/permissions";
 
 const NAMESPACE_NAME_MAX = 64;
@@ -422,46 +436,11 @@ async function collectTarballOids(env: Env, packageIds: unknown[]): Promise<stri
 
 type NamespaceDoc = NamespaceLike & { description?: string; createdAt?: Date };
 
-type UserDoc = UserLike & { uuid: string; username: string; roles: string[] };
 
-async function findUser(env: Env, uuid: string): Promise<UserDoc | null> {
-  return (await db<UserDoc | null>(env, {
-    kind: "findOne",
-    collection: "users",
-    filter: { uuid },
-    projection: { uuid: 1, username: 1, roles: 1 },
-  })) as UserDoc | null;
-}
+
 
 /** Read either form-encoded or JSON bodies. `POST /namespaces` accepts both. */
-async function readBody(request: Request): Promise<Map<string, string>> {
-  const contentType = request.headers.get("content-type") ?? "";
 
-  if (contentType.includes("application/json")) {
-    try {
-      const parsed = (await request.json()) as Record<string, unknown>;
-      const out = new Map<string, string>();
-      for (const [k, v] of Object.entries(parsed ?? {})) {
-        if (typeof v === "string" && v.trim()) out.set(k, v.trim());
-        else if (typeof v === "number" || typeof v === "boolean") out.set(k, String(v));
-      }
-      return out;
-    } catch {
-      return new Map();
-    }
-  }
-
-  try {
-    const form = await request.formData();
-    const out = new Map<string, string>();
-    for (const [k, v] of form.entries()) {
-      if (typeof v === "string" && v.trim()) out.set(k, v.trim());
-    }
-    return out;
-  } catch {
-    return new Map();
-  }
-}
 
 export { readBody, findUser, NAMESPACE_NAME_MAX };
 // Re-exported so callers have one import site for the permission helpers.

@@ -39,6 +39,13 @@ export type ParsedHash = {
   hash: string;
 };
 
+// Defect D73: `sha256Hex` was declared here *and* exported from `./tokens`,
+// as two identical implementations. This module now uses the shared one.
+import { sha256Hex } from "./tokens";
+
+// Re-exported so existing importers keep working, without a second implementation.
+export { sha256Hex };
+
 const PBKDF2_PREFIX = "pbkdf2$sha256$";
 const LEGACY_PREFIX = "legacy-sha256$";
 
@@ -128,11 +135,6 @@ async function pbkdf2(password: string, salt: Uint8Array, iterations: number): P
     256,
   );
   return new Uint8Array(bits);
-}
-
-export async function sha256Hex(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value) as BufferSource);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────

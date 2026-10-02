@@ -1242,3 +1242,221 @@ on the package. An assertion reading `pkgDoc.sha256` reported `undefined` and pa
 on a vacuous `undefined…` string, and the revocation check compared a `version`
 field that does not exist, so it passed regardless of what was written. Both now
 read the version array.
+
+---
+
+## D71 — the production database credential was committed, in a public repository
+
+**Severity: critical. Found by a secret sweep, not by any test.**
+
+### What it was
+
+Seven verification harnesses carried the production MongoDB URI — password
+included — as a hardcoded string:
+
+```
+scripts/_signed_in.cjs        scripts/auth_journey.cjs
+scripts/rate_limit_probe.cjs  scripts/token_journey.cjs
+scripts/write_journey.cjs     scripts/write_path_audit.mjs
+scripts/write_path_fuzz.mjs
+```
+
+`git ls-files` confirms all seven are tracked, and `git log --all -S` confirms the
+value has been in history since at least `f3efe4d`.
+
+### Why it matters
+
+The repository is **public** (`visibility: public`, `private: false`). Anyone who
+could read the repository also had read/write access to the Atlas cluster: the user
+collection with its password hashes, every namespace, every package, and the ability
+to change all of it.
+
+### Why nothing caught it
+
+Everything else passed, with the credential in the tree: typecheck, lint, 337
+Worker tests, five CI jobs, and six harnesses totalling 200+ assertions. Nothing in
+the pipeline looked at file *content* for credentials.
+
+It was never necessary. The Worker reads `MONGO_URI` from `worker/.dev.vars`, which
+is gitignored, and the harnesses run in the same shell — the value was available the
+whole time.
+
+### The fix
+
+`scripts/_env.cjs` resolves the URI from the environment and **throws with an
+actionable message** when it is absent, because a harness that silently skips its
+checks is worse than one that refuses to start:
+
+```
+write_path_fuzz.mjs needs a MongoDB URI, and none is set.
+
+  Set MONGODB_TEST_URI (preferred, a direct connection string) or MONGO_URI.
+  Locally, source worker/.dev.vars, which is gitignored:
+
+      set -a && . worker/.dev.vars && set +a
+```
+
+The ESM harnesses bridge to it with `createRequire`, so one helper serves both module
+systems. `mongoDbName()` defaults to `fpmregistry_local`, not the production
+`fpmregistry`, so a run with only a generic URI cannot write to production by
+accident.
+
+### Guard — `scripts/check_no_secrets.mjs`, in CI
+
+Scans `git ls-files` only, so it never reads `.dev.vars`, `node_modules` or build
+output. Rules: Mongo URIs with a non-placeholder inline password, GitHub PATs,
+private-key blocks, OpenAI/Slack-shaped keys, and named secrets assigned a literal.
+
+Placeholder values are recognised so documentation examples stay legal —
+`mongodb+srv://user:pass@…` does not fail the build, but
+`mongodb+srv://henilp105_db_user:FsPIM1HkOairYjZj@…` does.
+
+**Verified by mutation**: reintroducing the exact URI into `token_journey.cjs` exits
+1 and names the file, line and rule.
+
+Five findings were allowlisted individually: `TEST_JWT_SECRET` and `TEST_PASSWORD`
+in the legacy Flask suite's tests. Listed one by one rather than allowing
+`backend/tests/`, because "allow all of tests/" is how real credentials get
+committed — and each is a constant that can be read and judged on its own.
+
+### Remediation still required — this is not fixed by removing it
+
+**Removing a secret from the tree does not un-leak it.** The credential must be
+**rotated in Atlas**, and the old value treated as compromised. Only the repository
+owner can do that. History still contains it, so rotation is mandatory; purging
+history is hygiene on top, not a substitute.
+
+Also verified clean: `BREVO_API_KEY=` appears in history only as an empty value,
+`JWT_SECRET_KEY=` only as compose/doc placeholders, and there are no GitHub tokens
+or private keys anywhere in tracked files or history. `worker/.dev.vars` is
+gitignored.
+
+---
+
+## D72 — the runbook omitted two required secrets
+
+**Severity: high. Found by `scripts/check_deploy_ready.mjs`.**
+
+`DEPLOYMENT.md` step 3 listed `JWT_SECRET_KEY`, `VALIDATION_SECRET` and
+`BREVO_API_KEY`. It did not list:
+
+- **`MONGO_URI`** — read on the first database call. Without it the Worker cannot
+  connect to Atlas at all.
+- **`SALT`** — read by every password verification, via `mongo-pool.ts:501`.
+
+Following the runbook exactly therefore produced a deployment that answered **500 to
+every request**, with `Login returns 500` mentioned only in a troubleshooting table
+and no indication of the cause. A missing secret with no symptom pointing at it is
+the worst kind of documentation gap, because the operator has nothing to grep for.
+
+Both are now in step 3, with the note that `SALT` cannot be rotated freely — it must
+match what the accounts were hashed with, and changing it locks every existing user
+out.
+
+---
+
+## D73 — the same helper declared in two modules
+
+**Severity: low as shipped, high as a pattern. This is the shape D68 took.**
+
+`namespaces.ts` declared private copies of `readBody` and `findUser` while
+`./namespaces-shared` — already imported by `packages.ts` and `ratings.ts` — exported
+the same two names. Nothing imported the private copies, so the duplication was
+invisible: typecheck, lint and 337 tests all passed.
+
+It had already begun to drift. The shared `findUser` rejects an empty `uuid` before
+querying and asks for `_id` explicitly; the private one did neither. Benign at the
+time — Mongo includes `_id` in an inclusion projection by default — but a copy
+nobody reads is a copy that will eventually be the one that is wrong.
+
+Three further collisions, all found by the same sweep:
+
+| Helper | Copies | Resolution |
+|---|---|---|
+| `readBody`, `findUser` | `namespaces.ts`, `namespaces-shared.ts` | private copies deleted; shared ones imported |
+| `sha256Hex` | `lib/password.ts`, `lib/tokens.ts` | identical implementations; `password.ts` now imports and re-exports the canonical one |
+| `isHex24` | `lib/ids.ts`, `lib/upload-tokens.ts` | identical; `upload-tokens.ts` imports it |
+| `hashPassword`, `verifyPassword` | `lib/password.ts`, `routes/auth.ts` | the route copies are RPC wrappers to the Durable Object, so they are renamed `…InPool` — the collision was the hazard, not the duplication |
+
+Renaming the wrappers nearly broke the DO contract: the rename also rewrote the
+`kind:` strings on the RPC operation, which `mongo-pool.ts` dispatches on. Caught by
+reading `mongo-pool.ts:95-96` before running anything, and reverted.
+
+### Guard — `worker/test/no-duplicate-helpers.test.ts`
+
+No top-level function name may be declared twice across `src/`, and `namespaces.ts`
+must import both helpers from the shared module. A third assertion checks the scan
+actually inspected more than 20 files and found more than 50 names, so it cannot rot
+into a no-op by quietly ceasing to match.
+
+**Verified by mutation**: restoring a private `isHex24` in `upload-tokens.ts` fails
+it with the name and both locations.
+
+### Also in this pass
+
+`worker/src/index.ts` used a bare `console.log` for the hourly cron bootstrap while
+all three sibling cases used the structured `logger` — and it is the case most likely
+to need reading, since it repairs index drift after a bad deploy. Now `logger.info`.
+
+The frontend was checked for the same pattern and is clean: its repeated names
+(`resetMessages`, `resetErrorMessage`, `Tooltip`) are per-module Redux action-type
+constants, which is the convention, not a duplicated behavioural helper.
+
+---
+
+## Deploy readiness — current state
+
+`scripts/check_deploy_ready.mjs`, 10 checks, in CI in report mode:
+
+| Check | State |
+|---|---|
+| no `REPLACE_WITH_*` placeholder in the target env | **FAIL — blocker** |
+| production origins are not localhost | pass |
+| `HOST` is not localhost | pass |
+| every `env.*` the source reads is bound or in the runbook | pass (after D72) |
+| no secret set as a plain `vars` value | pass |
+| Durable Object lifecycle declared | pass (via `exports`) |
+| Durable Object class bound | pass |
+| tarball bucket bound | pass |
+| `wrangler deploy --dry-run` succeeds | pass |
+| the dry run binds no placeholder | **FAIL — consequence of the first** |
+
+Verified in both directions: substituting a real-shaped KV id makes it **10/10** and
+exit 0; the committed placeholder makes it exit 1.
+
+### The one real blocker
+
+`wrangler.jsonc` has three KV namespace bindings set to
+`REPLACE_WITH_{,STAGING_,PRODUCTION_}KV_NAMESPACE_ID`. This is correct and
+unavoidable — a namespace id does not exist until `wrangler kv namespace create`
+returns one — but it means the committed config **cannot be deployed**, and
+`wrangler deploy --dry-run` accepts the placeholder without complaint:
+
+```
+env.CACHE (REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID)   KV Namespace
+```
+
+So a deploy can look completely clean and bind nothing. That is what the gate is
+for.
+
+### Before the first production deploy
+
+1. `wrangler kv namespace create CACHE` for each environment; paste the ids in.
+2. `wrangler r2 bucket create` for each environment (documented; the top-level
+   bucket name is already real).
+3. `wrangler secret put MONGO_URI`, `SALT`, `JWT_SECRET_KEY`, `VALIDATION_SECRET`
+   per environment — D72.
+4. **Rotate the Atlas credential** and update `MONGO_URI` — D71.
+5. Re-run `node scripts/check_deploy_ready.mjs production` until it exits 0, then add
+   `--strict` to the CI step.
+
+### Two things to verify with real eyes
+
+- **`locationHint: "apac"`** is hardcoded for the `MONGO_POOL` Durable Object. If the
+  Atlas cluster is not in APAC this adds latency to *every* request, because the DO
+  is where the database connection and the PBKDF2 live. It cannot be verified from
+  here; check the cluster's region against Cloudflare's placement.
+- **Brevo email is never sent** (`BREVO_API_KEY` unset). Registration succeeds and
+  the account is created, but the verification email is skipped, so nobody can
+  complete sign-up. `auth_journey.cjs` stands in for the emailed link at the database,
+  and says so.

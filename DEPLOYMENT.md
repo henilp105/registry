@@ -24,10 +24,24 @@ npx wrangler r2 bucket create fpm-registry-tarballs-preview
 npx wrangler kv namespace create CACHE        # paste the id into wrangler.jsonc
 
 # 3. Set secrets. These are NEVER in wrangler.jsonc.
+#
+#    MONGO_URI and SALT were missing from this list until defect D72, and both are
+#    required: the Worker reads MONGO_URI on its first database call and SALT on
+#    every password verification. Following the previous version of this runbook
+#    exactly produced a deployment that answered 500 to everything, with no other
+#    symptom to point at the cause.
+npx wrangler secret put MONGO_URI             # mongodb+srv://user:pass@cluster.mongodb.net/?appName=Cluster0
+npx wrangler secret put SALT                  # any non-empty string; see the rotation note below
 npx wrangler secret put JWT_SECRET_KEY       # node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 npx wrangler secret put VALIDATION_SECRET    # node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 npx wrangler secret put BREVO_API_KEY         # optional; verification emails are skipped without it
 ```
+
+`MONGO_URI` and `SALT` can be set as plain `vars` in `wrangler.jsonc` if you prefer,
+but secrets are the right home for both: `MONGO_URI` contains a database password,
+and `SALT` must match whatever the accounts were hashed with. **Changing `SALT`
+after accounts exist locks every existing user out** — it is not a free rotation.
+
 
 ### Required GitHub configuration
 

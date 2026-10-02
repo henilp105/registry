@@ -39,11 +39,11 @@
 
 const { chromium } = require("playwright");
 const { MongoClient } = require("mongodb");
+const { mongoUri } = require("./_env.cjs");
 
 const APP = process.argv[2] ?? "http://127.0.0.1:5173";
 const API = process.argv[3] ?? "http://127.0.0.1:8787";
-const URI =
-  "mongodb+srv://henilp105_db_user:FsPIM1HkOairYjZj@cluster0.kdreahb.mongodb.net/?appName=Cluster0";
+const URI = mongoUri("auth_journey.cjs");
 const DB = "fpmregistry_local";
 
 let passed = 0;

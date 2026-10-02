@@ -33,6 +33,9 @@
  * upload, so it must be a bearer secret the CLI holds in its config.
  */
 
+// Defect D73: a private copy of `isHex24`, byte-identical to the one in
+// `./ids`. One implementation now serves both.
+import { isHex24 } from "./ids";
 import { db, type Env } from "../db/client";
 import { randomToken, sha256Hex } from "./tokens";
 import { logger } from "./logger";
@@ -231,10 +234,6 @@ function toObjectId(hex: string): unknown {
   // Imported lazily to keep this module free of a hard mongodb dependency at
   // the edges; the Durable Object does the actual casting on the server side.
   return isHex24(hex) ? hex : { $invalid: hex };
-}
-
-function isHex24(value: string): boolean {
-  return /^[0-9a-fA-F]{24}$/.test(value);
 }
 
 function clampTtl(requested: number | undefined): number {

@@ -153,7 +153,11 @@ async function handleCron(cron: string, env: Env): Promise<void> {
         const result = await pool.execute({
           op: { kind: "bootstrap", collections: [...EXPECTED_COLLECTIONS], spec: INDEX_SPEC },
         });
-        console.log("cron bootstrap", JSON.stringify(result));
+        // The structured logger, like every other cron case below. This one line
+        // was a bare console.log, so the hourly bootstrap emitted unstructured
+        // output that no log filter could read -- and it is the case most likely
+        // to need reading, since it is what repairs index drift after a bad deploy.
+        logger.info("cron bootstrap", { result });
         return;
       }
       case "*/30 * * * *": {

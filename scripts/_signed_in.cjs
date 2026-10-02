@@ -13,9 +13,9 @@
  */
 const { chromium } = require("playwright");
 const { MongoClient } = require("mongodb");
+const { mongoUri } = require("./_env.cjs");
 
-const URI =
-  "mongodb+srv://henilp105_db_user:FsPIM1HkOairYjZj@cluster0.kdreahb.mongodb.net/?appName=Cluster0";
+const URI = mongoUri("_signed_in.cjs");
 const APP = process.env.APP_BASE ?? "http://127.0.0.1:5173";
 
 async function signIn({ admin = false, fresh = true } = {}) {
