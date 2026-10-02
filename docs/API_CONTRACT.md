@@ -1,7 +1,12 @@
 # API Contract — frozen baseline for the serverless migration
 
-> **Status:** Frozen · **Date:** 2026-10-02 · **Source of truth:** `frontend/src/store/actions/*` (the
-> actual consumer) cross-checked against `backend/**/*.py` and `backend/documentation/*.yaml`.
+> **Status:** Frozen · **Date:** 2026-10-02 · **Source of truth:** `frontend/src/store/actions/*` +
+> `frontend/src/store/utils/apiClient.js` (the actual consumer) on `v2.0.1`, cross-checked against
+> `backend/**/*.py` and `backend/documentation/*.yaml` on `v2.0.1`.
+>
+> ⚠️ **This contract was first derived against `main` and then re-derived against `v2.0.1`.**
+> §7 records every correction. `v2.0.1` is the base branch — see
+> [`BASELINE_AUDIT.md`](./BASELINE_AUDIT.md) §1.
 >
 > This file is **Phase 0** of [`SERVERLESS_MIGRATION_PLAN.md`](./SERVERLESS_MIGRATION_PLAN.md).
 > Every later phase is gated on contract tests derived from this document. If a change here is
@@ -17,14 +22,15 @@
 | **Error** | HTTP **non-2xx** AND JSON body `{ code, message }`. axios rejects on non-2xx; 29 sites read `error.response.data.message`. |
 | **Request encoding** | `multipart/form-data` (`FormData`) on **every** POST/PUT except `POST /auth/logout` (no body). |
 | **Token field naming** | Wire format is **snake_case**: `access_token`, `refresh_token`. Redux state is camelCase (`accessToken`). Do not unify. |
-| **`uuid` field** | Sent as a **form field**, not a header. See §4 — it is currently the literal string `"undefined"`. |
+| **`uuid` field** | Sent as a **form field**, not a header. See §4 — currently always absent, and 8 of its 10 call sites omit `Authorization` entirely. |
 | **`createdAt`** | Must serialise as a **string of ≥ 16 chars**. `namespace.js` does `.slice(4,16)`, `accountActions` does `.slice(0,16)`. A BSON `Date` serialising to `{}` will crash the UI. |
-| **`ver.isDeprecated`** | Serialises as the **string** `"true"` / `"false"`, not a boolean (`package.js:190` compares to `"true"`). |
+| **`ver.isDeprecated`** | 🔴 **See §7.3.** The frontend reads `ver.isDeprecated === "true"` but `v2.0.1` emits `is_deprecated` as a **boolean**, so every version renders "Active". We must emit **both** keys. |
 | **`ver.download_url`** | A **root-relative path beginning with `/`**, concatenated straight onto the API base URL. |
+| **`isAdmin`** | `POST /users/admin` returns the **string** `"true"`, not a boolean. Preserve. |
 
 ---
 
-## 2. Endpoint inventory (38 endpoints, all `multipart/form-data` unless noted)
+## 2. Endpoint inventory (43 routes on `v2.0.1`, all `multipart/form-data` unless noted)
 
 ### 2.1 Auth — `/auth`
 
@@ -56,13 +62,13 @@
 
 | Method | Path | Form / query | Auth | Response |
 |---|---|---|---|---|
-| GET | `/packages` | `query`, `page` (**0-based**), `sorted_by` (`""`\|`"updatedat"`) | — | `{packages[], total_pages}` — **no `code` check** |
+| GET | `/packages` | `query`, `page` (**0-based**), `sorted_by` (`""`\|`"updatedat"`\|`"name"`\|`"downloads"`) | — | `{packages[], total_pages}` — **no `code` check** |
 | GET | `/packages/{ns}/{pkg}` | — | — | `{code:200, data:{…}}` — `namespace`, `name`, `updated_at`, `registry_description`, `repository`, `homepage`, `license`, `latest_version_data.version`, `version_history[]`, `ratings_count{}` |
 | POST | `/packages/{ns}/{pkg}/verify` | `uuid` | — | raw `{isVerified}` (stored directly) |
 | PUT | `/packages` ⚠️ **only PUT in the app** | `uuid`, `name`, `namespace`, `isDeprecated="true"` | — | `{code:200, message}` |
 | POST | `/packages/{ns}/{pkg}/delete` | `uuid` | — | `{code:200, message}` |
 | POST | `/packages/{ns}/{pkg}/{version}/delete` | `uuid` | — | `{code:200, message}` |
-| POST | `/packages/{ns}/{pkg}/uploadToken` | *(empty)* | `Bearer` | `{code:200, message, uploadToken}` |
+| POST | `/packages/{ns}/{pkg}/uploadToken` | *(empty)* | `Bearer` | `{code:200, message, uploadToken}` — 🔴 **see §7.4**: backend emits `upload_token`, frontend reads `uploadToken`. Emit **both**. |
 | POST | `/packages/{ns}/{pkg}/maintainers` | `uuid` | — | `{users:[{id, username}]}` |
 
 ### 2.4 Namespaces — note singular vs plural
@@ -76,7 +82,7 @@
 | POST | `/namespaces/{ns}/admins` | `uuid` | — | `{users:[{id, username}]}` |
 | POST | `/namespaces/{ns}/maintainers` | `uuid` | — | `{users:[{id, username}]}` |
 
-### 2.5 Maintainership — dynamic segment at position 1
+### 2.5 Maintainership — dynamic segment at position 1 (6 routes, all `@jwt_required()`)
 
 | Method | Path | Form fields | Auth |
 |---|---|---|---|
@@ -115,27 +121,35 @@
 
 ---
 
-## 4. 🔴 Known frontend bug that must be preserved (or fixed first)
+## 4. 🔴 Known frontend auth defect that must be fixed, not preserved
 
-`state.auth.uuid` is read in **10 components** but **never written**:
+`state.auth.uuid` is read in **10 components** and is **never written**:
 
-- `authReducer.js` `initialState` = `{isAuthenticated, accessToken, refreshToken, error, username, isLoading, message}` — **no `uuid`**.
-- `LOGIN_SUCCESS` sets only `accessToken`, `refreshToken`, `username`.
-- The sole `uuid` write is `LOGOUT_SUCCESS → uuid: null`.
+- `authReducer.js` `initialState` = `{isAuthenticated, accessToken, refreshToken, username, isLoading, error, message}` — **no `uuid`**.
+- No reducer case writes one. (`main` had `uuid: null` on `LOGOUT_SUCCESS`; `v2.0.1` removed even that key.)
+- `redux-persist`'s `authTransform` whitelists only `isAuthenticated, username, accessToken, refreshToken`, so a `uuid` would not survive a reload anyway.
 
-⇒ `formData.append("uuid", undefined)` serialises to the **literal string `"undefined"`**, so **11
-endpoints currently receive `uuid === "undefined"`** while sending **no** `Authorization` header:
+**On `main`** this meant `formData.append("uuid", undefined)` serialised to the literal string
+`"undefined"`, and **11 endpoints received `uuid === "undefined"` with no `Authorization` header**.
 
-`/auth/reset-password`, `/auth/change-email`, `/users/account`, `/users/delete`,
-`/packages/{ns}/{pkg}/verify`, `/packages/{ns}/{pkg}/delete`, `/packages/{ns}/{pkg}/{v}/delete`,
-`/packages/{ns}/{pkg}/maintainers`, `/namespace/{ns}/delete`, `/namespaces/{ns}/admins`,
-`/namespaces/{ns}/maintainers`, and all six `/{username}/…` routes.
+**On `v2.0.1`** the new `apiClient.js:createFormData` filters out `undefined`/`null`, so the literal
+string is no longer sent — it is silently *omitted*. That is an accident of the new helper, **not a
+fix**. The 10 call sites and the state bug are identical.
 
-**Consequence for the migration:** the serverless auth layer must resolve identity from
-**either** the `Authorization: Bearer` header **or** a `uuid` form field, and must **not** start
-rejecting `"undefined"` until the frontend has been updated to send a real token on those routes.
-**This is a security defect in the current system** — those routes are effectively unauthenticated
-today. It is tracked as a required fix, not silently preserved.
+**The real impact on `v2.0.1`:** 8 of those 10 call paths use the **unauthenticated `post()` helper**
+(no `Authorization` header) — `addRemoveMaintainerActions`, `namespaceAdminsActions`,
+`namespaceMaintainersActions`, `userListActions`, and 4 of the 5 `adminActions`. Every one of those
+routes is `@jwt_required()`. **So they all return 401 and those admin/moderation features are
+currently non-functional in the shipped app.**
+
+**Consequences for the migration:**
+
+1. The serverless auth resolver must accept identity from **either** the `Authorization: Bearer`
+   header **or** a `uuid` form field, so both the current frontend and the fixed one work.
+2. **Do not start rejecting `"undefined"`** until the frontend sends real Bearer tokens on those
+   routes, or the moderator features break twice.
+3. The **frontend must be fixed** to send `Authorization: Bearer` on all 10 routes. This is part of
+   the frontend revamp brief — it is a functionality fix, not a cosmetic change.
 
 ---
 
@@ -156,14 +170,104 @@ today. It is tracked as a required fix, not silently preserved.
 
 Before any phase can be declared complete, the Vitest suite must assert:
 
-- [ ] Every one of the 38 endpoints returns `code: 200` + the exact documented fields on success.
-- [ ] Every error path returns **non-2xx** with `{ code, message }`.
+- [ ] Every one of the 43 endpoints returns `code: 200` + the exact documented fields on success.
+- [ ] Every error path returns **non-2xx** with `{ code, message }` — matching, not merely mirroring (D14).
 - [ ] `access_token` / `refresh_token` are **snake_case** on the wire.
 - [ ] `createdAt` serialises as a string of ≥ 16 characters.
-- [ ] `ver.isDeprecated` is the string `"true"`, not a boolean.
+- [ ] `ver.is_deprecated` is a **boolean** *and* `ver.isDeprecated` is the **string** `"true"`/`"false"` (§7.3).
 - [ ] `ver.download_url` starts with `/`.
-- [ ] `page` is **0-based**; `sorted_by` accepts only `""` and `"updatedat"`.
+- [ ] `page` is **0-based** for `/packages`, **1-based** for `/packages_cli` (an existing asymmetry).
+- [ ] `sorted_by` resolves `"updatedat"` to the real `updated_at` field, and `"downloads"` to the real download counter (§7.5).
 - [ ] `/namespace/{ns}` (GET) and `/namespaces` (POST) coexist without shadowing.
-- [ ] `/packages` dispatches correctly for both GET and PUT.
+- [ ] `/packages` dispatches correctly for GET, POST and PUT.
 - [ ] `GET /users/{username}` returns **both** the dashboard shape and the user-page shape.
 - [ ] A tarball `GET` streams from R2 with `Content-Disposition: attachment`.
+- [ ] Package upload-token responses carry **both** `upload_token` and `uploadToken` (§7.4).
+- [ ] Identity resolves from `Authorization: Bearer` **or** a `uuid` form field.
+
+---
+
+## 7. Corrections from the `v2.0.1` re-derivation
+
+The first pass of this document was written against `main`. Re-deriving it against `v2.0.1` changed
+the following. Each was verified in code, not inferred.
+
+### 7.1 `v2.0.1` **does** have MongoDB indexes — defect D17 is closed
+
+`mongo.py::ensure_indexes()` (called from `server.py::initialize_app()`) creates unique indexes on
+`users.uuid`/`username`/`email`, a unique composite on `packages(name, namespace)`, sort indexes, and
+a **weighted text index** over `packages(name, description, registry_description, keywords,
+categories)`. `BASELINE_AUDIT.md` D17 ("zero indexes") described `main` and is **wrong for the
+migrated base**. The serverless implementation re-creates this exact set via the `ensureIndexes`
+op, then extends it.
+
+### 7.2 CORS in `v2.0.1` is **worse** than on `main`
+
+```python
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+```
+
+`supports_credentials=True` with a wildcard causes Flask-CORS to **reflect the request `Origin`**
+and send `Access-Control-Allow-Credentials: true`. Any website can therefore make credentialed
+cross-origin calls. The Worker implementation in `src/lib/cors.ts` fails closed and drops
+`Allow-Credentials` entirely — the frontend uses Bearer tokens, not cookies, so this makes the API
+CSRF-immune as a side effect.
+
+### 7.3 🔴 `ver.isDeprecated` — a live bug, and the contract must emit **both** keys
+
+| Side | Value |
+|---|---|
+| Frontend `package.js:280` | `ver.isDeprecated === "true" ? "Yes" : "No"` |
+| Backend `models/package.py:126` | emits `"is_deprecated": <boolean>` |
+
+**They never match, so every version renders "Active".** The first pass of this document wrongly
+recorded the backend as emitting the string `"true"`.
+
+Fix: emit **both** — `is_deprecated` (boolean, correct) and `isDeprecated` (string, for the current
+frontend). Purely additive. Also note `is_deprecated` is never set to `True` anywhere, so the field
+is currently constant; Phase 7 adds the missing deprecation API.
+
+### 7.4 🔴 Package upload-token key mismatch
+
+| Endpoint | Emits | Frontend reads |
+|---|---|---|
+| `POST /namespaces/{ns}/uploadToken` | `uploadToken` ✅ | `uploadToken` ✅ |
+| `POST /packages/{ns}/{pkg}/uploadToken` | `upload_token` ❌ | `uploadToken` ❌ |
+
+The package-token dialog silently shows an empty string. Emit **both** keys on both endpoints.
+
+Separately: the two token stores use different timestamp key names — `createdAt`/`createdBy`
+(namespaces) vs `created_at`/`created_by` (packages) — and `upload()` searches **only**
+`db.namespaces`, so **package-level upload tokens cannot actually authorise an upload**. Phase 4
+replaces both with one `upload_tokens` collection (defect D4) with consistent keys.
+
+### 7.5 🔴 `sorted_by` maps to fields that do not exist
+
+`sorted_by` is whitelisted against `{name, author, createdat, updatedat, downloads}` but the actual
+document fields are `updated_at` and `created_at`; `downloads` lives on
+`tarballs.files.downloads_stats.total_downloads`. So **"Date last updated" and "downloads" both
+silently fall back to sorting by name**. The Worker maps the public names onto the real fields:
+
+| Public `sorted_by` | Real sort field |
+|---|---|
+| `""` (default), `name` | `name` |
+| `updatedat`, `createdat` | `updated_at`, `created_at` (DESC) |
+| `downloads` | denormalised `download_count` on the package doc, DESC |
+
+### 7.6 Other `v2.0.1` changes affecting the contract
+
+- **`PUT /packages` does not exist.** `deprecatePackage` PUTs to a route that returns **405**, so
+  deprecation is entirely unreachable. Phase 7 adds it.
+- **`POST /auth/reset-password` is a hard 500** — `auth.py:260` references `env_var` and `hashlib`,
+  neither of which is imported. Both frontend reset paths are dead.
+- **`GET /apidocs` 500s** — `swag_from("documentation/search_packages_cli.yaml")` points at a file
+  that does not exist. Irrelevant to the Worker, which generates its own OpenAPI document.
+- **Refresh tokens are unusable** — minted at login and `verify_email`, stored by the frontend, but
+  there is **no `/auth/refresh` route and no `@jwt_required(refresh=True)` anywhere**. Phase 3 adds
+  one.
+- **`POST /packages` derives the namespace from the token** and never reads a `namespace` form field.
+- **`isAdmin` is the string `"true"`**, not a boolean.
+- **`GET /users/admin/transfer` is unauthenticated** and returns 501. Dropped in the Worker.
+- **Upload tokens live for exactly 7 days** and are never revoked — defect D4.
+- **`MAX_CONTENT_LENGTH` now exists** (`50 MB`, from `MAX_UPLOAD_SIZE_MB`), so defect D8 is
+  narrowed to the `tarfile.getnames()` decompression step rather than the whole upload.
