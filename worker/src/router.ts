@@ -42,7 +42,10 @@ export async function route(
   const seg = path.split("/").filter(Boolean);
 
   // ── meta ───────────────────────────────────────────────────────────────────
-  if (path === "/health" || path === "/healthz") return handleHealth(env);
+  // Defect D81: /healthz was answered by a static stub in meta.ts that never
+  // touched MongoDB. The real probe lives in index.ts; route it through there
+  // by returning null for /healthz so index.ts's intercept handles it.
+  if (path === "/health") return handleHealth(env);
   if (path === "/" || path === "/apidocs" || path === "/apidocs/openapi.json") {
     if (path === "/") return jsonOk({ message: "fpm registry api", version: "3.0.0" });
     return handleOpenapi(path, env);

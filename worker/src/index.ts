@@ -44,7 +44,10 @@ export default {
     try {
       // Health checks must answer even when MongoDB is unreachable, otherwise
       // a DB blip makes the whole edge look dead. Mirrors v2.0.1's `/health`.
-      if (url.pathname === "/health") {
+      if (url.pathname === "/health" || url.pathname === "/healthz") {
+        // Defect D81: the router aliased /healthz to a static "healthy" stub,
+        // so a load balancer probing /healthz never noticed an unreachable DB.
+        // Both spellings now run the real probe.
         return healthResponse(env, cors);
       }
 

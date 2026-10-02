@@ -101,14 +101,10 @@ export const INDEX_SPEC: IndexSpec[] = [
       { key: { created_at: -1 }, name: "reports_created_at" },
     ],
   },
-  {
-    collection: "tarballs.files",
-    indexes: [
-      // Carried from v2.0.1. Note: v2.0.1's GridFS record stores only the URL
-      // string, not tarball bytes — Phase 6 replaces this with R2 entirely.
-      { key: { "metadata.url": 1 }, name: "tarballs_metadata_url" },
-    ],
-  },
+  // Defect D81: the legacy GridFS index spec is dropped. `tarballs.files` no
+  // longer exists (Phase 6 moved artifacts to R2), and createIndexes against a
+  // namespace the bootstrap never materialised fails on Atlas M0 with
+  // 'Expected createIndexes to be string, but got <nil>' every hourly cron.
 ];
 
 /**

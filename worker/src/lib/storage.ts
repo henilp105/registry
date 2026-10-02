@@ -360,10 +360,24 @@ class Sha256 {
     view.setUint32(padLength + 4, bitLength >>> 0, false);
     view.setUint32(padLength, Math.floor(bitLength / 0x1_0000_0000), false);
 
+    // Defect D81: `this.update(padding)` used to mutate this instance, so a
+    // second `hex()` produced a different digest (padding was applied twice).
+    // Work on copies of the working state instead, leaving the instance -- and
+    // its message schedule -- untouched.
+    const savedH = new Uint32Array(this.#h);
+    const savedBuffer = new Uint8Array(this.#buffer);
+    const savedLength = this.#length;
+    const savedBufferLength = this.#bufferLength;
+
     this.update(padding);
 
     let out = "";
     for (const word of this.#h) out += word.toString(16).padStart(8, "0");
+
+    this.#h.set(savedH);
+    this.#buffer.set(savedBuffer);
+    this.#length = savedLength;
+    this.#bufferLength = savedBufferLength;
     return out;
   }
 

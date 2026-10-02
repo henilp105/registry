@@ -45,7 +45,7 @@ import {
 import { logger } from "./logger";
 
 /** Paths that must never be refused. Health checks are for monitoring. */
-const ALWAYS_ALLOWED = new Set(["/health", "/", "/apidocs", "/apidocs/openapi.json"]);
+const ALWAYS_ALLOWED = new Set(["/health", "/healthz", "/", "/apidocs", "/apidocs/openapi.json"]);
 
 type RateDecision = Decision & { kind: LimitKind };
 

@@ -203,10 +203,17 @@ export async function consumeUploadToken(env: Env, presented: string): Promise<T
 
 /** Revoke a token. Only the creator or a site admin may call this. */
 export async function revokeUploadToken(env: Env, tokenId: string, actorUuid: string): Promise<boolean> {
+  // D81: reject a malformed id up front. The old `{ $invalid: hex }` sentinel
+  // is a real aggregation operator, so the server *error*ed instead of
+  // returning zero matches -- a 500 for a simply-not-found token.
+  if (!isHex24(tokenId)) {
+    logger.info("upload token revoke matched nothing", { tokenId, actorUuid });
+    return false;
+  }
   const result = (await db<{ modifiedCount: number }>(env, {
     kind: "updateOne",
     collection: UPLOAD_TOKEN_COLLECTION,
-    filter: { _id: toObjectId(tokenId), revoked_at: null },
+    filter: { _id: tokenId, revoked_at: null },
     update: { $set: { revoked_at: new Date() } },
   })) as { modifiedCount: number };
 
@@ -227,13 +234,6 @@ export async function sweepExpiredTokens(env: Env, olderThanDays = 30): Promise<
   const removed = result?.deletedCount ?? 0;
   if (removed > 0) logger.info("swept expired upload tokens", { removed });
   return removed;
-}
-
-/** Reinterpret a 24-char hex string as an ObjectId for a query. */
-function toObjectId(hex: string): unknown {
-  // Imported lazily to keep this module free of a hard mongodb dependency at
-  // the edges; the Durable Object does the actual casting on the server side.
-  return isHex24(hex) ? hex : { $invalid: hex };
 }
 
 function clampTtl(requested: number | undefined): number {
