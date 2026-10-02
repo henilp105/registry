@@ -35,6 +35,7 @@ import { DurableObject } from "cloudflare:workers";
 import { hashPassword, parseIterations, verifyPassword } from "../lib/password";
 import {
   MongoClient,
+  ObjectId,
   type ClientSession,
   type Db,
   type Document,
@@ -262,7 +263,23 @@ export class MongoPool extends DurableObject<PoolEnv> {
         const result = await this.#run(request.op);
         this.#opsServed += 1;
         this.#lastError = null;
-        return result;
+        // Sanitise at the RPC boundary. This is the only place raw BSON leaves
+        // the Durable Object, and workerd's RPC layer cannot serialise a BSON
+        // ObjectId -- it throws
+        //   `Could not serialize object of type "_ObjectId"`.
+        //
+        // This is not a cosmetic detail. The MongoDB driver returns documents
+        // with `_id` as an ObjectId unless a projection excludes it, and Mongo's
+        // `$project` includes `_id` by default. So any query that returns a whole
+        // document -- every read route in this API -- returned an ObjectId and
+        // failed at the boundary, turning a 200 into a 500.
+        //
+        // Found by running `wrangler dev` against the real Atlas cluster with
+        // real documents. Every read route 500'd: /packages, /packages/{ns}/{pkg},
+        // /namespace/{ns}. The 26 live-Atlas tests had passed because their
+        // fixtures and projections happened never to place an ObjectId in the
+        // response -- which is precisely the gap that only real data finds.
+        return toRpcSafe(result);
       } catch (err) {
         if (attempt >= 1 || !isRetryable(err)) throw err;
         // The socket may have died under us; drop it so the retry reconnects.
@@ -284,11 +301,39 @@ export class MongoPool extends DurableObject<PoolEnv> {
     lastError: string | null;
     serverVersion: string | null;
   }> {
+    // A cold Durable Object has no client, because the connection is established
+    // lazily on first use. The previous version of this method reported
+    // `connected: false` in that state -- reporting a database outage it had
+    // never actually tested.
+    //
+    // Found by running `wrangler dev` against the real cluster: `/health` said
+    // `degraded, mongo.connected: false` while `/packages` was succeeding in
+    // reaching MongoDB, and the only genuine fault was a missing text index. The
+    // health endpoint pointed at the wrong subsystem, which is exactly the wrong
+    // property for a signal that exists to direct an incident.
+    //
+    // So: connect if needed, then actually verify. Absence of evidence is not
+    // evidence of disconnection.
     if (!this.#client) {
-      return { ok: true, connected: false, opsServed: this.#opsServed, lastError: this.#lastError, serverVersion: null };
+      try {
+        await this.#connect();
+      } catch (err) {
+        return {
+          ok: false,
+          connected: false,
+          opsServed: this.#opsServed,
+          lastError: err instanceof Error ? err.message : String(err),
+          serverVersion: null,
+        };
+      }
     }
+
     try {
-      const info = (await this.#client.db("admin").command({ buildInfo: 1 })) as { version?: string };
+      // `#connect()` guarantees a client, but TS cannot see across the await, so
+      // re-read the field rather than asserting.
+      const client = this.#client;
+      if (!client) throw new Error("connection lost between connect and probe");
+      const info = (await client.db("admin").command({ buildInfo: 1 })) as { version?: string };
       return {
         ok: true,
         connected: true,
@@ -376,14 +421,25 @@ export class MongoPool extends DurableObject<PoolEnv> {
 
     const c = this.#dbFor(client).collection(op.collection);
 
+    // Every query fragment goes through the hex -> ObjectId conversion. Doing it
+    // here rather than per call site is what makes the string ids that
+    // `toRpcSafe` emits safe to use as filters. See `toBsonQueries`.
+    // `insertOne` carries a document rather than a filter, and the earlier
+    // branches above have already returned for every non-query kind.
+    const filter = ("filter" in op ? toBsonQueries(op.filter) : {}) as Filter<Document>;
+    // `update` and `pipeline` only exist on some variants of the union, so they
+    // are narrowed by kind rather than read off the whole union.
+    const update = "update" in op && op.update ? (toBsonQueries(op.update) as Document) : undefined;
+    const pipeline = "pipeline" in op && op.pipeline ? (toBsonQueries(op.pipeline) as Document[]) : undefined;
+
     switch (op.kind) {
       case "findOne":
         return (
-          (await c.findOne(op.filter as Filter<Document>, op.projection ? { projection: op.projection } : undefined)) ??
+          (await c.findOne(filter, op.projection ? { projection: op.projection } : undefined)) ??
           null
         );
       case "find": {
-        let cursor = c.find(op.filter as Filter<Document>);
+        let cursor = c.find(filter);
         if (op.projection) cursor = cursor.project(op.projection);
         if (op.sort) cursor = cursor.sort(op.sort);
         if (op.skip) cursor = cursor.skip(op.skip);
@@ -397,23 +453,23 @@ export class MongoPool extends DurableObject<PoolEnv> {
         return { insertedId: r.insertedId };
       }
       case "updateOne": {
-        const r = await c.updateOne(op.filter as Filter<Document>, op.update, op.upsert ? { upsert: true } : undefined);
+        const r = await c.updateOne(filter, update as Document, op.upsert ? { upsert: true } : undefined);
         return { matchedCount: r.matchedCount, modifiedCount: r.modifiedCount, upsertedId: r.upsertedId ?? null };
       }
       case "updateMany": {
-        const r = await c.updateMany(op.filter as Filter<Document>, op.update);
+        const r = await c.updateMany(filter, update as Document);
         return { matchedCount: r.matchedCount, modifiedCount: r.modifiedCount, upsertedId: null };
       }
       case "deleteOne": {
-        const r = await c.deleteOne(op.filter as Filter<Document>);
+        const r = await c.deleteOne(filter);
         return { deletedCount: r.deletedCount };
       }
       case "deleteMany": {
-        const r = await c.deleteMany(op.filter as Filter<Document>);
+        const r = await c.deleteMany(filter);
         return { deletedCount: r.deletedCount };
       }
       case "aggregate":
-        return await c.aggregate(op.pipeline).toArray();
+        return await c.aggregate(pipeline as Document[]).toArray();
     }
   }
 
@@ -449,3 +505,75 @@ function isRetryable(err: unknown): boolean {
 }
 
 const RETRYABLE_CODES = new Set([6, 7, 89, 91, 189, 9001, 10107, 11600, 11602, 13435, 13436]);
+
+/**
+ * Convert 24-character hex strings back into ObjectIds, recursively, inside any
+ * query fragment.
+ *
+ * ── Why this exists, and why it is here rather than in the handlers ─────────
+ * The RPC layer cannot serialise a BSON ObjectId, so `toRpcSafe` turns every id
+ * into its hex string on the way out. A handler then reads `doc._id` and feeds it
+ * straight back into the next filter.
+ *
+ * Measured against MongoDB 8.0.34 with driver 7.7.0, that fails:
+ *
+ *     { _id: "<24 hex>" }              -> 0 matches
+ *     { _id: ObjectId(...) }           -> 1 match
+ *
+ * So the driver does **not** coerce a hex string on an `_id` path either, which
+ * is the opposite of the long-standing assumption this codebase was written on
+ * (`lib/ids.ts` says "the MongoDB driver converts a 24-character hex string into
+ * an ObjectId automatically"). Scattering a conversion helper over ~30 filter
+ * call sites would work until the next author forgot one, and a forgotten one is
+ * a silent zero-match: no error, just an empty result that reads as "not found".
+ *
+ * Doing it once, here, means the hex form is *always* usable as a filter.
+ *
+ * ── The assumption this makes ───────────────────────────────────────────────
+ * A string of exactly 24 hex characters is assumed to be an id. Checked against
+ * the schema: the only other hex-valued fields are `sha256` (64 chars) and
+ * upload-token digests (64 chars), so there is no collision today. If a future
+ * field ever holds a 24-hex value that is *not* an id, this would silently change
+ * its meaning -- which is the trade, made deliberately and recorded here.
+ */
+const HEX24 = /^[0-9a-fA-F]{24}$/;
+
+function toBsonQueries(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(toBsonQueries);
+  if (value === null || typeof value !== "object") {
+    return HEX24.test(String(value ?? "")) ? new ObjectId(String(value)) : value;
+  }
+  if (value instanceof Date || value instanceof ObjectId) return value;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = toBsonQueries(v);
+  return out;
+}
+
+/**
+ * Convert BSON values into something workerd's RPC layer can serialise.
+ *
+ * Deliberately lossy in one direction only: an ObjectId becomes its hex string,
+ * which is what the API already exposes as `_id` everywhere else. Dates become
+ * ISO strings. Everything else is returned as-is, so there is exactly one place
+ * in the codebase that knows about BSON's type surface.
+ */
+function toRpcSafe(value: unknown): unknown {
+  if (value === null || value === undefined) return value ?? null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "bigint") return Number(value);
+  if (Array.isArray(value)) return value.map(toRpcSafe);
+  if (typeof value === "object") {
+    const proto = Object.getPrototypeOf(value);
+    // BSON ObjectId, and anything else driver-specific exposing toHexString().
+    if (typeof (value as { toHexString?: unknown }).toHexString === "function") {
+      return (value as { toHexString(): string }).toHexString();
+    }
+    if (proto === null) return value;
+    // A Buffer/Uint8Array is already RPC-safe; `Date` was handled above.
+    if (value instanceof Uint8Array) return Array.from(value);
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = toRpcSafe(v);
+    return out;
+  }
+  return value;
+}

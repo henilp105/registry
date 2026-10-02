@@ -126,6 +126,35 @@ describe("responses", () => {
     }
   });
 
+  it("routes every documented path, not just describes it", () => {
+    // The missing direction. `openapi.test.ts` asserted spec -> document, so a
+    // route that appeared in the route table but had no handler passed every
+    // check while answering 404. `/packages_cli` was exactly that: documented in
+    // the generated OpenAPI, referenced by `packages.py`'s `@swag_from`, and
+    // never implemented.
+    //
+    // Documenting a route that does not exist is worse than omitting it, because
+    // a client generator emits a method for it and a reader trusts the spec.
+    //
+    // Matching is on the route's static first segment appearing as a quoted
+    // literal somewhere in the two entry points: `index.ts` (health, apidocs,
+    // CORS) and `router.ts` (everything else). A segment can still appear in a
+    // comment, so this asserts "not obviously unrouted" rather than proving
+    // reachability -- the real proof is requesting each documented route, which
+    // is what surfaced D48.
+    const entrypoints = readSource("../src/index.ts") + readSource("../src/router.ts");
+    const unreached = [...new Set(ROUTES.map((r) => r.path.split("/")[1] ?? ""))]
+      .filter((segment) => !segment.startsWith("{"))
+      // A segment may be matched as a bare literal (`"packages"`) or inside a
+      // full path (`url.pathname === "/health"`), so accept either.
+      .filter((segment) => !entrypoints.includes(segment));
+
+    expect(
+      unreached,
+      `documented path segment(s) never appear in the router: ${unreached.join(", ")}`,
+    ).toEqual([]);
+  });
+
   it("documents a refusal-only route as having no success response", () => {
     // The inverse: if a route is marked refusal-only, prove it really has no
     // 2xx, so adding a `200` later is a deliberate act rather than an accident.

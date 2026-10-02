@@ -54,6 +54,21 @@
     ]
   },
 
+  // Declares the Durable Object's lifecycle. Wrangler treats `migrations` and
+  // `exports` as mutually exclusive ways of saying the same thing -- declaring
+  // both is a hard config error, so this file uses `exports` and carries no
+  // `migrations` array.
+  //
+  // `storage: sqlite` is the modern default and is not billed on the free plan.
+  // The class stores nothing in `ctx.storage`; it exists to own the MongoDB
+  // connection and to give the KDF a 30 s CPU budget instead of 10 ms.
+  "exports": {
+    "MongoPool": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+
   "r2_buckets": [
     {
       "binding": "TARBALLS",
@@ -79,14 +94,33 @@
     ]
   },
 
+  // ── Environment inheritance, which is the trap here ─────────────────────
+  // `vars`, `durable_objects` and `kv_namespaces` are NOT inherited by an
+  // `env` block. Each environment below therefore repeats them explicitly.
+  //
+  // Omitting the repetition is silent: `wrangler deploy --env production` prints
+  // no error, and produces a Worker with no MONGO_POOL and no CACHE. Every route
+  // that touches MongoDB then fails, and the cause is a config block three
+  // hundred lines away from the symptom. Verified by running
+  // `wrangler deploy --dry-run --env production` and reading its binding table.
   "env": {
     "staging": {
       "name": "fpm-registry-api-staging",
       "vars": {
         "ENVIRONMENT": "staging",
         "MONGO_DB_NAME": "fpmregistry_staging",
+        "PBKDF2_ITERATIONS": "210000",
         "HOST": "https://staging.registry.fortran-lang.org",
         "ALLOWED_ORIGINS": "https://staging.registry.fortran-lang.org"
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "MONGO_POOL", "class_name": "MongoPool" }]
+      },
+      "kv_namespaces": [
+        { "binding": "CACHE", "id": "REPLACE_WITH_STAGING_KV_NAMESPACE_ID" }
+      ],
+      "exports": {
+        "MongoPool": { "type": "durable-object", "storage": "sqlite" }
       },
       "r2_buckets": [
         {
@@ -100,8 +134,18 @@
       "vars": {
         "ENVIRONMENT": "production",
         "MONGO_DB_NAME": "fpmregistry",
+        "PBKDF2_ITERATIONS": "210000",
         "HOST": "https://registry.fortran-lang.org",
         "ALLOWED_ORIGINS": "https://registry.fortran-lang.org"
+      },
+      "durable_objects": {
+        "bindings": [{ "name": "MONGO_POOL", "class_name": "MongoPool" }]
+      },
+      "kv_namespaces": [
+        { "binding": "CACHE", "id": "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID" }
+      ],
+      "exports": {
+        "MongoPool": { "type": "durable-object", "storage": "sqlite" }
       },
       "r2_buckets": [
         {

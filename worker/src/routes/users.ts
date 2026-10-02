@@ -117,7 +117,10 @@ async function profile(request: Request, env: Env, username: string): Promise<Re
     kind: "findOne",
     collection: "users",
     filter: { username },
-    projection: { username: 1, email: 1, createdAt: 1 },
+    // `_id` is required: the packages list below filters on `packages.author`,
+    // which is a foreign key to `users._id`. The previous projection omitted it,
+    // so the filter had no id to match.
+    projection: { _id: 1, username: 1, email: 1, createdAt: 1 },
   })) as PublicProfileDoc | null;
 
   if (!user) return jsonError(404, "User not found");
@@ -131,14 +134,25 @@ async function profile(request: Request, env: Env, username: string): Promise<Re
     db<unknown[]>(env, {
       kind: "find",
       collection: "packages",
-      filter: { author: viewer?._id },
+      // The *profile owner's* packages, not the viewer's. This filtered on
+      // `viewer?._id`, so it returned the right answer only when you opened your
+      // own profile: for any other username, and for an anonymous visitor --
+      // which is how a public profile page is normally first loaded -- the filter
+      // was `author: undefined` and matched nothing. `packages: []` at HTTP 200.
+      //
+      // Publishing someone's packages is not sensitive: they are listed on the
+      // search results and the package pages already.
+      filter: { author: user._id },
       projection: { name: 1, namespace_name: 1 },
     }),
     db<unknown[]>(env, {
       kind: "aggregate",
       collection: "namespaces",
       pipeline: [
-        { $match: { $or: [{ author: viewer?._id }, { admins: viewer?._id }, { maintainers: viewer?._id }] } },
+        // The profile owner's namespaces, by the same reasoning as the packages
+        // list above. Filtering on the viewer meant an anonymous visitor to any
+        // profile saw `namespaces: []`.
+        { $match: { $or: [{ author: user._id }, { admins: user._id }, { maintainers: user._id }] } },
         {
           $lookup: {
             from: "packages",

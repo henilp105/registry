@@ -195,7 +195,9 @@ async function searchPackages(env: Env, url: URL): Promise<Response> {
   ]);
 
   const totalDocs = total ?? 0;
-  const totalPages = limit > 0 ? Math.ceil(totalDocs / limit) : 0;
+  // Zero results means zero pages. The legacy behaviour of reporting one page for
+  // an empty result is not reproduced.
+  const totalPages = totalDocs > 0 && limit > 0 ? Math.ceil(totalDocs / limit) : 0;
 
   return jsonOk({
     packages: ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
@@ -207,6 +209,143 @@ async function searchPackages(env: Env, url: URL): Promise<Response> {
     })),
     total_pages: totalPages,
   });
+}
+
+
+/**
+ * Dispatcher for `GET /packages_cli`.
+ *
+ * Separate from `handlePackageRoutes` because the router matches on the first
+ * path segment: `/packages_cli` never enters the `packages` branch, so putting
+ * this check inside that handler would have been dead code. It was, briefly.
+ */
+export async function handlePackageCliRoute(
+  request: Request,
+  env: Env,
+  _ctx: ExecutionContext,
+  segments: string[],
+  url: URL,
+  _auth: AuthContext | null,
+): Promise<Response | null> {
+  if (request.method.toUpperCase() === "GET" && segments.length === 1) {
+    return searchPackagesCli(env, url);
+  }
+  return null;
+}
+
+// ── GET /packages_cli ───────────────────────────────────────────────────────
+
+/**
+ * Search, shaped for the `fpm` CLI.
+ *
+ * ── Why this route is separate from `/packages` ────────────────────────────
+ * It is not a stylistic choice. The two endpoints disagree on the wire in ways a
+ * client can observe, and `v0.0.1` preserved both:
+ *
+ *   - `page` is **1-based** here and 0-based on `/packages`. The CLI subtracts
+ *     one before computing `skip`; the web frontend does not.
+ *   - `*` is a sentinel meaning "any" for `namespace`, `package` and `license`.
+ *   - an empty result is a **404** here with `{"status":"error", ...}`, while
+ *     `/packages` returns 200 and an empty array. The CLI reads the 404 as
+ *     "nothing found"; the web UI renders an empty state.
+ *   - each entry carries a flattened `version` string rather than a nested
+ *     `latest_version_data` object.
+ *
+ * Making this a copy of `/packages` would have silently broken every one of them.
+ *
+ * ── Defect D48: documented but never implemented ─────────────────────────────
+ * Phase 9 generated the OpenAPI document from the route table and listed
+ * `/packages_cli`, recovered from `packages.py`'s `@swag_from`. No handler was
+ * ever written, so the route was published in the API spec and answered 404.
+ * Documenting a route that does not exist is worse than omitting it: a client
+ * generator emits a method for it, and a reader trusts the spec.
+ *
+ * Found by walking the *generated* spec and requesting every route it documents.
+ * `openapi.test.ts` asserted only that every spec entry appears in the document,
+ * never that every documented route is actually routed, so it passed.
+ *
+ * Defect D18 applies here as on `/packages`: `v0.0.1` interpolated the user's
+ * query straight into an unescaped `$regex` and then ran a second full scan for
+ * `count_documents`. Now one `$text` query against the weighted index, and the
+ * filters are escaped matches over bounded inputs.
+ */
+async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
+  const rawQuery = (url.searchParams.get("query") ?? "fortran").trim();
+  // 1-based, converted once here so the rest of the function is 0-based like
+  // every other page calculation in this codebase.
+  const page = clampInt(url.searchParams.get("page"), 1, 1, MAX_SKIP) - 1;
+  const limit = clampInt(url.searchParams.get("limit"), DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
+  const skip = page * limit;
+  const sortedBy = (url.searchParams.get("sorted_by") ?? "name").toLowerCase();
+  const sortField = SORT_MAP[sortedBy] ?? "name";
+  const direction = sortDirection(url.searchParams.get("sort"));
+
+  // `*` is the CLI's "any" sentinel, not a literal to match against.
+  const wildcard = (key: string): string | null => {
+    const value = url.searchParams.get(key);
+    if (value === null) return null;
+    const trimmed = value.trim();
+    return trimmed === "" || trimmed === "*" ? null : trimmed;
+  };
+  const namespace = wildcard("namespace");
+  const packageName = wildcard("package");
+  const license = wildcard("license");
+
+  const extra: Record<string, unknown> = {};
+  if (namespace) extra.namespace_name = { $regex: `^${escapeRegex(namespace)}`, $options: "i" };
+  if (packageName) extra.name = { $regex: `^${escapeRegex(packageName)}`, $options: "i" };
+  if (license) extra.license = { $regex: escapeRegex(license), $options: "i" };
+
+  const plan = planSearch(rawQuery);
+  const filter = buildMatchFilter(plan, { is_deprecated: false, ...extra });
+
+  const [rows, total] = await Promise.all([
+    db<Record<string, unknown>[]>(env, {
+      kind: "aggregate",
+      collection: "packages",
+      pipeline: [
+        { $match: filter },
+        { $sort: plan.kind === "text" ? { score: { $meta: "textScore" } } : { [sortField]: direction } },
+        { $skip: skip },
+        { $limit: limit },
+        { $project: { name: 1, namespace_name: 1, description: 1, versions: 1 } },
+      ],
+    }),
+    db<number>(env, {
+      kind: "count",
+      collection: "packages",
+      filter: plan.kind === "text" ? { is_deprecated: false, ...extra } : filter,
+    }),
+  ]);
+
+  const packages = (rows ?? []).map((row) => ({
+    name: row.name,
+    namespace: row.namespace_name,
+    description: row.description,
+    // Newest by semver, not `versions[-1]`. v0.0.1 took the last element of a
+    // string-sorted list, so a package holding both 0.9.0 and 0.10.0 advertised
+    // 0.9.0 as its latest: the same defect as D9.
+    version: latestVersionOf(row.versions),
+  }));
+
+  // 404 on empty is this route's legacy contract specifically. Changing it would
+  // make `fpm search` read "no matches" as a transport failure.
+  if (packages.length === 0) {
+    return jsonError(404, "packages not found", { status: "error" });
+  }
+
+  const totalDocs = total ?? 0;
+  return jsonOk({ packages, total_pages: limit > 0 ? Math.ceil(totalDocs / limit) : 0 });
+}
+
+/** Newest version by semver comparison, or `null` when there are none. */
+function latestVersionOf(versions: unknown): string | null {
+  if (!Array.isArray(versions) || versions.length === 0) return null;
+  const entries = versions
+    .map((v) => (v as { version?: unknown })?.version)
+    .filter((v): v is string => typeof v === "string");
+  if (entries.length === 0) return null;
+  return [...entries].sort(compareVersionsDescending)[0] ?? null;
 }
 
 // ── GET /packages/{ns}/{pkg} ─────────────────────────────────────────────────

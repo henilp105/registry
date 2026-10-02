@@ -257,14 +257,25 @@ async function namespacePackages(env: Env, namespaceName: string): Promise<Respo
       { $match: { namespace: namespaceName } },
       { $limit: 1 },
       {
+        // Join on `_id` -> `packages.namespace`, which is the real foreign key:
+        // `upload` writes `namespace: namespace._id` into the package document.
+        //
+        // The previous form joined `namespaces.packages` -- an array of package
+        // *name strings* -- against `packages._id`, a list of ObjectIds. Those
+        // never match, so `$lookup` returned an empty array and the endpoint
+        // reported `packages: []` for every namespace, at HTTP 200. Found by
+        // running this against seeded data; no test had asserted the join
+        // returned anything, only that the route did not 500.
+        //
+        // It also had `$unwind` followed by `rows[0]`, which would have capped
+        // the response at a single package even with a correct join.
         $lookup: {
           from: "packages",
-          localField: "packages",
-          foreignField: "_id",
+          localField: "_id",
+          foreignField: "namespace",
           as: "packageDocs",
         },
       },
-      { $unwind: { path: "$packageDocs", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           createdAt: 1,
@@ -283,24 +294,21 @@ async function namespacePackages(env: Env, namespaceName: string): Promise<Respo
   const row = rows?.[0];
   if (!row) return jsonError(404, "Namespace not found");
 
-  const doc = (row.packageDocs ?? null) as Record<string, unknown> | null;
+  const docs = (row.packageDocs ?? []) as Record<string, unknown>[];
 
   // Contract: `createdAt` must be a string, because the frontend slices it
   // (`.slice(4,16)`). toJsonSafe converts the BSON Date.
   return jsonOk({
     createdAt: toJsonSafe(row.createdAt),
-    packages: doc
-      ? [
-          {
-            namespace: doc.namespace_name,
-            name: doc.name,
-            description: doc.description,
-            keywords: doc.keywords ?? [],
-            updated_at: toJsonSafe(doc.updated_at),
-          },
-        ]
-      : [],
+    packages: docs.map((doc) => ({
+      namespace: doc.namespace_name,
+      name: doc.name,
+      description: doc.description,
+      keywords: doc.keywords ?? [],
+      updated_at: toJsonSafe(doc.updated_at),
+    })),
   });
+
 }
 
 // ── POST /namespace/{ns}/delete ───────────────────────────────────────────────

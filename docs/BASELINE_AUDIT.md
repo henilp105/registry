@@ -264,3 +264,140 @@ so it is blind to the deletion of a route this migration *added*. Verified by
 removing `/auth/refresh` and watching the gate pass. The reverse direction is
 covered by `openapi.test.ts` and `frontend-contract.test.ts`.
 
+---
+
+## D48–D52 — Found by running the Worker against real data
+
+**Severity: D49 and D50 are critical — every read route 500'd in production.**
+
+Until this point the migration had been verified by type checking, linting, 266
+unit tests (26 of them against live Atlas), a bundle dry-run and the OpenAPI
+validator. All green. Then the Worker was actually *run* — `wrangler dev` against
+the real cluster, with seeded documents, and every documented route requested.
+
+Every one of these is invisible to a unit test that does not hold a real document.
+
+### D49 — BSON ObjectId could not cross the Durable Object boundary (critical)
+
+`Could not serialize object of type "_ObjectId". This type does not support serialization.`
+
+workerd's RPC layer cannot serialise a BSON `ObjectId`. `#run` returned raw
+driver results, so the DO → Worker hop threw and turned every read route into a
+500: `/packages`, `/packages/{ns}/{pkg}`, `/namespace/{ns}`.
+
+It hit every read because the driver returns `_id` as an ObjectId unless a
+projection excludes it, and Mongo's `$project` includes `_id` by default.
+
+Fixed at `execute()`, the single RPC boundary, by a `toRpcSafe` conversion.
+
+**The fix then broke everything it touched**, which is the more interesting part.
+`toRpcSafe` emits ids as hex strings, and handlers feed a returned `_id` straight
+back into the next filter — around thirty call sites do this. Measured against
+MongoDB 8.0.34 with driver 7.7.0:
+
+| Filter | Matches |
+|---|---|
+| `{ _id: ObjectId(...) }` | 1 |
+| `{ _id: "<24 hex>" }` | 0 |
+| `{ namespace: ObjectId(...) }` | 0 |
+| `{ namespace: "<24 hex>" }` | 0 |
+
+So the driver does **not** coerce a hex string to an ObjectId — not even on an
+`_id` path. This is the opposite of what `worker/src/lib/ids.ts` asserts:
+
+> "The MongoDB driver converts a 24-character hex string into an ObjectId
+> automatically when it is used against `_id`"
+
+That comment is now known to be false and was inherited from the earlier defect-D11
+work. Correcting it matters more than the code: it is the kind of claim that makes
+the next author skip the check.
+
+Fixing thirty call sites individually would work until the next author forgot one,
+and a forgotten one is a silent zero-match — no error, just an empty result that
+reads as "not found". So the conversion happens once, in the DO, over every query
+fragment (`toBsonQueries`). Its one assumption: a 24-hex-character string is an
+id. Checked against the schema, the only other hex-valued fields are `sha256` and
+upload-token digests, both 64 characters. Recorded in the code because a future
+24-hex non-id field would silently change meaning.
+
+### D50 — `/namespace/{ns}` joined on the wrong key (high)
+
+`$lookup` joined `namespaces.packages` — an array of package **name strings** —
+against `packages._id`, a list of ObjectIds. Never matches. Every namespace
+reported `packages: []` at HTTP 200, which looks like a legitimate empty state.
+
+The same pipeline had `$unwind` followed by `rows[0]`, so even a correct join
+would have capped the response at a single package.
+
+Fixed to join `_id` → `packages.namespace`, which is the real foreign key.
+
+### D51 — Public profile listed the *viewer’s* packages and namespaces (high)
+
+`GET /users/{username}` filtered `packages.author` on `viewer?._id` instead of the
+profile owner's id, and omitted `_id` from its own projection, so there was no
+owner id to filter on. The result was correct only when you opened your own
+profile; for any other username — and for an anonymous visitor, which is how a
+public profile page is normally first loaded — the filter was `author: undefined`,
+matching nothing. `packages: []` and `namespaces: []` at HTTP 200.
+
+Both filters now use the profile owner.
+
+### D52 — `/packages_cli` was documented but never implemented (high)
+
+Phase 9 generated the OpenAPI document from the route table and listed
+`/packages_cli`, recovered from `packages.py`'s `@swag_from`. No handler was ever
+written: the route was published in the API spec and answered 404.
+
+Documenting a route that does not exist is worse than omitting it. A client
+generator emits a method for it, and a reader trusts the spec. `fpm search` depends
+on it.
+
+It is not a copy of `/packages`. The two disagree observably and both were kept:
+`page` is **1-based** here and 0-based there; `*` is an "any" sentinel; an empty
+result is a **404** here (`{"status":"error", ...}`) and 200-with-`[]` there; and
+entries carry a flattened `version` string rather than `latest_version_data`.
+Copying `/packages` would have silently broken all four.
+
+### D53 — `/health` reported an outage it never tested (medium)
+
+`health()` returned `connected: false` whenever `#client` was null. The DO
+connects lazily, so a **cold** Worker reported a database outage that had never
+been diagnosed. Meanwhile `/packages` was successfully reaching MongoDB and the
+only genuine fault was a missing text index.
+
+A health signal exists to point an incident at the right subsystem, and this one
+pointed at the wrong one. It now connects if needed and actually verifies:
+absence of evidence is not evidence of disconnection.
+
+### Also fixed while here
+
+- **No `migrations`/`exports` declaration for the Durable Object.** `wrangler`
+  rejects a deploy without one.
+- **`vars`, `durable_objects` and `kv_namespaces` are not inherited by an `env`
+  block.** The `staging` and `production` blocks overrode only `vars` and
+  `r2_buckets`, so `wrangler deploy --env production` produced a Worker with **no
+  `MONGO_POOL` and no `CACHE`** — silently, with no error. Every database route
+  would have failed in production while the same code passed every other check.
+  Both environments now declare them explicitly, and
+  `worker/test/wrangler-config.test.ts` asserts it.
+- **`PBKDF2_ITERATIONS` was top-level only**, so both environments would have
+  silently fallen back to a different KDF cost.
+- **Production's KV placeholder had been copy-pasted from staging**, so both
+  environments named the same cache-invalidation namespace.
+- `total_pages` reported 1 for an empty result set.
+
+### The test gaps this exposed
+
+1. `openapi.test.ts` was **circular**: it asserted spec → document, so a route
+   present in the router and absent from the spec passed. Now also asserts the
+   reverse — every documented segment appears in an entry point — and every `501`
+   the router can emit is documented. Verified by reintroducing D52 and watching
+   it fail.
+2. No test asserted a `$lookup` actually **joined**. D50's pipeline returned a
+   well-formed empty result, so every status-code assertion passed.
+3. The 26 live-Atlas tests never returned an ObjectId through the RPC boundary,
+   because their projections happened to avoid it.
+
+**The honest summary: none of D49–D53 could have been caught by any amount of
+unit testing.** They needed the process running against documents that exist.
+

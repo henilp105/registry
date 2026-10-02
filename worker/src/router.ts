@@ -24,7 +24,7 @@ import { handleHealth, handleOpenapi } from "./routes/meta";
 import { handleAuthRoutes } from "./routes/auth";
 import { handleUserRoutes } from "./routes/users";
 import { handleNamespaceRoutes } from "./routes/namespaces";
-import { handlePackageRoutes } from "./routes/packages";
+import { handlePackageCliRoute, handlePackageRoutes } from "./routes/packages";
 import { handleRatingReportRoutes } from "./routes/ratings";
 import { handleTarballRoutes } from "./routes/tarballs";
 import { handleValidationRoutes } from "./routes/validation";
@@ -95,6 +95,10 @@ export async function route(
 
   // `/packages` — method dispatch happens inside the handler, per
   // API_CONTRACT.md §3.1 (`GET` = search, `PUT` = deprecate, `POST` = upload).
+  if (seg[0] === "packages_cli") {
+    return handlePackageCliRoute(request, env, ctx, seg, url, auth);
+  }
+
   if (seg[0] === "packages") {
     return handlePackageRoutes(request, env, ctx, seg, url, auth);
   }
