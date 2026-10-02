@@ -4,14 +4,36 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#734f96" />
+    <meta name="theme-color" content="#4759c3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0c0e14" media="(prefers-color-scheme: dark)" />
     <meta
       name="description"
-      content="Fortran-lang registry of packages"
+      content="The official registry for fpm, the Fortran Package Manager"
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo256.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <title>fpm - registry</title>
+    <title>fpm registry</title>
+    <script>
+      /* Resolve the colour theme before first paint so a dark-mode user never
+         sees a white flash. Kept in sync with src/theme/theme.js - it cannot
+         import anything because the bundle has not loaded yet. */
+      (function () {
+        var theme;
+        try {
+          theme = window.localStorage.getItem("fpm-theme");
+        } catch (e) {
+          theme = null;
+        }
+        if (theme !== "light" && theme !== "dark") {
+          theme = window.matchMedia &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+        document.documentElement.setAttribute("data-theme", theme);
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
