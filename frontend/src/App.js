@@ -18,6 +18,7 @@ import AdminSection from "./pages/admin";
 import Archives from "./pages/archives";
 import ForgotPassword from "./pages/forgotpassword";
 import ResetPassword from "./pages/resetpassword";
+import SessionGuard from "./components/SessionGuard";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import 'bootstrap/dist/css/bootstrap.min.css';
 
@@ -25,6 +26,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 function App() {
   return (
     <BrowserRouter>
+      <SessionGuard />
       <NavbarComponent />
       <Routes>
         <Route path="/" exact element={<Home />} />

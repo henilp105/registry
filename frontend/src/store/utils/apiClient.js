@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getAccessToken, emitUnauthorized } from "./session";
 
 /**
  * Configured Axios instance for API calls
@@ -10,6 +11,47 @@ const apiClient = axios.create({
     "Content-Type": "multipart/form-data",
   },
 });
+
+/**
+ * Attach the current access token to every request.
+ *
+ * Fixes the defect described in docs/API_CONTRACT.md §4: ten moderator call
+ * paths sent no `Authorization` header at all, and every one of those routes is
+ * `@jwt_required()`, so they all returned 401. The backend resolves identity
+ * from `get_jwt_identity()`, i.e. the header - the `uuid` form field those
+ * routes used to send is never populated by any reducer.
+ *
+ * Requests that already set the header explicitly (`authenticatedPost`,
+ * `logout`) are left alone.
+ */
+apiClient.interceptors.request.use((config) => {
+  const token = getAccessToken();
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+/**
+ * End the session on 401.
+ *
+ * There is no refresh endpoint on the backend, so an expired or revoked access
+ * token cannot be renewed. Only responses to requests that actually carried a
+ * token are treated as session expiry - this deliberately excludes 401s from
+ * endpoints that reject anonymous callers (e.g. a wrong password on
+ * `POST /auth/login`), which must surface their own error message.
+ */
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const sentToken = error?.config?.headers?.Authorization;
+    if (status === 401 && sentToken) {
+      emitUnauthorized();
+    }
+    return Promise.reject(error);
+  }
+);
 
 /**
  * Create FormData from an object
