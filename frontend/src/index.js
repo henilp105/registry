@@ -1,5 +1,19 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+
+// --- Stylesheet load order. This is the only place it is expressed. -------
+//   1. tokens.css  - custom property definitions; must be first so every
+//                    later rule can read them.
+//   2. Bootstrap  - vendor layer. Imported here, once, for the whole app.
+//   3. base.css   - element defaults + the Bootstrap bridge, so it must come
+//                    *after* the vendor sheet it is overriding.
+//   4. index.css  - the few remaining document-level rules.
+// Anything imported by a page component (App.css, home.css, the page
+// stylesheets) is pulled in by ./App below and therefore lands last, which is
+// what lets a page opt out of the base layer.
+import "./theme/tokens.css";
+import "bootstrap/dist/css/bootstrap.min.css";
+import "./theme/base.css";
 import "./index.css";
 import App from "./App";
 import { CookiesProvider } from "react-cookie";

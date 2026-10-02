@@ -20,8 +20,10 @@ import ForgotPassword from "./pages/forgotpassword";
 import ResetPassword from "./pages/resetpassword";
 import SessionGuard from "./components/SessionGuard";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import 'bootstrap/dist/css/bootstrap.min.css';
 
+// Bootstrap is imported once, in src/index.js, in the position the cascade
+// needs. Importing it here as well would load it *after* theme/base.css and
+// let the vendor sheet win the tie against the token layer.
 
 function App() {
   return (

@@ -26,7 +26,7 @@ import {
   At
 } from "react-bootstrap-icons";
 
-import "bootstrap/dist/css/bootstrap.min.css";
+// Bootstrap is imported once, in src/index.js.
 import "./account.css";
 
 const Account = () => {
