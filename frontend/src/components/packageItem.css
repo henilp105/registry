@@ -1,0 +1,134 @@
+/* A single package row in a search or namespace result list. */
+
+.package-item {
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-surface);
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    box-shadow var(--duration-base) var(--ease-standard),
+    border-color var(--duration-base) var(--ease-standard);
+}
+
+/* Hover lifts the card. Driven by :hover rather than a React isHovered state
+   so it also fires for keyboard users tabbing onto the card's links, which a
+   mouse-only handler never did. */
+.package-item:hover,
+.package-item:focus-within {
+  transform: translateY(-2px);
+  border-color: var(--primary-300);
+  box-shadow: var(--shadow-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .package-item:hover,
+  .package-item:focus-within {
+    transform: none;
+  }
+}
+
+.package-item__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background-color: var(--primary-50);
+  overflow: hidden;
+}
+
+.package-item__main {
+  flex: 1;
+  min-width: 12.5rem;
+}
+
+.package-item__name {
+  margin-bottom: var(--space-1);
+  color: var(--color-brand-solid);
+  font-size: 1.1rem;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.package-item__name:hover {
+  color: var(--color-brand-solid-hover);
+}
+
+.package-item__namespace {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+}
+
+.package-item__namespace:hover {
+  color: var(--color-text);
+}
+
+.package-item__meta {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-sm);
+}
+
+/* Two-line clamp. The -webkit- prefixed pair is the only way to express this;
+   line-clamp is the standard spelling and is what the unprefixed property
+   falls back to where it is supported. */
+.package-item__description {
+  display: -webkit-box;
+  margin: var(--space-2) 0 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: var(--line-height-relaxed);
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.package-item__keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+
+/* Keyword pills double as search filters. */
+.package-item__keyword {
+  display: inline-block;
+  margin: 2px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.package-item__keyword:hover {
+  border-color: var(--primary-400);
+  background-color: var(--primary-100);
+  color: var(--primary-800);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .package-item__keyword {
+    transition: none;
+  }
+}
+
+.package-item__more {
+  align-self: center;
+  color: var(--color-text-subtle);
+  font-size: 11px;
+  font-weight: var(--font-weight-medium);
+}
