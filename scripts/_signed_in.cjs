@@ -28,6 +28,24 @@ async function signIn({ admin = false, fresh = true } = {}) {
 
   const browser = await chromium.launch({ args: ["--no-sandbox"] });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+
+  // NOT varied per run, and the reason is worth recording.
+  //
+  // `POST /auth/signup` authenticates nobody, so `clientKey()` falls back to the
+  // source address: every browser harness shares one `a:127.0.0.1` budget of 10 auth
+  // requests/minute. `token_journey.cjs` solves this by sending
+  // `cf-connecting-ip`, because it publishes from Node and no CORS applies.
+  //
+  // A browser harness cannot. Adding a header makes the request non-simple, so the
+  // browser sends a preflight, and the Worker's CORS allow-list is exactly
+  // `Content-Type, Authorization` -- so the preflight fails and axios reports a bare
+  // "Network Error" with no status and no message. That is worse than sharing a
+  // bucket: it looks like the registry is down.
+  //
+  // So the budget is respected by spending less of it: one account per run where the
+  // journey allows, and a bounded retry below rather than an immediate second try.
+  const sourceIp = "127.0.0.1";
+
   const page = await ctx.newPage();
 
   const fill = async (n, v) => {
@@ -64,7 +82,7 @@ async function signIn({ admin = false, fresh = true } = {}) {
   }
   if (!made) {
     throw new Error(
-      `registration did not create ${USER}. The API said: ` +
+      `registration did not create ${USER} (from ${sourceIp}). The API said: ` +
         JSON.stringify(
           await page.evaluate(() => document.body.innerText.replace(/\s+/g, " ").slice(120, 400)),
         ),
@@ -101,7 +119,7 @@ async function signIn({ admin = false, fresh = true } = {}) {
     await browser.close();
   };
 
-  return { browser, ctx, page, USER, PASSWORD, token, users, cleanup };
+  return { browser, ctx, page, USER, PASSWORD, token, users, sourceIp, cleanup };
 }
 
 module.exports = { signIn };

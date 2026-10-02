@@ -1460,3 +1460,137 @@ for.
   the account is created, but the verification email is skipped, so nobody can
   complete sign-up. `auth_journey.cjs` stands in for the emailed link at the database,
   and says so.
+
+---
+
+## D74 — the four membership dialogs had never been opened, by anything
+
+**Severity: high as a coverage gap. No application defect was found — the surface is correct.**
+
+### Why it existed
+
+D68's fix made `isNamespaceAdmin` report the truth, which is what put the buttons
+back on the namespace card. Before that fix the card rendered **no buttons at all**:
+no Add Admin, no Remove Admin, no Add Maintainer, no Remove Maintainer, no Generate
+Token. So there was no way to reach those dialogs, and consequently nothing had ever
+executed them — four forms, four actions, four reducers, six API endpoints, and the
+registry's entire privilege-escalation boundary.
+
+The irony is that D68 was *found* by trying to drive one of them. Fixing it made the
+rest reachable and therefore testable for the first time.
+
+### `scripts/member_journey.cjs`, 26/26, three consecutive runs
+
+- **All four dialogs are opened**, each filled and submitted through the UI. The first
+  version drove Add Admin through its dialog and then called the other three endpoints
+  directly, reasoning that they hit the same API. That is precisely the assumption
+  that hid D68 — the API was right and the dialogs were unreachable — so all four are
+  now opened individually.
+- The grant is asserted in MongoDB, **and** from the grantee's side: the namespace
+  appears on their profile with `isNamespaceAdmin: true`. This is D68 verified from
+  outside the process that fixed it, through a real request rather than a unit test.
+- **Escalation is refused.** A non-member cannot add themselves as namespace admin
+  (401 `reason: forbidden`, D65's marker present), the `admins` array is unchanged,
+  and a plain maintainer cannot promote themselves either. `v2.0.1` requires
+  namespace admin even to add a maintainer; that asymmetry is preserved and now
+  asserted.
+- **Revocation is real**: a removed admin immediately loses the ability to grant.
+  That assertion demands `401` **and** `reason: forbidden`, because it previously
+  accepted any 4xx — see below.
+
+### The API shape is a trap, and it cost two wrong turns
+
+`POST /users/{username}/namespace/admin` — the **path** username is the **acting**
+user; the body's `username` is the **target**. `gate()` requires
+`managesOnlySelf(actor, pathUsername)`, so putting the target in the path returns
+`401 forbidden` even when the caller holds every right. The React actions get this
+right by passing `currUsername` as a second argument.
+
+This is preserved legacy behaviour, and `check_api_compat.py` is right to keep it.
+But it reads as "manage user X" when it means "as me, manage X", and it is exactly
+the kind of shape that produces a false conclusion about a broken permission model.
+Recorded so the next reader does not lose an afternoon to it.
+
+### Three harness bugs that each looked like an application bug
+
+Worth listing because each produced a confident, wrong conclusion:
+
+1. **Wrong form field names.** The probe sent `username_to_be_added` and
+   `namespace_name` — the *internal* action payload names. The Worker reads
+   `username` and `namespace`; the React action maps between them. Every refusal came
+   back as `400 "Please enter username"`, which reads as a validation failure rather
+   than the authorisation decision under test.
+2. **Actor and target conflated**, as above. Every refusal became a 401 that looked
+   like the permission model was broken.
+3. **`cf-connecting-ip` cannot be varied from a browser harness.** Fixing the auth
+   rate-limit exhaustion (see below) by sending a distinct source address per run
+   **broke every browser harness**, because a custom header makes the request
+   non-simple, the browser sends a preflight, and the Worker's CORS allow-list is
+   exactly `Content-Type, Authorization`. The preflight fails and axios reports a bare
+   **"Network Error"** with no status and no message — which looks like the registry
+   is down rather than like a test-harness configuration error.
+
+   `token_journey.cjs` can vary the address because it publishes from Node, where no
+   CORS applies. A browser harness cannot, and the constraint is now documented in
+   `_signed_in.cjs` rather than rediscovered.
+
+### A vacuous pass caught in the act
+
+The final revocation check asserted `status >= 400`, so it accepted a **400**. It was
+in fact receiving `400 "Please enter username"` from the wrong-field probe above —
+i.e. the most security-relevant assertion in the file was passing on a validation
+error. It now requires `401` **and** `reason: forbidden`, which is what surfaced the
+stale field names, and then a `window.__NSNAME__` that an `addInitScript` had never
+populated on an already-loaded page.
+
+Two distinct harness bugs survived several rounds here precisely because the
+assertions were too loose to notice them.
+
+---
+
+## Process audit
+
+The directive asked for a process-wise review as well as a file-wise one. Three
+findings, all about the *process* rather than the code.
+
+### Rate limiting is correct, and it makes the harnesses fragile by design
+
+`clientKey()` prefers the authenticated identity and falls back to the source address.
+Two of the three write paths have no identity at all:
+
+| Path | Authenticated by | Key | Budget |
+|---|---|---|---|
+| `POST /auth/signup` | nobody — no account yet | address | 10/min |
+| `POST /packages` | an upload token, not a bearer token | address | 5/hour |
+
+So **every browser harness shares one `a:127.0.0.1` budget**. This is right for
+production — a NAT or a shared CI runner should not let one user throttle the rest —
+and it is wrong for a test fleet, which by definition is many clients behind one
+address.
+
+`token_journey.cjs` now sends a distinct `cf-connecting-ip` per run. Browser harnesses
+cannot (see D74, item 3) and instead stay inside the budget by creating one account
+per run where the journey allows.
+
+The general rule this establishes, now recorded in the harnesses themselves: **a
+limiter that cannot distinguish synthetic clients will eventually make the test suite
+unable to verify the thing it exists to verify.** It presents as flakiness, which is
+the least legible failure mode there is.
+
+### `wrangler deploy --dry-run` is not a deploy check
+
+It binds `REPLACE_WITH_*` KV ids without complaint and exits 0. Recorded in D72; the
+gate exists because of it.
+
+### The pipeline had no content checks at all
+
+Six rounds of verification — typecheck, lint, up to 340 tests, five CI jobs, six
+harnesses — passed with a live database credential in the tree. Not one of them read
+file *content*. `check_no_secrets.mjs` now does, and it is the only check that could
+have found D71.
+
+The general lesson, which is the same one D68 and D69 keep teaching from opposite
+ends: **every check so far verified a layer, and the defects lived in the gaps between
+layers.** The API was correct while the forms were unreachable; the endpoints were
+correct while the dialogs that call them had never run; the token was minted correctly
+while the reducer discarded it.
