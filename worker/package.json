@@ -2,7 +2,7 @@
   "name": "fpm-registry-api",
   "version": "3.0.0",
   "private": true,
-  "description": "fpm registry API \u2014 Cloudflare Workers + Durable Objects + MongoDB Atlas + R2",
+  "description": "fpm registry API — Cloudflare Workers + Durable Objects + MongoDB Atlas + R2",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -12,7 +12,7 @@
     "deploy": "wrangler deploy",
     "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy --env production",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "cf:preview": "npm run build && npm run deploy:staging",
@@ -27,6 +27,7 @@
     "@cloudflare/vitest-pool-workers": "^0.8.0",
     "@cloudflare/workers-types": "^5.20261001.1",
     "@eslint/js": "^9.17.0",
+    "@types/node": "^22.20.5",
     "eslint": "^9.17.0",
     "prettier": "^3.4.0",
     "typescript": "^5.7.0",

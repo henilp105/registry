@@ -34,21 +34,37 @@ import type { UserDoc } from "../lib/auth";
 import type { Env } from "../db/client";
 import { json, jsonError, jsonOk } from "../lib/responses";
 import { signToken, verifyToken, type AuthContext } from "../lib/auth";
-import {
-  DEFAULT_PBKDF2_ITERATIONS,
-  hashPassword,
-  needsRehash,
-  parseIterations,
-  verifyPassword,
-} from "../lib/password";
+import { needsRehash, parseIterations, DEFAULT_PBKDF2_ITERATIONS } from "../lib/password";
 import { validateEmail, validatePassword, validateUsername } from "../lib/validators";
 import { sendEmailChangeConfirmation, sendPasswordResetEmail, sendVerificationEmail } from "../lib/mail";
 import { sha256Hex, randomToken, randomId } from "../lib/tokens";
 import { logger } from "../lib/logger";
 
-/** Resolved PBKDF2 cost, from config with the documented default. */
+/** Resolved PBKDF2 cost, for the `needsRehash` comparison. */
 function iterations(env: Env): number {
   return parseIterations(env.PBKDF2_ITERATIONS, DEFAULT_PBKDF2_ITERATIONS);
+}
+
+/**
+ * Hash a password *inside the Durable Object*.
+ *
+ * PBKDF2-SHA256 at 210k iterations measures 176 ms on this machine, roughly 18x
+ * the Worker's entire 10 ms CPU budget, so running it in the handler would
+ * return error 1102 on every signup and login. The DO has 30 s of CPU per
+ * request on the Free plan. See the `hashPassword` op in mongo-pool.ts.
+ */
+async function hashPassword(env: Env, password: string): Promise<string> {
+  return (await db<string>(env, { kind: "hashPassword", password })) as string;
+}
+
+/** Verify a password against a stored hash, also inside the DO. */
+async function verifyPassword(env: Env, password: string, stored: string): Promise<boolean> {
+  return (await db<boolean>(env, {
+    kind: "verifyPassword",
+    password,
+    stored,
+    salt: env.SALT,
+  })) as boolean;
 }
 
 const ACCESS_TOKEN_DAYS = 90;
@@ -129,7 +145,7 @@ async function login(request: Request, env: Env): Promise<Response> {
   const invalid = jsonError(401, "Invalid email or password");
   if (!user) return invalid;
 
-  if (!(await verifyPassword(password, String(user.password), env.SALT))) return invalid;
+  if (!(await verifyPassword(env, password, String(user.password)))) return invalid;
 
   // Defect S8: `v2.0.1` skipped this whenever IS_CI was set, so any environment
   // that could set that variable disabled verification entirely.
@@ -137,7 +153,7 @@ async function login(request: Request, env: Env): Promise<Response> {
 
   // Defect D15-adjacent: upgrade the stored hash when the KDF cost has moved on.
   if (needsRehash(String(user.password), iterations(env))) {
-    const rehashed = await hashPassword(password, iterations(env));
+    const rehashed = await hashPassword(env, password);
     await db(env, {
       kind: "updateOne",
       collection: "users",
@@ -224,7 +240,7 @@ async function signup(request: Request, env: Env, ctx: ExecutionContext): Promis
   const doc = {
     username: safeUsername,
     email: safeEmail,
-    password: await hashPassword(safePassword, iterations(env)),
+    password: await hashPassword(env, safePassword),
     uuid,
     isVerified: false,
     newEmail: "",
@@ -384,7 +400,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     if (!user) return jsonError(404, "User not found");
 
     if (oldPassword !== undefined) {
-      if (!(await verifyPassword(oldPassword, String(user.password), env.SALT))) {
+      if (!(await verifyPassword(env, oldPassword, String(user.password)))) {
         return jsonError(401, "Invalid old password");
       }
     }
@@ -393,7 +409,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
       kind: "updateOne",
       collection: "users",
       filter: { uuid: user.uuid },
-      update: { $set: { password: await hashPassword(password, iterations(env)) } },
+      update: { $set: { password: await hashPassword(env, password) } },
     });
     return jsonOk({ message: "Password reset successful" });
   }
@@ -408,7 +424,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     kind: "updateOne",
     collection: "users",
     filter: { uuid: consumed.user_uuid },
-    update: { $set: { password: await hashPassword(password, iterations(env)) } },
+    update: { $set: { password: await hashPassword(env, password) } },
   });
 
   return jsonOk({ message: "Password reset successful" });

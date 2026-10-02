@@ -36,7 +36,6 @@
   "vars": {
     "ENVIRONMENT": "development",
     "MONGO_DB_NAME": "fpmregistry",
-    "SALT": "CHANGE_ME_LEGACY_SALT",
     "PBKDF2_ITERATIONS": "210000",
     "HOST": "http://localhost:5173",
     "ALLOWED_ORIGINS": "http://localhost:5173"

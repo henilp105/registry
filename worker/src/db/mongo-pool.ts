@@ -32,6 +32,7 @@
  */
 
 import { DurableObject } from "cloudflare:workers";
+import { hashPassword, parseIterations, verifyPassword } from "../lib/password";
 import {
   MongoClient,
   type ClientSession,
@@ -66,7 +67,30 @@ export type MongoOp =
   | { kind: "transaction"; steps: TransactionStep[] }
   /** Create collections if absent, then apply indexes. Idempotent. */
   | { kind: "bootstrap"; collections: string[]; spec: IndexSpec[] }
-  | { kind: "ensureIndexes"; spec: IndexSpec[] };
+  | { kind: "ensureIndexes"; spec: IndexSpec[] }
+  /**
+   * Password KDF, run *here* rather than in the Worker.
+   *
+   * Measured on this repo:
+   *     PBKDF2-SHA256,   4,096 iterations .......   3.9 ms
+   *     PBKDF2-SHA256,  10,000 iterations .......   8.5 ms
+   *     PBKDF2-SHA256, 210,000 iterations ....... 176 ms
+   *     Worker Free CPU budget .................  10 ms
+   *
+   * So even the iteration count MongoDB itself uses for SCRAM costs ~40% of
+   * the whole budget, and the count we actually want for password storage is
+   * ~18x over it. Hashing in a Worker handler would return Cloudflare error
+   * 1102 on every login and every signup.
+   *
+   * The Durable Object has 30 s of CPU per request on the Free plan, which is
+   * the same trick that makes the MongoDB connection viable: move the
+   * expensive CPU into the one place that has budget for it.
+   *
+   * A useful side effect: the legacy `SALT` secret only has to exist on the
+   * Durable Object, so it is no longer part of the Worker's environment.
+   */
+  | { kind: "hashPassword"; password: string }
+  | { kind: "verifyPassword"; password: string; stored: string; salt: string };
 
 export type TransactionStep =
   | { kind: "insertOne"; collection: string; doc: Document }
@@ -80,6 +104,9 @@ export type IndexSpec = { collection: string; indexes: Document[] };
 export type PoolEnv = {
   MONGO_URI: string;
   MONGO_DB_NAME: string;
+  /** Legacy sha256 salt. Lives only here so it is absent from the Worker env. */
+  SALT: string;
+  PBKDF2_ITERATIONS: string;
 };
 
 export type WriteResult = {
@@ -333,6 +360,12 @@ export class MongoPool extends DurableObject<PoolEnv> {
     }
     if (op.kind === "transaction") {
       return this.#transaction(op.steps);
+    }
+    if (op.kind === "hashPassword") {
+      return hashPassword(op.password, parseIterations(this.env.PBKDF2_ITERATIONS));
+    }
+    if (op.kind === "verifyPassword") {
+      return verifyPassword(op.password, op.stored, op.salt ?? this.env.SALT);
     }
     if (op.kind === "ensureIndexes") {
       return this.#ensureIndexes(op.spec);
