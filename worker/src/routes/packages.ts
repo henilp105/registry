@@ -54,6 +54,14 @@ import {
   sortDirection,
 } from "../lib/search";
 import { consumeUploadToken, tokenAllows } from "../lib/upload-tokens";
+import {
+  MAX_TARBALL_BYTES,
+  TarballTooLarge,
+  putTarball,
+  tarballKey,
+  type StoredTarball,
+} from "../lib/storage";
+import { toHexOrId } from "../lib/ids";
 import { ENTITY, TTL, entityVersion, invalidate, serveCached } from "../lib/cache";
 import { readBody, findUser, resolvePackageTarget } from "./namespaces-shared";
 import { logger } from "../lib/logger";
@@ -616,14 +624,14 @@ async function deprecatePackage(
 /**
  * Upload.
  *
- * **Phase 6 moves the bytes to R2.** This currently validates everything and
- * returns a clear error rather than pretending to succeed, so a half-finished
- * upload path cannot be mistaken for a working one.
- *
- * Authorization is the 7-day namespace publish token, NOT a JWT — that is the
- * existing contract with `fpm publish --token`, and it stays. What changes is
- * that the token now lives in `upload_tokens`, is scoped, is revocable, and is
+ * Authorization is the 7-day publish token, NOT a JWT — that is the existing
+ * contract with `fpm publish --token` and it is preserved. What changed is that
+ * the token now lives in `upload_tokens`, is scoped, is revocable, and is
  * compared by hash (defect D4).
+ *
+ * The bytes go to R2, streamed, with a SHA-256 computed incrementally and
+ * stored on the version document — something `v2.0.1` never did at all
+ * (defect D24).
  */
 async function upload(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   let form: FormData;
@@ -658,17 +666,16 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
   if (!(tarball instanceof File) || tarball.size === 0) {
     return jsonError(400, "Tarball file is missing");
   }
-  // Defect D8/S19: v2.0.1 had no size cap and then called
-  // `tarfile.open(...).getnames()`, fully decompressing an attacker-controlled
-  // gzip in-request. Cap the compressed size before anything touches it.
-  const MAX_TARBALL_BYTES = 50 * 1024 * 1024;
+  // Defect D8/S19: cap the size before anything reads the body. v2.0.1 had no
+  // cap and then called `tarfile.open(...).getnames()`, fully inflating an
+  // attacker-controlled gzip in-request.
   if (tarball.size > MAX_TARBALL_BYTES) {
     return jsonError(413, "Tarball exceeds the maximum upload size");
   }
 
-  // `dry_run` must not have side effects. v2.0.1 wrote a GridFS record and a
-  // tarball to disk *before* the early return, leaking one of each per call
-  // with no cleanup (defect D15). Nothing is persisted on this path at all.
+  // `dry_run` must have no side effects. v2.0.1 wrote a GridFS record and a
+  // tarball to disk *before* the early return, leaking one of each per call with
+  // no cleanup (defect D15). Nothing at all is persisted on this path.
   if (dryRun) return jsonOk({ message: "Dry run Successful." });
 
   const verdict = await consumeUploadToken(env, token);
@@ -679,7 +686,7 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
     return jsonError(401, "Invalid upload token");
   }
 
-  const namespace = (await db<{ _id: unknown; namespace: string; namespace_name?: string } | null>(env, {
+  const namespace = (await db<{ _id: unknown; namespace: string } | null>(env, {
     kind: "findOne",
     collection: "namespaces",
     filter: { _id: toHexOrId(verdict.namespaceId) },
@@ -708,10 +715,130 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
     }
   }
 
-  // Phase 6 replaces this with a streaming R2 upload plus a SHA-256 digest.
-  void ctx;
-  logger.info("upload validated, awaiting Phase 6 storage", { packageName, version });
-  return jsonError(501, "Upload storage is being migrated to R2 — not yet available");
+  // Stream to R2 with an incremental digest. This is the first time an artifact
+  // checksum has ever been recorded for this registry.
+  let stored: StoredTarball;
+  try {
+    stored = await putTarball(
+      env,
+      tarballKey(namespace.namespace, packageName, version),
+      tarball.stream(),
+      tarball.size,
+    );
+  } catch (err) {
+    if (err instanceof TarballTooLarge) {
+      return jsonError(413, "Tarball exceeds the maximum upload size");
+    }
+    logger.error("r2 put failed", { message: err instanceof Error ? err.message : String(err) });
+    return jsonError(400, "Invalid tarball file");
+  }
+
+  const now = new Date();
+  const versionDoc = {
+    version,
+    tarball: `${packageName}-${version}.tar.gz`,
+    dependencies: "",
+    created_at: now,
+    is_deprecated: false,
+    // The new, derivable key. The old `/tarballs/<ObjectId>` shape is still
+    // routed by routes/tarballs.ts so existing links keep working.
+    download_url: `/tarballs/${namespace.namespace}/${packageName}/${version}`,
+    sha256: stored.sha256,
+    size: stored.size,
+    is_verified: false,
+    // The upload pipeline cannot validate a tarball inside a 10 ms CPU budget,
+    // so an uploaded version starts unverified and GitHub Actions (Phase 8)
+    // flips this.
+    unable_to_verify: true,
+  };
+
+  if (existing) {
+    await db(env, {
+      kind: "updateOne",
+      collection: "packages",
+      filter: { _id: existing._id },
+      update: {
+        $push: { versions: versionDoc },
+        $set: { updated_at: now, license },
+      },
+    });
+  } else {
+    const uploader = await db<(Record<string, unknown> & { _id: unknown }) | null>(env, {
+      kind: "findOne",
+      collection: "users",
+      filter: { uuid: verdict.createdBy },
+      projection: { _id: 1 },
+    }) as (Record<string, unknown> & { _id: unknown }) | null;
+
+    const inserted = (await db<{ insertedId: unknown }>(env, {
+      kind: "insertOne",
+      collection: "packages",
+      doc: {
+        name: packageName,
+        namespace: namespace._id,
+        namespace_name: namespace.namespace,
+        description: "Package Under Verification",
+        registry_description: null,
+        homepage: "Package Under Verification",
+        repository: "Package Under Verification",
+        copyright: "Package Under Verification",
+        license,
+        author: uploader?._id,
+        maintainers: uploader?._id ? [uploader._id] : [],
+        keywords: ["fortran", "fpm"],
+        categories: ["fortran", "fpm"],
+        is_deprecated: false,
+        is_verified: false,
+        is_malicious: false,
+        unable_to_verify: true,
+        security_status: "No security issues found",
+        download_count: 0,
+        ratings: { users: {}, counts: { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 }, avg_ratings: 0 },
+        malicious_report: { users: {}, isViewed: false },
+        created_at: now,
+        updated_at: now,
+        versions: [versionDoc],
+      },
+    })) as { insertedId: unknown };
+
+    await db(env, {
+      kind: "updateOne",
+      collection: "namespaces",
+      filter: { _id: namespace._id },
+      update: { $push: { packages: inserted.insertedId }, $set: { updatedAt: now } },
+    });
+    if (uploader?._id) {
+      await db(env, {
+        kind: "updateOne",
+        collection: "users",
+        filter: { _id: uploader._id },
+        update: { $addToSet: { authorOf: inserted.insertedId } },
+      });
+    }
+  }
+
+  // Retire every cached view of this package and of the namespace's package
+  // list, so the new version appears immediately rather than after a TTL.
+  await invalidate(
+    env,
+    ENTITY.package(namespace.namespace, packageName),
+    ENTITY.namespace(namespace.namespace),
+    ENTITY.namespacePackages(namespace.namespace),
+  );
+
+  ctx.waitUntil(
+    Promise.resolve(
+      logger.info("package uploaded", {
+        namespace: namespace.namespace,
+        packageName,
+        version,
+        bytes: stored.size,
+        sha256: stored.sha256.slice(0, 12),
+      }),
+    ),
+  );
+
+  return jsonOk({ message: "Package Uploaded Successfully." });
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -721,11 +848,6 @@ function text(form: FormData, key: string): string | undefined {
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-/** Reinterpret a 24-char hex string as the id a query needs. */
-function toHexOrId(value: string): unknown {
-  return value;
 }
 
 export { escapeRegex, clampInt, SORT_MAP, MAX_PAGE_SIZE };
