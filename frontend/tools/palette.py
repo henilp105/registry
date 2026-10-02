@@ -129,24 +129,44 @@ ACCENT_DARK = {300: p(None, .880, .070, IBM_H), 400: p(None, .790, .095, IBM_H),
                700: p(None, .550, .140, IBM_H)}
 
 
+# The ink used for a label sitting on a saturated fill. Not pure black: a
+# touch of the neutral ramp's own hue so it does not read as a hole punched in
+# the colour, and so it is the same ink in both themes.
+_INK = "#0b0b12"
+_WHITE = "#ffffff"
+
+
 def _semantic(name):
-    """success / warning / danger / info, per theme."""
+    """success / warning / danger / info, per theme.
+
+    Four slots per theme, not three. The fourth is `on`: the label colour for
+    text sitting *on* the solid fill (a filled button, a solid badge). It has
+    to be a token rather than a hard-coded #fff, because the dark theme
+    inverts the solid fills to be light - white text on the dark theme's
+    success green measures 2.3:1, which is a hard fail. The dark `on` values
+    are the ink above; the light ones are white, except warning, whose fill is
+    light enough in both themes that ink reads better.
+    """
     if name == "success":
-        h, light = 152, ((.930, .055), (.560, .130), (.435, .110))
-        dark = ((.300, .075), (.720, .155), (.835, .130))
+        h, light = 152, ((.930, .055), (.550, .130), (.435, .110), _WHITE)
+        dark = ((.300, .075), (.720, .155), (.835, .130), _INK)
     elif name == "warning":
-        h, light = 78, ((.945, .065), (.760, .150), (.420, .110))
-        dark = ((.320, .080), (.800, .140), (.900, .110))
+        h, light = 78, ((.945, .065), (.760, .150), (.420, .110), _INK)
+        dark = ((.320, .080), (.800, .140), (.900, .110), _INK)
     elif name == "danger":
-        h, light = 25, ((.945, .045), (.590, .170), (.460, .160))
-        dark = ((.310, .085), (.680, .170), (.805, .140))
+        h, light = 25, ((.945, .045), (.585, .170), (.460, .160), _WHITE)
+        dark = ((.310, .085), (.680, .170), (.805, .140), _INK)
     else:  # info
-        h, light = 230, ((.945, .045), (.580, .140), (.450, .130))
-        dark = ((.300, .080), (.720, .130), (.835, .110))
+        h, light = 230, ((.945, .045), (.560, .140), (.450, .130), _WHITE)
+        dark = ((.300, .080), (.720, .130), (.835, .110), _INK)
     out = {}
     for key, src in (("light", light), ("dark", dark)):
-        for slot, (L, C) in zip(("soft", "solid", "text"), src):
-            out[f"{key}-{slot}"] = p(None, L, C, h)
+        for slot, spec in zip(("soft", "solid", "text", "on"), src):
+            if slot == "on":
+                out[f"{key}-{slot}"] = spec
+            else:
+                L, C = spec
+                out[f"{key}-{slot}"] = p(None, L, C, h)
     return out
 
 
@@ -155,6 +175,10 @@ def sem_for(theme):
     for name, pal in _SEMANTICS.items():
         for slot in ("soft", "solid", "text"):
             out[f"{name}-{slot}"] = pal[f"{theme}-{slot}"]
+        # Named `on-<name>-solid` rather than `<name>-on` to read as a pair:
+        # the label colour and the fill it belongs to sit next to each other
+        # in the token list and in the contrast table.
+        out[f"on-{name}-solid"] = pal[f"{theme}-on"]
     return out
 
 
@@ -266,6 +290,13 @@ CHECKS = [
     ("success-solid", "surface-canvas", 3.0, "success button fill vs page"),
     ("info-solid", "surface", 3.0, "info button fill vs card"),
     ("border", "surface", 1.2, "decorative divider (no AA floor applies)"),
+    # --- labels sitting ON a solid fill (filled buttons, solid badges).
+    # These are the pairs that a hard-coded `color: #fff` gets wrong in the
+    # dark theme, where every solid inverts to a light colour.
+    ("on-success-solid", "success-solid", 4.5, "label on a success fill"),
+    ("on-danger-solid", "danger-solid", 4.5, "label on a danger fill"),
+    ("on-info-solid", "info-solid", 4.5, "label on an info fill"),
+    ("on-warning-solid", "warning-solid", 4.5, "label on a warning fill"),
 ]
 
 CHECKS_DARK_ONLY = [

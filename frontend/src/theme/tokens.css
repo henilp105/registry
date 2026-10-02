@@ -91,17 +91,21 @@
   --color-brand-outline: #5b53c0;
   --color-focus: #5b53c0;
   --color-success-soft: #cef3d6;
-  --color-success-solid: #26894c;
+  --color-success-solid: #22864a;
   --color-success-text: #0a6231;
+  --color-on-success-solid: #ffffff;
   --color-warning-soft: #ffeaca;
   --color-warning-solid: #e5a323;
   --color-warning-text: #674600;
+  --color-on-warning-solid: #0b0b12;
   --color-danger-soft: #ffe6e4;
-  --color-danger-solid: #cf4946;
+  --color-danger-solid: #cd4845;
   --color-danger-text: #9e2225;
+  --color-on-danger-solid: #ffffff;
   --color-info-soft: #d8f2ff;
-  --color-info-solid: #0086b1;
+  --color-info-solid: #007fa9;
   --color-info-text: #005e7d;
+  --color-on-info-solid: #ffffff;
   /* ---------------------------------------------------------------------
      Typography
      Two stacks only, no webfonts: a neutral grotesque for prose, a monospace
@@ -269,15 +273,19 @@
   --color-success-soft: #04381a;
   --color-success-solid: #48c072;
   --color-success-text: #84e19f;
+  --color-on-success-solid: #0b0b12;
   --color-warning-soft: #452e00;
   --color-warning-solid: #efb146;
   --color-warning-text: #ffd79a;
+  --color-on-warning-solid: #0b0b12;
   --color-danger-soft: #531b19;
   --color-danger-solid: #ef6661;
   --color-danger-text: #ffa39b;
+  --color-on-danger-solid: #0b0b12;
   --color-info-soft: #003346;
   --color-info-solid: #32b3e6;
   --color-info-text: #7ed6ff;
+  --color-on-info-solid: #0b0b12;
   --color-shadow: #000000;
   --color-overlay: rgb(3 6 13 / 62%);
 
