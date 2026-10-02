@@ -178,7 +178,7 @@ FOOTER = '''/* =================================================================
    ========================================================================== */
 :root,
 [data-theme="dark"] {
-  --bs-body-bg: var(--color-canvas);
+  --bs-body-bg: var(--color-surface-canvas);
   --bs-body-color: var(--color-text);
   --bs-body-color-rgb: 14, 15, 21;
   --bs-secondary-color: var(--color-text-muted);
@@ -281,6 +281,7 @@ def build():
             )
         )
     )
+    parts.append(STATIC)
     parts.append(LIGHT_TAIL)
     parts.append("}\n\n")
     parts.append("/* ==========================================================================\n"

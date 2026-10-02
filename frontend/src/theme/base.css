@@ -24,7 +24,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: var(--color-canvas);
+  background-color: var(--color-surface-canvas);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--font-size-base);
@@ -187,12 +187,12 @@ table {
   }
 
   ::-webkit-scrollbar-track {
-    background: var(--color-canvas);
+    background: var(--color-surface-canvas);
   }
 
   ::-webkit-scrollbar-thumb {
     background-color: var(--color-border);
-    border: 2px solid var(--color-canvas);
+    border: 2px solid var(--color-surface-canvas);
     border-radius: var(--radius-full);
   }
 
@@ -202,7 +202,7 @@ table {
 }
 
 * {
-  scrollbar-color: var(--color-border) var(--color-canvas);
+  scrollbar-color: var(--color-border) var(--color-surface-canvas);
   scrollbar-width: thin;
 }
 
@@ -380,7 +380,7 @@ table {
 .text-info { color: var(--color-info-text) !important; }
 
 .bg-light { background-color: var(--color-surface-sunken) !important; }
-.bg-body { background-color: var(--color-canvas) !important; }
+.bg-body { background-color: var(--color-surface-canvas) !important; }
 .bg-white { background-color: var(--color-surface) !important; }
 
 /* -- Alerts ------------------------------------------------------------- */

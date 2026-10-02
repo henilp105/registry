@@ -102,6 +102,87 @@
   --color-info-soft: #d8f2ff;
   --color-info-solid: #0086b1;
   --color-info-text: #005e7d;
+  /* ---------------------------------------------------------------------
+     Typography
+     Two stacks only, no webfonts: a neutral grotesque for prose, a monospace
+     for anything machine-shaped (identifiers, versions, tokens, code). The
+     mono stack is the "technical instrument" cue.
+     --------------------------------------------------------------------- */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", "DejaVu Sans Mono", monospace;
+
+  /* Modular scale, ratio 1.2 (minor third), anchored on a 15px body.
+     Restrained on purpose: a registry is a table, not a poster. */
+  --font-size-2xs: 0.6875rem; /* 11px - overlines, badges */
+  --font-size-xs: 0.75rem; /* 12px - metadata */
+  --font-size-sm: 0.8125rem; /* 13px - dense tables, chips */
+  --font-size-base: 0.9375rem; /* 15px - body */
+  --font-size-md: 1rem; /* 16px - inputs, lead */
+  --font-size-lg: 1.125rem; /* 18px - card titles */
+  --font-size-xl: 1.375rem; /* 22px - section headings */
+  --font-size-2xl: 1.75rem; /* 28px - page titles */
+  --font-size-3xl: 2.125rem; /* 34px - display (404, wordmark) */
+
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.35;
+  --line-height-normal: 1.55;
+  --line-height-relaxed: 1.7;
+
+  --tracking-tight: -0.011em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-widest: 0.07em; /* overlines / small caps */
+
+  /* Four weights. A registry does not need seven. */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ---------------------------------------------------------------------
+     Space - 4px base
+     --------------------------------------------------------------------- */
+  --space-0: 0;
+  --space-1: 0.25rem; /*  4px */
+  --space-2: 0.5rem; /*  8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --space-8: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem; /* 48px */
+  --space-16: 4rem; /* 64px */
+  --space-20: 5rem; /* 80px */
+
+  --content-width: 72rem;
+  --content-width-narrow: 44rem;
+  --content-width-readme: 46rem;
+  --header-height: 3.5rem;
+
+  /* ---------------------------------------------------------------------
+     Radius - four steps and a pill. The previous stylesheet had five
+     arbitrary values (4, 5, 10, 25, 50px).
+     --------------------------------------------------------------------- */
+  --radius-sm: 4px; /* inputs, chips, badges */
+  --radius-md: 8px; /* buttons, cards */
+  --radius-lg: 12px; /* dialogs, feature cards */
+  --radius-full: 999px; /* pills */
+
+  /* ---------------------------------------------------------------------
+     Motion
+     --------------------------------------------------------------------- */
+  --duration-instant: 80ms;
+  --duration-fast: 140ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
   --color-shadow: #0b1020;
   --color-overlay: rgb(13 15 21 / 45%);
 
@@ -237,7 +318,7 @@
    ========================================================================== */
 :root,
 [data-theme="dark"] {
-  --bs-body-bg: var(--color-canvas);
+  --bs-body-bg: var(--color-surface-canvas);
   --bs-body-color: var(--color-text);
   --bs-body-color-rgb: 14, 15, 21;
   --bs-secondary-color: var(--color-text-muted);
