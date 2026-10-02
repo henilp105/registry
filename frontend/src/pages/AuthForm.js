@@ -107,11 +107,11 @@ const AuthForm = ({ isLogin }) => {
   const passwordStrength = getPasswordStrength(formData.password);
 
   return (
-    <Container className="auth-page">
-      <div className="auth-page__inner">
+    <Container className="authform-page">
+      <div className="authform-page__inner">
         {/* Logo and Header */}
         <div className="text-center mb-4">
-          <h1 className="auth-page__title">fpm registry</h1>
+          <h1 className="authform-page__title">fpm registry</h1>
           <p className="text-muted">
             {isLogin 
               ? "Welcome back! Sign in to your account" 
@@ -119,12 +119,12 @@ const AuthForm = ({ isLogin }) => {
           </p>
         </div>
 
-        <Card className="auth-card overflow-hidden">
+        <Card className="authform-card overflow-hidden">
           <Card.Header className="border-0 pb-0 bg-transparent">
-            <Card.Title className="auth-card__title">
+            <Card.Title className="authform-card__title">
               {isLogin ? "Sign In" : "Create Account"}
             </Card.Title>
-            <Card.Text className="auth-card__subtitle">
+            <Card.Text className="authform-card__subtitle">
               {isLogin
                 ? "Enter your credentials to access your account"
                 : "Fill in your information to create a new account"}
@@ -233,13 +233,13 @@ const AuthForm = ({ isLogin }) => {
                 {/* Password strength indicator for signup */}
                 {!isLogin && formData.password && (
                   <div>
-                    <div className="auth-strength">
+                    <div className="authform-strength">
                       {[1, 2, 3].map((level) => (
                         <div
                           key={level}
-                          className={`auth-strength__bar${
+                          className={`authform-strength__bar${
                             passwordStrength.strength >= level
-                              ? ` auth-strength__bar--filled-${
+                              ? ` authform-strength__bar--filled-${
                                   ["", "weak", "medium", "strong"][level]
                                 }`
                               : ""
@@ -249,7 +249,7 @@ const AuthForm = ({ isLogin }) => {
                     </div>
                     {passwordStrength.label && (
                       <div
-                        className={`auth-strength__label auth-strength__label--${
+                        className={`authform-strength__label authform-strength__label--${
                           ["", "weak", "medium", "strong"][passwordStrength.strength]
                         }`}
                       >
@@ -271,7 +271,7 @@ const AuthForm = ({ isLogin }) => {
               <Button
                 variant="primary"
                 type="submit"
-                className="auth-submit py-2"
+                className="authform-submit py-2"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -295,14 +295,14 @@ const AuthForm = ({ isLogin }) => {
             </Form>
 
             {/* Toggle between login/signup */}
-            <div className="auth-switch">
+            <div className="authform-switch">
               <p className="mb-0">
                 {isLogin
                   ? "Don\u2019t have an account?"
                   : "Already have an account?"}{" "}
                 <Link
                   to={isLogin ? "/account/register" : "/account/login"}
-                  className="auth-switch__link"
+                  className="authform-switch__link"
                 >
                   {isLogin ? "Sign up" : "Sign in"}
                 </Link>
@@ -316,11 +316,11 @@ const AuthForm = ({ isLogin }) => {
             dropping the links is a product decision, not a styling one. */}
         <p className="text-center text-muted small mt-4">
           By continuing, you agree to our{" "}
-          <Link to="/terms" className="auth-switch__link">
+          <Link to="/terms" className="authform-switch__link">
             Terms of Service
           </Link>{" "}
           and{" "}
-          <Link to="/privacy" className="auth-switch__link">
+          <Link to="/privacy" className="authform-switch__link">
             Privacy Policy
           </Link>
         </p>

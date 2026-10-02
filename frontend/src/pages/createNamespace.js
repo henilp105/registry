@@ -128,7 +128,7 @@ const NamespaceForm = () => {
         <Container>
           <Row className="justify-content-center">
             <Col md={8} lg={6}>
-              <div className="namespace-card">
+              <div className="namespace-create-card">
                 <div className="namespace-loading">
                   <Spinner animation="border" variant="primary" />
                   <span className="namespace-loading__text">
@@ -148,7 +148,7 @@ const NamespaceForm = () => {
       <Container>
         <Row className="justify-content-center">
           <Col lg={7} xl={6}>
-            <div className="namespace-card">
+            <div className="namespace-create-card">
               {/* Header */}
               <div className="namespace-card__header">
                 <div className="namespace-card__header-icon" aria-hidden="true">

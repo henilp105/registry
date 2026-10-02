@@ -1,14 +1,19 @@
-/* Login / register form.
+/* Login / register form (AuthForm).
+ *
+ * Scoped with an `authform-` prefix on purpose. The stylesheet is global, and
+ * auth.css already defines `.auth-card`, `.auth-title` and friends for the
+ * other four auth pages - an unprefixed `.auth-card` here silently restyled
+ * those too, depending on which sheet happened to be imported last.
  *
  * The page previously painted a blue-to-violet gradient (#3b82f6 -> #8b5cf6)
  * on the heading and the submit button, and used a translucent white card over
- * a hard-coded gradient background. None of that could survive a dark theme,
- * and the gradient was a different brand colour from the one the rest of the
- * app uses. The heading and button now use the brand ramp, so light and dark
- * are the same hue at different lightness.
+ * a hard-coded gradient background. Neither could survive a dark theme, and
+ * the gradient was a different brand colour from the one the rest of the app
+ * uses. The heading and button now use the brand ramp, so light and dark are
+ * the same hue at different lightness.
  */
 
-.auth-page {
+.authform-page {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -16,18 +21,18 @@
   padding: var(--space-6) var(--space-4);
 }
 
-.auth-page__inner {
+.authform-page__inner {
   width: 100%;
   max-width: 28rem;
 }
 
-.auth-page__title {
+.authform-page__title {
   margin-bottom: var(--space-2);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  /* The gradient text effect, but built from the brand ramp rather than a
-     fixed blue/violet pair. background-clip needs the fill to be transparent
-     for the gradient to show through. */
+  /* The gradient-text effect, but built from the brand ramp rather than a
+     fixed blue/violet pair. background-clip needs a transparent fill for the
+     gradient to show through. */
   background: linear-gradient(
     to right,
     var(--primary-600),
@@ -39,20 +44,21 @@
 }
 
 /* Solid, not translucent: a backdrop-filter over an unknown backdrop is
-   unreadable in dark mode, and this card is where the form lives. */
-.auth-card {
+   unreadable in dark mode, and this is the card the form lives in. */
+.authform-card {
   border: 0;
   background-color: var(--color-surface);
   box-shadow: var(--shadow-lg);
+  overflow: hidden;
 }
 
-.auth-card__title {
+.authform-card__title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   text-align: center;
 }
 
-.auth-card__subtitle {
+.authform-card__subtitle {
   margin-bottom: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
@@ -63,13 +69,13 @@
    Password strength meter
    -------------------------------------------------------------------------- */
 
-.auth-strength {
+.authform-strength {
   display: flex;
   gap: var(--space-1);
   margin-top: var(--space-2);
 }
 
-.auth-strength__bar {
+.authform-strength__bar {
   flex: 1;
   height: 4px;
   border-radius: var(--radius-full);
@@ -77,40 +83,40 @@
   transition: background-color var(--duration-base) var(--ease-standard);
 }
 
-.auth-strength__bar--filled-weak {
+.authform-strength__bar--filled-weak {
   background-color: var(--color-danger-solid);
 }
 
-.auth-strength__bar--filled-medium {
+.authform-strength__bar--filled-medium {
   background-color: var(--color-warning-solid);
 }
 
-.auth-strength__bar--filled-strong {
+.authform-strength__bar--filled-strong {
   background-color: var(--color-success-solid);
 }
 
-.auth-strength__label {
+.authform-strength__label {
   margin-top: var(--space-1);
   font-size: var(--font-size-xs);
 }
 
-.auth-strength__label--weak {
+.authform-strength__label--weak {
   color: var(--color-danger-text);
 }
 
-.auth-strength__label--medium {
+.authform-strength__label--medium {
   color: var(--color-warning-text);
 }
 
-.auth-strength__label--strong {
+.authform-strength__label--strong {
   color: var(--color-success-text);
 }
 
 /* --------------------------------------------------------------------------
-   Submit button
+   Submit
    -------------------------------------------------------------------------- */
 
-.auth-submit {
+.authform-submit {
   width: 100%;
   border: 0;
   font-weight: var(--font-weight-medium);
@@ -122,16 +128,20 @@
   transition: filter var(--duration-base) var(--ease-standard);
 }
 
-.auth-submit:hover:not(:disabled) {
+.authform-submit:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
-.auth-submit:disabled {
+.authform-submit:disabled {
   filter: none;
   opacity: 0.65;
 }
 
-.auth-switch {
+/* --------------------------------------------------------------------------
+   Switch between login and register
+   -------------------------------------------------------------------------- */
+
+.authform-switch {
   margin-top: var(--space-6);
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border-subtle);
@@ -139,13 +149,13 @@
   text-align: center;
 }
 
-.auth-switch__link {
+.authform-switch__link {
   color: var(--color-link);
   font-weight: var(--font-weight-medium);
   text-decoration: none;
 }
 
-.auth-switch__link:hover {
+.authform-switch__link:hover {
   color: var(--color-link-hover);
   text-decoration: underline;
 }
