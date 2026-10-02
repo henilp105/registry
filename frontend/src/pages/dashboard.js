@@ -33,6 +33,20 @@ const Dashboard = () => {
   const namespaces = useSelector((state) => state.dashboard.namespaces);
   const isLoading = useSelector((state) => state.dashboard.isLoading || state.auth.isLoading);
   const error = useSelector((state) => state.dashboard.error);
+
+  // The four maintainer/admin dialogs report their success via their slice's
+  // successMessage. When one appears, the packages/namespaces just mutated,
+  // so refetch what the dashboard shows (D84): the user never saw the new
+  // membership without a manual reload.
+  const maintainerSuccess = useSelector((state) => state.addRemoveMaintainer.successMessage);
+  const nsMaintainerSuccess = useSelector((state) => state.addRemoveNamespaceMaintainer.successMessage);
+  const nsAdminSuccess = useSelector((state) => state.addRemoveNamespaceAdmin.successMessage);
+  useEffect(() => {
+    if ((maintainerSuccess || nsMaintainerSuccess || nsAdminSuccess) && username) {
+      dispatch(fetchPackages(username));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maintainerSuccess, nsMaintainerSuccess, nsAdminSuccess]);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
