@@ -593,6 +593,66 @@ table {
   padding-block: var(--space-2);
 }
 
+.app-navbar__wordmark {
+  font-family: var(--font-display, inherit);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+/* Defect D84: the accent span had no rule at all, so the wordmark rendered
+   as one unbroken colour. It is the brand's Fortran-orange marker. */
+.app-navbar__wordmark-accent {
+  color: var(--color-brand-solid, #e5a323);
+}
+
+/* Defect D84: ThemeToggle's classes were unstyled -- the control rendered as
+   a default button with two stacked SVGs and no state indication. */
+.theme-toggle {
+  --_size: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--_size);
+  height: var(--_size);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast, 120ms) var(--ease-standard, ease),
+    border-color var(--duration-fast, 120ms) var(--ease-standard, ease),
+    background-color var(--duration-fast, 120ms) var(--ease-standard, ease);
+}
+
+.theme-toggle:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-strong, var(--color-border));
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--color-brand-solid, #5b53c0);
+  outline-offset: 2px;
+}
+
+.theme-toggle-track {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle-glyph {
+  display: block;
+}
+
+/* The glyph shown is the theme you are in, matching the component comment.
+   Before this rule existed both SVGs rendered, stacked vertically. */
+.theme-toggle .theme-toggle-glyph-moon { display: none; }
+[data-theme="dark"] .theme-toggle .theme-toggle-glyph-sun { display: none; }
+[data-theme="dark"] .theme-toggle .theme-toggle-glyph-moon { display: block; }
+
 .nav-tabs {
   border-bottom-color: var(--color-border-subtle);
   gap: var(--space-1);
