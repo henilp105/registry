@@ -70,6 +70,7 @@ import {
   type StoredTarball,
 } from "../lib/storage";
 import { toHexOrId } from "../lib/ids";
+import { idsBothForms, pullBothForms } from "../db/bson";
 import { ENTITY, TTL, entityVersion, invalidate, serveCached } from "../lib/cache";
 import { readBody, findUser, resolvePackageTarget } from "./namespaces-shared";
 import { logger } from "../lib/logger";
@@ -550,7 +551,7 @@ async function packageMaintainers(request: Request, env: Env, namespaceName: str
       const users = (await db<unknown[]>(env, {
         kind: "find",
         collection: "users",
-        filter: { _id: { $in: (target.package.maintainers ?? []) as unknown[] } },
+        filter: { _id: { $in: idsBothForms((target.package.maintainers ?? []) as unknown[]) } },
         projection: { username: 1 },
       })) as Record<string, unknown>[];
 
@@ -640,7 +641,7 @@ async function deleteVersion(
       kind: "updateMany",
       collection: "users",
       filter: {},
-      update: { $pull: { authorOf: target.package._id, maintainerOf: target.package._id } },
+      update: { $pull: { authorOf: pullBothForms(target.package._id), maintainerOf: pullBothForms(target.package._id) } },
     });
   }
 
@@ -694,7 +695,7 @@ async function deletePackage(
         kind: "updateMany",
         collection: "users",
         filter: {},
-        update: { $pull: { authorOf: target.package._id, maintainerOf: target.package._id } },
+        update: { $pull: { authorOf: pullBothForms(target.package._id), maintainerOf: pullBothForms(target.package._id) } },
       },
     ],
   });

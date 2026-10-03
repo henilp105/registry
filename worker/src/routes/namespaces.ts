@@ -38,6 +38,7 @@ import type { AuthContext } from "../lib/auth";
 import { validateNamespaceName } from "../lib/validators";
 import { isDuplicateKeyError } from "../lib/publish";
 import { issueUploadToken, revokeUploadToken, DEFAULT_TTL_DAYS } from "../lib/upload-tokens";
+import { idsBothForms } from "../db/bson";
 import { logger } from "../lib/logger";
 import { deletePackageTarballs } from "../lib/storage";
 import { ENTITY, invalidate } from "../lib/cache";
@@ -251,7 +252,7 @@ async function listMembers(env: Env, namespaceName: string, field: "admins" | "m
   const users = await db<unknown[]>(env, {
     kind: "find",
     collection: "users",
-    filter: { _id: { $in: ids } },
+    filter: { _id: { $in: idsBothForms(ids) } },
     projection: { username: 1 },
   });
 
@@ -411,7 +412,7 @@ async function deleteNamespace(
             kind: "updateMany" as const,
             collection: "users",
             filter: {},
-            update: { $pull: { authorOf: { $in: packageIds }, maintainerOf: { $in: packageIds } } },
+            update: { $pull: { authorOf: { $in: idsBothForms(packageIds) }, maintainerOf: { $in: idsBothForms(packageIds) } } },
           }]
         : []),
       // Release any publish token scoped to this namespace.

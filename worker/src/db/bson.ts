@@ -124,6 +124,21 @@ export function pullBothForms(id: unknown): unknown {
   return pair ? rawBson({ $in: [pair.oid, pair.hex] }) : id;
 }
 
+/**
+ * Expand a list of ids to match documents stored with either form. Legacy
+ * docs hold hex strings in membership arrays; worker-written ones hold
+ * ObjectIds. Use in `{ _id: { $in: ... } }` / `$in: [...]` read filters.
+ */
+export function idsBothForms(ids: unknown[]): unknown[] {
+  const out: unknown[] = [];
+  for (const id of ids) {
+    const pair = idPair(id);
+    if (pair) out.push(pair.oid, pair.hex);
+    else out.push(id);
+  }
+  return out;
+}
+
 export function toBsonQueries<T = unknown>(value: unknown): T {
   if (Array.isArray(value)) return value.map(toBsonQueries) as T;
 

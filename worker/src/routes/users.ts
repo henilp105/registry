@@ -43,7 +43,7 @@ import {
   type UserLike,
 } from "../lib/permissions";
 import { invalidate, ENTITY } from "../lib/cache";
-import { memberOf, notMemberOf, pullBothForms } from "../db/bson";
+import { idsBothForms, memberOf, notMemberOf, pullBothForms } from "../db/bson";
 import { logger } from "../lib/logger";
 import { deletePackageTarballs } from "../lib/storage";
 import { readBody } from "./namespaces";
@@ -365,8 +365,8 @@ async function deleteUser(
           // by exercising the write path against the live cluster; no unit test
           // reached it, because every fixture had `author` already absent.
           $pull: {
-            admins: target._id,
-            maintainers: target._id,
+            admins: pullBothForms(target._id),
+            maintainers: pullBothForms(target._id),
             packages: { $in: ownedIds },
           },
         },
@@ -382,7 +382,7 @@ async function deleteUser(
         kind: "updateMany",
         collection: "users",
         filter: {},
-        update: { $pull: { authorOf: { $in: ownedIds }, maintainerOf: { $in: ownedIds } } },
+        update: { $pull: { authorOf: { $in: idsBothForms(ownedIds) }, maintainerOf: { $in: idsBothForms(ownedIds) } } },
       },
       { kind: "updateMany", collection: "upload_tokens", filter: { created_by: target.uuid }, update: { $set: { revoked_at: new Date() } } },
       { kind: "deleteOne", collection: "users", filter: { _id: target._id } },
@@ -601,7 +601,7 @@ async function removePackageMaintainer(
     kind: "updateOne",
     collection: "users",
     filter: { _id: target._id },
-    update: { $pull: { maintainerOf: pkg._id } },
+    update: { $pull: { maintainerOf: pullBothForms(pkg._id) } },
   });
 
   await invalidate(env, ENTITY.package(namespaceName, packageName), ENTITY.namespacePackages(namespaceName));
@@ -639,7 +639,7 @@ async function addNamespaceMaintainer(
   const result = (await db<{ modifiedCount: number }>(env, {
     kind: "updateOne",
     collection: "namespaces",
-    filter: { _id: namespace._id, maintainers: { $ne: target._id } },
+    filter: { _id: namespace._id, maintainers: notMemberOf(target._id) },
     update: { $addToSet: { maintainers: target._id } },
   })) as { modifiedCount: number };
 
@@ -684,8 +684,8 @@ async function removeNamespaceMaintainer(
   const result = (await db<{ modifiedCount: number }>(env, {
     kind: "updateOne",
     collection: "namespaces",
-    filter: { _id: namespace._id, maintainers: target._id },
-    update: { $pull: { maintainers: target._id } },
+    filter: { _id: namespace._id, maintainers: memberOf(target._id) },
+    update: { $pull: { maintainers: pullBothForms(target._id) } },
   })) as { modifiedCount: number };
 
   await invalidate(env, ENTITY.namespace(namespaceName), ENTITY.namespacePackages(namespaceName));
@@ -724,7 +724,7 @@ async function addNamespaceAdmin(
   const result = (await db<{ modifiedCount: number }>(env, {
     kind: "updateOne",
     collection: "namespaces",
-    filter: { _id: namespace._id, admins: { $ne: target._id } },
+    filter: { _id: namespace._id, admins: notMemberOf(target._id) },
     update: { $addToSet: { admins: target._id } },
   })) as { modifiedCount: number };
 
@@ -770,8 +770,8 @@ async function removeNamespaceAdmin(
   const result = (await db<{ modifiedCount: number }>(env, {
     kind: "updateOne",
     collection: "namespaces",
-    filter: { _id: namespace._id, admins: target._id },
-    update: { $pull: { admins: target._id } },
+    filter: { _id: namespace._id, admins: memberOf(target._id) },
+    update: { $pull: { admins: pullBothForms(target._id) } },
   })) as { modifiedCount: number };
 
   await invalidate(env, ENTITY.namespace(namespaceName), ENTITY.namespacePackages(namespaceName));
