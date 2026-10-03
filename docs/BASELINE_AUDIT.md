@@ -1705,3 +1705,23 @@ stayed public.
 
 **Rotation is still required** and is not something a commit can do: the value
 remains in git history. See the remediation note above.
+
+### D88 — cascade deletes skipped legacy namespace entries
+
+`namespaces.packages[]` holds package *name strings* on documents written before
+the join was fixed (D34-era), and ObjectIds after it. Two deletes read that array
+as if every entry were an ObjectId:
+
+- `deleteNamespace` collected `(package, version)` pairs through
+  `{_id: {$in: <those entries>}}`, matched nothing, and pruned **no R2 object** —
+  so deleting a namespace leaked every tarball it owned against the 10 GB
+  free-tier ceiling. Fixed to select on `packages.namespace`, the same field the
+  `deleteMany` in the same transaction uses, so the two cannot disagree again.
+- `deletePackage` / `deleteVersion` pulled only the ObjectId, leaving the legacy
+  string behind, so a deleted package stayed listed in its namespace forever.
+  Now pulls both forms.
+
+The D13 fix closed this class of bug for current documents; legacy data kept a
+copy of it. That is the pattern worth watching on every join fix: the code that
+was repaired stops being wrong, and nothing marks the documents it stopped
+understanding.

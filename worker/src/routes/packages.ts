@@ -613,7 +613,11 @@ async function deleteVersion(
       kind: "updateOne",
       collection: "namespaces",
       filter: { _id: target.namespace._id },
-      update: { $pull: { packages: target.package._id } },
+      // Defect D88: `$pull` on the ObjectId leaves the legacy *name string*
+      // entries behind on documents written before the join was fixed, so a
+      // deleted package stayed listed in its namespace forever. Pull both
+      // forms — `$pull` with an `$in` of two values is one round trip.
+      update: { $pull: { packages: { $in: [target.package._id, packageName] } } },
     });
     await db(env, {
       kind: "updateMany",
@@ -665,7 +669,9 @@ async function deletePackage(
         kind: "updateOne",
         collection: "namespaces",
         filter: { _id: target.namespace._id },
-        update: { $pull: { packages: target.package._id } },
+        // Defect D88: pull the legacy name string as well as the ObjectId, or
+        // the deleted package keeps appearing in its namespace's package list.
+        update: { $pull: { packages: { $in: [target.package._id, packageName] } } },
       },
       {
         kind: "updateMany",

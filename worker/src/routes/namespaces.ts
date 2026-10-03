@@ -373,26 +373,43 @@ async function deleteNamespace(
   if (!namespace) return jsonError(404, "Namespace not found");
 
   const namespaceId = namespace._id;
-  const packageIds = (namespace.packages ?? []) as unknown[];
 
   // Collect the (package, version) pairs before deleting the documents, so the
   // corresponding R2 objects can be pruned. Doing it after the delete would be
   // too late -- the objects would be unreachable but still stored, counting
   // against the 10 GB free-tier ceiling (defect D78).
-  const packageVersions = await collectPackageVersions(env, packageIds);
+  //
+  // Defect D88: this was driven by `namespaces.packages[]`, which for legacy
+  // documents holds package *name strings* rather than ObjectIds (the same
+  // mismatch the packages list above documents). `collectPackageVersions`
+  // filtered `{_id: {$in: <strings>}}`, matched nothing, returned [], and no R2
+  // object was ever pruned -- every namespace delete leaked its tarballs.
+  // The delete below keys on `namespace`, so the collection now does too, and
+  // the ids for the user unlink come from those documents rather than from the
+  // legacy array.
+  const packages = await collectNamespacePackages(env, namespaceId);
+  const packageIds = packages.map((p) => p.id);
+  const packageVersions = packages.map((p) => ({
+    packageName: p.name,
+    versions: p.versions,
+  }));
 
   await db(env, {
     kind: "transaction",
     steps: [
       // Remove the packages themselves.
       { kind: "deleteMany", collection: "packages", filter: { namespace: namespaceId } },
-      // Unlink from every author and maintainer.
-      {
-        kind: "updateMany",
-        collection: "users",
-        filter: {},
-        update: { $pull: { authorOf: { $in: packageIds }, maintainerOf: { $in: packageIds } } },
-      },
+      // Unlink from every author and maintainer. `$in` over the *resolved*
+      // ObjectIds; the legacy `namespaces.packages[]` entries are cleared by
+      // the namespace delete below regardless.
+      ...(packageIds.length > 0
+        ? [{
+            kind: "updateMany" as const,
+            collection: "users",
+            filter: {},
+            update: { $pull: { authorOf: { $in: packageIds }, maintainerOf: { $in: packageIds } } },
+          }]
+        : []),
       // Release any publish token scoped to this namespace.
       {
         kind: "updateMany",
@@ -421,30 +438,36 @@ async function deleteNamespace(
 }
 
 /**
- * Defect D78: this used to collect legacy GridFS `oid`s, which never exist in
- * this architecture -- so the count it returned was always 0 and no object was
- * ever pruned. Now it collects what the R2 key actually derives from.
+ * Every package in a namespace, by the field the delete actually uses.
+ *
+ * Defect D78 fixed this to collect what the R2 key derives from instead of
+ * legacy GridFS `oid`s. Defect D88 fixed the *join*: it filtered on
+ * `namespaces.packages[]`, which holds name strings on legacy documents rather
+ * than ObjectIds, so the result was always empty and every namespace delete
+ * leaked its tarballs. `packages.namespace` is the same selector the
+ * `deleteMany` below uses, so the two cannot disagree again.
  */
-async function collectPackageVersions(
+async function collectNamespacePackages(
   env: Env,
-  packageIds: unknown[],
-): Promise<{ packageName: string; versions: string[] }[]> {
-  if (packageIds.length === 0) return [];
+  namespaceId: unknown,
+): Promise<{ id: unknown; name: string; versions: string[] }[]> {
+  if (namespaceId === undefined || namespaceId === null) return [];
   const packages = (await db<unknown[]>(env, {
     kind: "find",
     collection: "packages",
-    filter: { _id: { $in: packageIds } },
+    filter: { namespace: namespaceId },
     projection: { name: 1, versions: 1 },
   })) as Record<string, unknown>[];
 
   return (packages ?? [])
     .map((pkg) => ({
-      packageName: String(pkg.name ?? ""),
+      id: pkg._id,
+      name: String(pkg.name ?? ""),
       versions: ((pkg.versions ?? []) as Record<string, unknown>[])
         .map((v) => String(v.version ?? ""))
         .filter((v) => v.length > 0),
     }))
-    .filter((p) => p.packageName.length > 0 && p.versions.length > 0);
+    .filter((p) => p.name.length > 0);
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
