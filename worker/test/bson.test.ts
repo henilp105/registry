@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
-import { isIdLike, toBsonQueries, toRpcSafe, toMillis } from "../src/db/bson";
+import { isIdLike, toBsonQueries, toRpcSafe, toMillis, rawBson, memberOf, notMemberOf, pullBothForms } from "../src/db/bson";
 
 /**
  * The BSON ↔ RPC round trip, pinned.
@@ -292,5 +292,42 @@ describe("toBsonQueries: operator operands are not ids (D95)", () => {
       const converted = toBsonQueries<{ v: unknown }>({ v: value }).v;
       expect(converted instanceof ObjectId, value).toBe(isIdLike(value));
     }
+  });
+});
+
+describe("rawBson: the escape hatch (legacy maintainers)", () => {
+  const HEX_QUERY = "0123456789abcdef01234567";
+
+  it("passes a wrapped fragment through toBsonQueries untouched", () => {
+    const fragment = { $in: [HEX_QUERY] };
+    const converted = toBsonQueries<{ maintainers: unknown }>({ maintainers: rawBson(fragment) });
+    expect(converted.maintainers).toBe(fragment);
+  });
+
+  it("memberOf matches both the ObjectId and the legacy hex-string form", () => {
+    const converted = toBsonQueries<{ maintainers: { $in: unknown[] } }>({
+      maintainers: memberOf(HEX_QUERY),
+    });
+    const forms = converted.maintainers.$in;
+    expect(forms.some((v) => v instanceof ObjectId)).toBe(true);
+    expect(forms.some((v) => v === HEX_QUERY)).toBe(true);
+  });
+
+  it("notMemberOf excludes both forms", () => {
+    const converted = toBsonQueries<{ maintainers: { $nin: unknown[] } }>({
+      maintainers: notMemberOf(HEX_QUERY),
+    });
+    const forms = converted.maintainers.$nin;
+    expect(forms.some((v) => v instanceof ObjectId)).toBe(true);
+    expect(forms.some((v) => v === HEX_QUERY)).toBe(true);
+  });
+
+  it("pullBothForms cannot be re-broken by the converter", () => {
+    const converted = toBsonQueries<{ $pull: { maintainers: { $in: unknown[] } } }>({
+      $pull: { maintainers: pullBothForms(HEX_QUERY) },
+    });
+    const forms = converted.$pull.maintainers.$in;
+    expect(forms.some((v) => v instanceof ObjectId)).toBe(true);
+    expect(forms.some((v) => v === HEX_QUERY)).toBe(true);
   });
 });
