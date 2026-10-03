@@ -9,7 +9,7 @@
  * This module is the thin layer that turns a `Request` into an identity.
  */
 
-import type { Env } from "../db/client";
+import { db, type Env } from "../db/client";
 import { verifyToken, type AuthContext } from "./jwt";
 import type { Claims, TokenType } from "./jwt";
 
@@ -44,5 +44,27 @@ export async function authenticate(request: Request, env: Env): Promise<AuthCont
   if (!token) return null;
 
   const result = await verifyToken(token, env.JWT_SECRET_KEY, "access");
-  return result.ok ? { uuid: result.claims.sub, token, claims: result.claims } : null;
+  if (!result.ok) return null;
+
+  // Defect: logout, password change, and password reset all record
+  // `sessionsInvalidBefore` on the user, but only /auth/refresh honoured it —
+  // so a stolen access token stayed valid for its full TTL (up to 90 days)
+  // even after the victim "logged out". Check it here, at the chokepoint every
+  // authenticated route passes through. One extra indexed `users` read per
+  // request; it does not touch the KDF, so it stays well inside the 10 ms
+  // CPU ceiling (the I/O wait does not count against it).
+  const user = (await db<{ isVerified?: boolean; sessionsInvalidBefore?: string | Date } | null>(env, {
+    kind: "findOne",
+    collection: "users",
+    filter: { uuid: result.claims.sub },
+    projection: { isVerified: 1, sessionsInvalidBefore: 1 },
+  })) as { isVerified?: boolean; sessionsInvalidBefore?: string | Date } | null;
+  if (!user) return null;
+
+  const invalidBefore = user.sessionsInvalidBefore
+    ? Math.floor(new Date(user.sessionsInvalidBefore).getTime() / 1000)
+    : 0;
+  if (result.claims.iat < invalidBefore) return null;
+
+  return { uuid: result.claims.sub, token, claims: result.claims };
 }

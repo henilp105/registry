@@ -92,6 +92,17 @@ export const INDEX_SPEC: IndexSpec[] = [
     ],
   },
   {
+    // Every signup, email-change, and reset request inserts a row keyed by
+    // token_hash; without this index every verify/reset is a collection scan
+    // and expired rows accumulate forever (nothing purged them).
+    collection: "auth_tokens",
+    indexes: [
+      { key: { token_hash: 1 }, name: "auth_tokens_hash_unique", unique: true },
+      { key: { expires_at: 1 }, name: "auth_tokens_expires_at" },
+      { key: { user_uuid: 1 }, name: "auth_tokens_user" },
+    ],
+  },
+  {
     // Defect D13: malicious reports leave the package document so `/report/view`
     // can actually flip triage state instead of re-returning the same reports.
     collection: "malicious_reports",
@@ -116,5 +127,6 @@ export const EXPECTED_COLLECTIONS = [
   "packages",
   "namespaces",
   "upload_tokens",
+  "auth_tokens",
   "malicious_reports",
 ] as const;

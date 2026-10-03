@@ -32,7 +32,7 @@
 import { db, toJsonSafe } from "../db/client";
 import type { UserDoc } from "../lib/auth";
 import type { Env } from "../db/client";
-import { json, jsonError, jsonOk } from "../lib/responses";
+import { jsonError, jsonOk } from "../lib/responses";
 import { signToken, verifyToken, type AuthContext } from "../lib/auth";
 import { needsRehash, parseIterations, DEFAULT_PBKDF2_ITERATIONS } from "../lib/password";
 import { validateEmail, validatePassword, validateUsername } from "../lib/validators";
@@ -114,7 +114,7 @@ export async function handleAuthRoutes(
     case "GET reset-password":
       // The reset link is an SPA route; the SPA owns this path. Returning a
       // redirect keeps a bare API hit from 404-ing confusingly.
-      return json(302, { code: 200, message: "Continue in the browser" }, { location: `${env.HOST}/` });
+      return new Response(null, { status: 302, headers: { location: `${env.HOST}/` } });
     default:
       void url;
       void ctx;
@@ -437,10 +437,16 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     const user = await findUserByUuid(env, identity);
     if (!user) return jsonError(404, "User not found");
 
-    if (oldPassword !== undefined) {
-      if (!(await verifyPasswordInPool(env, oldPassword, String(user.password)))) {
-        return jsonError(401, "Invalid old password");
-      }
+    // Re-authentication is mandatory on this shape: a valid Bearer token alone
+    // used to be enough to set a new password without proving knowledge of the
+    // old one, so a hijacked unlocked session (or stolen access token) could
+    // permanently take over the account. The reset-token path (Shape B)
+    // already proves control of the mailbox instead.
+    if (oldPassword === undefined || oldPassword === "") {
+      return jsonError(400, "Please enter your current password");
+    }
+    if (!(await verifyPasswordInPool(env, oldPassword, String(user.password)))) {
+      return jsonError(401, "Invalid old password");
     }
 
     await db(env, {
@@ -494,18 +500,38 @@ async function verifyEmail(request: Request, env: Env): Promise<Response> {
   if (!pending) return jsonError(404, "User not found");
 
   const update: Record<string, unknown> = { isVerified: true };
-  // Confirming a change-of-address promotes the pending address.
+  // Confirming a change-of-address promotes the pending address. The token
+  // must name the same address the user row currently points at — otherwise
+  // this link was minted for an address the account has since moved on from.
   if (pending.newEmail) {
+    if (consumed.email && consumed.email !== pending.newEmail) {
+      return jsonError(401, "Verification link is invalid or has expired");
+    }
+    const taken = await db<UserDoc | null>(env, {
+      kind: "findOne",
+      collection: "users",
+      filter: { email: pending.newEmail, uuid: { $ne: pending.uuid } },
+      projection: { uuid: 1 },
+    });
+    if (taken) return jsonError(400, "Email already in use");
     update.email = pending.newEmail;
     update.newEmail = "";
   }
 
-  await db(env, {
-    kind: "updateOne",
-    collection: "users",
-    filter: { uuid: consumed.user_uuid },
-    update: { $set: update },
-  });
+  try {
+    await db(env, {
+      kind: "updateOne",
+      collection: "users",
+      filter: { uuid: consumed.user_uuid },
+      update: { $set: update },
+    });
+  } catch (err) {
+    // Another signup claimed the address between change-email and confirm.
+    if (err instanceof Error && /duplicate key/i.test(err.message)) {
+      return jsonError(400, "Email already in use");
+    }
+    throw err;
+  }
 
   const [accessToken, refreshToken] = await issueTokens(env, consumed.user_uuid);
 
@@ -560,6 +586,10 @@ async function changeEmail(request: Request, env: Env, auth: AuthContext | null)
       kind: "verify_email",
       user_uuid: auth.uuid,
       username: user.username,
+      // Bind the token to the exact address being claimed. Without this, a
+      // second change-email request overwrites `users.newEmail` and the FIRST
+      // confirmation link silently verifies the SECOND address.
+      email: newEmail,
       expires_at: new Date(Date.now() + VERIFY_TOKEN_TTL_MINUTES * 60_000),
       used_at: null,
       created_at: new Date(),
@@ -605,7 +635,7 @@ async function consumeSingleUseToken(
   env: Env,
   raw: string,
   kind: "verify_email" | "password_reset",
-): Promise<{ user_uuid: string; username: string } | null> {
+): Promise<{ user_uuid: string; username: string; email?: string } | null> {
   const tokenHash = await sha256Hex(raw);
 
   // Claim first. If nothing matched, the token is unknown, already used,
@@ -621,12 +651,12 @@ async function consumeSingleUseToken(
 
   // The token is now spent, so read the owner off it. Safe because nobody
   // else can claim it — the filter above already excluded them.
-  const doc = (await db<{ user_uuid: string; username: string } | null>(env, {
+  const doc = (await db<{ user_uuid: string; username: string; email?: string } | null>(env, {
     kind: "findOne",
     collection: "auth_tokens",
     filter: { token_hash: tokenHash, kind },
-    projection: { user_uuid: 1, username: 1 },
-  })) as { user_uuid: string; username: string } | null;
+    projection: { user_uuid: 1, username: 1, email: 1 },
+  })) as { user_uuid: string; username: string; email?: string } | null;
 
   return doc;
 }

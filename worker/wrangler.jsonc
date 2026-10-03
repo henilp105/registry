@@ -94,11 +94,10 @@
   ],
 
   "triggers": {
-    // 5 cron triggers are available on the free plan; we use 4.
+    // 5 cron triggers are available on the free plan; we use 3.
     "crons": [
-      "17 * * * *",   // hourly   — refresh hot package cache from MongoDB
-      "*/30 * * * *", // 30-min   — rebuild the search index
-      "0 3 * * *",    // 03:00 UTC— pending validation sweep
+      "17 * * * *",   // hourly   — ensure MongoDB indexes exist (bootstrap)
+      "0 3 * * *",    // 03:00 UTC— sweep expired upload/auth tokens
       "0 4 * * 0"     // 04:00 Sun— prune orphaned tarballs from R2
     ]
   },

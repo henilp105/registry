@@ -14,7 +14,7 @@ import { MongoPool, POOL_NAME } from "./db/mongo-pool";
 import type { Env } from "./db/client";
 import { INDEX_SPEC, EXPECTED_COLLECTIONS } from "./db/indexes";
 import { buildSnapshot, pruneArchives } from "./routes/archives";
-import { sweepExpiredTokens } from "./lib/upload-tokens";
+import { sweepExpiredTokens, sweepExpiredAuthTokens } from "./lib/upload-tokens";
 import { collectLiveTarballKeys, pruneOrphanedTarballs } from "./routes/tarballs";
 import { corsHeaders, handlePreflight } from "./lib/cors";
 import { logger } from "./lib/logger";
@@ -199,18 +199,13 @@ async function handleCron(cron: string, env: Env): Promise<void> {
         logger.info("cron bootstrap", { result });
         return;
       }
-      case "*/30 * * * *": {
-        // Phase 7: the search index is the weighted $text index in MongoDB, so
-        // there is no separate index to rebuild. What needs refreshing is the
-        // namespace autocomplete mirror, which the KV namespace serves.
-        return;
-      }
       case "0 3 * * *": {
         // Sweep upload tokens that expired over a month ago. On v2.0.1 these
         // were pushed onto namespaces.upload_tokens[] forever with no sweep, so
         // the document grew until it hit the 16 MB cap (defect D4).
         const swept = await sweepExpiredTokens(env, 30);
-        logger.info("nightly sweep", { expiredUploadTokens: swept });
+        const sweptAuth = await sweepExpiredAuthTokens(env);
+        logger.info("nightly sweep", { expiredUploadTokens: swept, expiredAuthTokens: sweptAuth });
         return;
       }
       case "0 4 * * 0": {

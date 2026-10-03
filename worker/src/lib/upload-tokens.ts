@@ -216,6 +216,51 @@ export async function consumeUploadToken(env: Env, presented: string): Promise<T
   };
 }
 
+export type InspectedToken =
+  | { ok: true; namespaceId: string; packageId: string | null; createdBy: string }
+  | { ok: false; reason: "unknown" | "expired" | "revoked" | "exhausted" };
+
+/**
+ * Read-only validation of a presented token.
+ *
+ * Deliberately separated from `consumeUploadToken` so callers can check a
+ * token (and even run a full dry-run publish) without burning a use. The
+ * atomic claim in `consumeUploadToken` is still what enforces `max_uses`
+ * under races; this is the pre-flight check.
+ */
+export async function inspectUploadToken(env: Env, presented: string): Promise<InspectedToken> {
+  const tokenHash = await sha256Hex(presented);
+  const doc = (await db<UploadTokenDoc | null>(env, {
+    kind: "findOne",
+    collection: UPLOAD_TOKEN_COLLECTION,
+    filter: { token_hash: tokenHash, kind: "upload" },
+    projection: { revoked_at: 1, expires_at: 1, use_count: 1, max_uses: 1, namespace_id: 1, package_id: 1, created_by: 1 },
+  })) as UploadTokenDoc | null;
+
+  if (!doc) return { ok: false, reason: "unknown" };
+  if (doc.revoked_at) return { ok: false, reason: "revoked" };
+  if (toMillis(doc.expires_at) <= Date.now()) return { ok: false, reason: "expired" };
+  if (doc.max_uses !== null && (doc.use_count ?? 0) >= doc.max_uses) {
+    return { ok: false, reason: "exhausted" };
+  }
+  return { ok: true, namespaceId: doc.namespace_id, packageId: doc.package_id ?? null, createdBy: doc.created_by };
+}
+
+/**
+ * Delete expired `auth_tokens` (verification / password-reset mails). Without
+ * this the collection grows forever: every signup, email change, and reset
+ * request inserts one row, and only upload tokens were ever swept.
+ */
+export async function sweepExpiredAuthTokens(env: Env, olderThanDays = 0): Promise<number> {
+  const cutoff = new Date(Date.now() - olderThanDays * 86_400_000);
+  const result = (await db<{ deletedCount: number }>(env, {
+    kind: "deleteMany",
+    collection: "auth_tokens",
+    filter: { expires_at: { $lt: cutoff } },
+  })) as { deletedCount: number };
+  return result?.deletedCount ?? 0;
+}
+
 /** Revoke a token. Only the creator or a site admin may call this. */
 export async function revokeUploadToken(env: Env, tokenId: string, actorUuid: string): Promise<boolean> {
   // D81: reject a malformed id up front. The old `{ $invalid: hex }` sentinel

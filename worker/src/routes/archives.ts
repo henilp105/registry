@@ -181,8 +181,17 @@ export async function buildSnapshot(env: Env): Promise<{ key: string; bytes: num
 /** Drop every archive but the most recent `keep`, bounding R2 usage. */
 export async function pruneArchives(env: Env, keep = 3): Promise<number> {
   try {
-    const listing = await env.TARBALLS.list({ prefix: ARCHIVE_PREFIX });
-    const sorted = [...listing.objects].sort((a, b) =>
+    // Paginate: R2 lists return at most 1000 keys, so a single `list()` call
+    // would only ever prune the newest page and let stale archives pile up
+    // beyond it (same cursor pattern as pruneOrphanedTarballs/storageUsage).
+    const objects: { key: string; uploaded?: Date }[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await env.TARBALLS.list({ prefix: ARCHIVE_PREFIX, cursor });
+      objects.push(...page.objects);
+      cursor = page.truncated ? page.cursor : undefined;
+    } while (cursor);
+    const sorted = [...objects].sort((a, b) =>
       (a.uploaded?.getTime() ?? 0) < (b.uploaded?.getTime() ?? 0) ? 1 : -1,
     );
     const stale = sorted.slice(keep);

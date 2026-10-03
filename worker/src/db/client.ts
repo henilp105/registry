@@ -49,8 +49,8 @@ export type Env = PoolEnv & {
 /**
  * Send one operation to the region's pool and await its result.
  *
- * `locationHint` biases placement toward the Atlas region so the round trip
- * stays short; the current cluster is ap-south-1.
+ * `locationHint: "apac"` biases placement toward the Atlas region (the
+ * cluster lives in the APAC group) so the round trip stays short.
  */
 export async function db<T = unknown>(env: Env, op: MongoOp): Promise<T> {
   const id = env.MONGO_POOL.idFromName(POOL_NAME);

@@ -289,7 +289,7 @@ runbook in [`DEPLOYMENT.md`](../DEPLOYMENT.md).
 | 6 | R2 | Streaming upload with incremental SHA-256, creating a digest that never existed (D24) |
 | 7 | search | `$text` index actually used; `PUT /packages` deprecation added (D26) |
 | 8 | validation | Moved to GitHub Actions, closing the `shell=True` injection (D7) and zip-bomb (D8) |
-| 9 | docs + ops | Generated OpenAPI 3.1 (46 paths / 48 operations), archives restored, 4 live crons |
+| 9 | docs + ops | Generated OpenAPI 3.1 (46 paths / 48 operations), archives restored, 3 live crons |
 
 ### Verification, measured rather than asserted
 

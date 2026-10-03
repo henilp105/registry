@@ -58,7 +58,7 @@ import {
   planSearch,
   sortDirection,
 } from "../lib/search";
-import { consumeUploadToken, tokenAllows } from "../lib/upload-tokens";
+import { consumeUploadToken, inspectUploadToken, tokenAllows } from "../lib/upload-tokens";
 import {
   MAX_TARBALL_BYTES,
   TarballTooLarge,
@@ -881,15 +881,28 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
   // `dry_run` must have no side effects. v2.0.1 wrote a GridFS record and a
   // tarball to disk *before* the early return, leaking one of each per call with
   // no cleanup (defect D15). Nothing at all is persisted on this path.
-  if (dryRun) return jsonOk({ message: "Dry run Successful." });
+  // It must also *validate credentials*: the whole point of a dry run is for CI
+  // to catch a bad token before the real publish, and answering "Successful"
+  // for a garbage token made every CI dry run a false negative.
+  if (dryRun) {
+    const inspected = await inspectUploadToken(env, token);
+    if (!inspected.ok) {
+      logger.warn("rejected upload token", { reason: inspected.reason });
+      return jsonError(401, "Invalid upload token");
+    }
+    return jsonOk({ message: "Dry run Successful." });
+  }
 
-  const verdict = await consumeUploadToken(env, token);
-  if (!verdict.valid) {
-    logger.warn("rejected upload token", { reason: verdict.reason });
-    // One message for every failure mode: distinguishing them would let a
-    // caller probe which tokens exist.
+  // Read-only check first so a *failed validation* (bad namespace, version
+  // conflict, oversized or unreadable tarball) never burns a use on a
+  // `max_uses: 1` token. The atomic `consumeUploadToken` below still enforces
+  // `max_uses` under races — this is the pre-flight half of the same check.
+  const inspected = await inspectUploadToken(env, token);
+  if (!inspected.ok) {
+    logger.warn("rejected upload token", { reason: inspected.reason });
     return jsonError(401, "Invalid upload token");
   }
+  const verdict = { valid: true as const, namespaceId: inspected.namespaceId, packageId: inspected.packageId, createdBy: inspected.createdBy };
 
   const namespace = (await db<{ _id: unknown; namespace: string; author?: unknown; admins?: unknown[]; maintainers?: unknown[] } | null>(env, {
     kind: "findOne",
@@ -960,6 +973,15 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
     logger.error("tarball hash failed", { message: err instanceof Error ? err.message : String(err) });
     return jsonError(400, "Invalid tarball file");
   }
+  // All cheap validation has now passed — claim the token for real. If a
+  // concurrent publish exhausts the same `max_uses: 1` token first, fail
+  // here rather than writing a version the token budget does not allow.
+  const verdict2 = await consumeUploadToken(env, token);
+  if (!verdict2.valid) {
+    logger.warn("upload token lost to a race at consume time", { reason: verdict2.reason });
+    return jsonError(401, "Invalid upload token");
+  }
+
   const stored: StoredTarball = {
     key: tarballKey(namespace.namespace, packageName, version),
     size: total,

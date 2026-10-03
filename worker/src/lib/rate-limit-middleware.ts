@@ -23,13 +23,12 @@
  * request on any route that already touches the database.
  *
  * ── What is deliberately NOT limited ────────────────────────────────────────
- * The edge cache. A cache hit does not reach MongoDB, so it does not reach the
- * counter either — and that is the correct outcome, not an oversight. Flooding
- * cached reads is the *cheap* way to hammer this registry: Cloudflare serves them
- * and Atlas sees nothing. What must be prevented is pressure on the 100
- * ops/second M0 cap, and every request that touches MongoDB is accounted for.
- * Adding a DO round trip to cache hits would trade the main optimisation of the
- * whole architecture for a limit that protects nothing.
+ * Health checks, the docs landing page, and a handful of liveness probes
+ * (`ALWAYS_ALLOWED`). Everything else — including requests that will
+ * ultimately be served from the KV cache — passes through the counter,
+ * because the counter *is* the thing that costs a Mongo round trip: the
+ * KV cache sits behind this middleware, not in front of it. That is the
+ * price of counting per account rather than per address.
  */
 
 import type { Env } from "../db/client";

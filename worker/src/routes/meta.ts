@@ -13,18 +13,6 @@ import type { Env } from "../db/client";
 import { buildOpenApi } from "../lib/openapi";
 import { json } from "../lib/responses";
 
-export function handleHealth(env: Env): Promise<Response> {
-  return Promise.resolve(handleHealthSync(env));
-}
-
-function handleHealthSync(env: Env): Response {
-  return json(200, {
-    service: "fpm-registry-api",
-    status: "healthy",
-    environment: env.ENVIRONMENT,
-  });
-}
-
 /** `GET /apidocs` — a minimal self-describing landing page. */
 export function handleDocsIndex(): Response {
   return json(200, {

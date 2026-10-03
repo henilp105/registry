@@ -35,10 +35,14 @@ import type { MongoOp, TransactionStep } from "./mongo-pool";
 /**
  * Reads and local computation. Nothing is persisted, so there is nothing to
  * duplicate — retrying is free and strictly better than failing.
+ *
+ * `rateLimit` is deliberately NOT here: it performs a counter increment, so
+ * replaying an ambiguous failure counts the same request twice against the
+ * caller's budget. Failing the request closed (no retry) costs one refused
+ * request; over-counting drains a legitimate user's window.
  */
 const PURE_KINDS = new Set([
   "ping",
-  "rateLimit",
   "findOne",
   "find",
   "count",

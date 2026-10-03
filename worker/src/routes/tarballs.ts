@@ -51,7 +51,7 @@ export async function handleTarballRoutes(
   const method = request.method.toUpperCase();
   const prefix = segments[0];
 
-  // GET /storage — usage against the 10 GB free-tier ceiling, so it is
+  // GET /tarballs/usage — usage against the 10 GB free-tier ceiling, so it is
   // observable before it is hit rather than after.
   if (method === "GET" && segments.length === 2 && segments[1] === "usage") {
     const usage = await storageUsage(env);
@@ -118,9 +118,6 @@ async function serveTarball(
   packageName: string,
   version: string,
 ): Promise<Response> {
-  // Count the fetch without making the download wait on a DB write: the
-  // increment rides along on ctx.waitUntil after the response is produced.
-  ctx.waitUntil(recordDownload(env, { name: packageName, namespace_name: namespace }));
   if (!SEGMENT.test(namespace) || !SEGMENT.test(packageName) || !SEGMENT.test(version)) {
     return jsonError(400, "Invalid tarball path");
   }
@@ -170,6 +167,11 @@ async function serveTarball(
       // rather than invisible.
       if (result.sha256) headers.set("x-checksum-sha256", result.sha256);
       headers.set("content-length", String(result.size));
+
+      // Count the fetch only once we know the artifact exists — a 400/404
+      // path segment or a missing object is not a "download". The increment
+      // rides along on ctx.waitUntil so the response never waits on it.
+      ctx.waitUntil(recordDownload(env, { name: packageName, namespace_name: namespace }));
 
       return new Response(result.body, { status: 200, headers });
     },

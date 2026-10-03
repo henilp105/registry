@@ -20,7 +20,7 @@ import type { Env } from "./db/client";
 import { jsonOk } from "./lib/responses";
 import type { AuthContext } from "./lib/auth";
 import { authenticate } from "./lib/auth";
-import { handleHealth, handleOpenapi } from "./routes/meta";
+import { handleOpenapi } from "./routes/meta";
 import { handleAuthRoutes } from "./routes/auth";
 import { handleUserRoutes } from "./routes/users";
 import { handleNamespaceRoutes } from "./routes/namespaces";
@@ -42,10 +42,11 @@ export async function route(
   const seg = path.split("/").filter(Boolean);
 
   // ── meta ───────────────────────────────────────────────────────────────────
-  // Defect D81: /healthz was answered by a static stub in meta.ts that never
-  // touched MongoDB. The real probe lives in index.ts; route it through there
-  // by returning null for /healthz so index.ts's intercept handles it.
-  if (path === "/health") return handleHealth(env);
+  // Defect D81: /health and /healthz used to resolve to a static stub in
+  // meta.ts that never touched MongoDB. The real probe lives in index.ts;
+  // defer to it by returning null here so route() callers in tests get the
+  // same semantics as production instead of the fake probe.
+  if (path === "/health" || path === "/healthz") return null;
   if (path === "/" || path === "/apidocs" || path === "/apidocs/openapi.json") {
     if (path === "/") return jsonOk({ message: "fpm registry api", version: "3.0.0" });
     return handleOpenapi(path, env);

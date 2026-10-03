@@ -28,7 +28,6 @@ const op = (partial: Record<string, unknown> & { kind: OpKind | string }): Mongo
 describe("isReplaySafe: reads and local computation are always safe", () => {
   it.each([
     "ping",
-    "rateLimit",
     "findOne",
     "find",
     "count",
@@ -41,6 +40,10 @@ describe("isReplaySafe: reads and local computation are always safe", () => {
     // Nothing is persisted, so there is nothing to duplicate. Failing here would
     // cost a round trip for no correctness benefit.
     expect(isReplaySafe(op({ kind })), kind).toBe(true);
+  });
+
+  it("rateLimit is NOT replayed: it increments a counter, so a retry double-counts the request", () => {
+    expect(isReplaySafe(op({ kind: "rateLimit" }))).toBe(false);
   });
 
   it("a real read op with a filter is safe", () => {
