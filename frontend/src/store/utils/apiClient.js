@@ -1,5 +1,12 @@
 import axios from "axios";
-import { getAccessToken, emitUnauthorized } from "./session";
+import {
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+  emitUnauthorized,
+  emitTokensRefreshed,
+} from "./session";
 
 /**
  * Configured Axios instance for API calls
@@ -36,8 +43,8 @@ apiClient.interceptors.request.use((config) => {
 /**
  * End the session on 401 -- but only when the session really is over.
  *
- * There is no refresh endpoint, so an expired or revoked token cannot be renewed
- * and signing out is the only correct response.
+ * The backend DOES have POST /auth/refresh; the token pair is renewed once
+ * and the original request retried before we give up and sign out.
  *
  * Two kinds of 401 have to be told apart, and conflating them breaks login
  * entirely (defect D65):
@@ -59,6 +66,36 @@ apiClient.interceptors.request.use((config) => {
  * The backend now sends `reason: "forbidden"` on the second kind. A client that
  * does not know the field is unaffected; this one uses it.
  */
+// One in-flight refresh, shared by every concurrent 401 so a burst of
+// expired requests triggers a single /auth/refresh call rather than N.
+let refreshPromise = null;
+
+const refreshTokens = () => {
+  if (refreshPromise) return refreshPromise;
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return Promise.reject(new Error("no refresh token"));
+
+  // Bare fetch, not apiClient: this must not itself go through the
+  // interceptor (that would recurse on a 401 from /auth/refresh).
+  const form = new FormData();
+  form.append("refresh_token", refreshToken);
+  refreshPromise = fetch(`${process.env.REACT_APP_REGISTRY_API_URL}/auth/refresh`, {
+    method: "POST",
+    body: form,
+  })
+    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`refresh ${res.status}`))))
+    .then((data) => {
+      setAccessToken(data.access_token);
+      setRefreshToken(data.refresh_token);
+      emitTokensRefreshed({ accessToken: data.access_token, refreshToken: data.refresh_token });
+      return data.access_token;
+    })
+    .finally(() => {
+      refreshPromise = null;
+    });
+  return refreshPromise;
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -82,6 +119,22 @@ apiClient.interceptors.response.use(
     const isPublic401 = PUBLIC_401_PATHS.some((p) => requestUrl.includes(p));
 
     if (status === 401 && sentToken && !isForbidden && !isPublic401) {
+      const original = error?.config;
+      const alreadyRetried = original?._retriedAfterRefresh;
+      if (original && !alreadyRetried && getRefreshToken()) {
+        original._retriedAfterRefresh = true;
+        return refreshTokens().then(
+          (newAccessToken) => {
+            original.headers = original.headers || {};
+            original.headers.Authorization = `Bearer ${newAccessToken}`;
+            return apiClient.request(original);
+          },
+          () => {
+            emitUnauthorized();
+            return Promise.reject(error);
+          },
+        );
+      }
       emitUnauthorized();
     }
     return Promise.reject(error);

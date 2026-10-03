@@ -21,6 +21,8 @@ const initialState = {
   message: null,
 };
 
+export const TOKEN_REFRESHED = "TOKEN_REFRESHED";
+
 const authReducer = (state = initialState, action) => {
   switch (action.type) {
     // Login
@@ -40,6 +42,14 @@ const authReducer = (state = initialState, action) => {
         username: action.payload.username,
         isLoading: false,
         error: null,
+      };
+
+    // Silent renewal of the access/refresh pair — same identity, new tokens.
+    case TOKEN_REFRESHED:
+      return {
+        ...state,
+        accessToken: action.payload.accessToken,
+        refreshToken: action.payload.refreshToken ?? state.refreshToken,
       };
 
     case LOGIN_FAILURE:

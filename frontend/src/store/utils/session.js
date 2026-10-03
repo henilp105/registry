@@ -15,7 +15,9 @@
  */
 
 let accessToken = null;
+let refreshToken = null;
 let onUnauthorized = null;
+let onTokensRefreshed = null;
 
 /**
  * Set (or clear) the token used for outgoing requests.
@@ -31,9 +33,37 @@ export const setAccessToken = (token) => {
 export const getAccessToken = () => accessToken;
 
 /**
+ * Set (or clear) the refresh token used to renew the access token.
+ * @param {string|null} token - JWT refresh token, or null to clear
+ */
+export const setRefreshToken = (token) => {
+  refreshToken = token || null;
+};
+
+/**
+ * @returns {string|null} The current refresh token
+ */
+export const getRefreshToken = () => refreshToken;
+
+/**
+ * Register a callback invoked when a token refresh succeeds, so the new token
+ * pair can be mirrored back into the Redux store.
+ * @param {Function} handler - Called with ({accessToken, refreshToken})
+ */
+export const setTokensRefreshedHandler = (handler) => {
+  onTokensRefreshed = typeof handler === "function" ? handler : null;
+};
+
+/**
+ * Notify the registered handler (if any) that the token pair was renewed.
+ */
+export const emitTokensRefreshed = (tokens) => {
+  if (onTokensRefreshed) onTokensRefreshed(tokens);
+};
+
+/**
  * Register a callback invoked when the API rejects a request we sent with an
- * access token (i.e. the session is no longer valid). There is no refresh
- * endpoint on the backend, so the only correct response is to sign out.
+ * access token, even after a refresh attempt (i.e. the session is over).
  * @param {Function} handler - Called with no arguments
  */
 export const setUnauthorizedHandler = (handler) => {

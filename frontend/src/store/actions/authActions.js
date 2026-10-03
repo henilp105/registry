@@ -104,9 +104,11 @@ export const logout = (accessToken) => async (dispatch) => {
     });
     tearDown();
   } catch (error) {
-    // Still sign out locally - the token is being discarded either way.
+    // Still sign out locally - the token is being discarded either way. No
+    // LOGOUT_FAILURE here: tearDown() already reset the slice, and a failure
+    // dispatch would merge a phantom `error` onto the clean state, showing up
+    // as a spurious banner on the next visit to /account/login.
     tearDown();
-    dispatch({ type: LOGOUT_FAILURE, payload: { error: getErrorMessage(error) } });
   }
 };
 

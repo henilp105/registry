@@ -3,9 +3,12 @@ import { useDispatch, useSelector } from "react-redux";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   setAccessToken,
+  setRefreshToken,
   setUnauthorizedHandler,
+  setTokensRefreshedHandler,
 } from "../store/utils/session";
 import { LOGOUT_SUCCESS } from "../store/actions/authActions";
+import { TOKEN_REFRESHED } from "../store/reducers/authReducer";
 
 /**
  * Keeps the module-scoped session in sync with Redux and handles the global
@@ -21,12 +24,25 @@ const SessionGuard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const accessToken = useSelector((state) => state.auth.accessToken);
+  const refreshToken = useSelector((state) => state.auth.refreshToken);
 
   // Mirror the store's token into the axios session on every change, including
   // the initial rehydration from redux-persist.
   useEffect(() => {
     setAccessToken(accessToken);
   }, [accessToken]);
+
+  useEffect(() => {
+    setRefreshToken(refreshToken);
+  }, [refreshToken]);
+
+  // A silent renewal (expired access token, fresh refresh token) must update
+  // the store — and therefore redux-persist's written copy — or the next page
+  // load rehydrates the old, already-expired access token.
+  useEffect(() => {
+    setTokensRefreshedHandler((tokens) => dispatch({ type: TOKEN_REFRESHED, payload: tokens }));
+    return () => setTokensRefreshedHandler(null);
+  }, [dispatch]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
