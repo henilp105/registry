@@ -125,6 +125,16 @@ export async function verifyToken(
 
   const [header, payload, signature] = parts as [string, string, string];
 
+  // Reject any token that doesn't declare HS256 before verifying. Not
+  // exploitable today (verification is HMAC-only), but it pins the alg so a
+  // future verifier change cannot be talked into a weaker algorithm.
+  try {
+    const headerJson = JSON.parse(decoder.decode(b64urlDecode(header))) as { alg?: unknown };
+    if (headerJson.alg !== "HS256") return { ok: false, reason: "malformed" };
+  } catch {
+    return { ok: false, reason: "malformed" };
+  }
+
   try {
     const key = await importHmacKey(secret);
     const valid = await crypto.subtle.verify(
