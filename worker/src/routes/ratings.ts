@@ -142,8 +142,6 @@ async function postRating(
   const target = await resolvePackageTarget(env, namespaceName, packageName);
   if (!target.ok) return target.response;
 
-  const packageId = strId(target.package._id);
-
   // Defect D22: one atomic pipeline update. The bucket counts and the average
   // are derived from `ratings.users` inside the database, so two concurrent
   // votes cannot overwrite each other's tally the way a read-modify-write did.
@@ -152,7 +150,7 @@ async function postRating(
     collection: "packages",
     filter: { _id: target.package._id },
     update: {
-      $set: { [`ratings.users.${packageId ? "" : ""}${strId(voter._id)}`]: value },
+      $set: { [`ratings.users.${strId(voter._id)}`]: value },
     },
   });
 
@@ -171,8 +169,6 @@ async function postRating(
     ENTITY.package(namespaceName, packageName),
     ENTITY.namespacePackages(namespaceName),
   );
-  void packageId;
-
   void ctx;
   logger.info("rating recorded", { namespaceName, packageName, rating: value });
   return jsonOk({ message: "Ratings Submitted Successfully" });
