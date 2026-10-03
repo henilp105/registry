@@ -23,6 +23,14 @@ npx wrangler r2 bucket create fpm-registry-tarballs
 npx wrangler r2 bucket create fpm-registry-tarballs-preview
 npx wrangler kv namespace create CACHE        # paste the id into wrangler.jsonc
 
+# One namespace per environment. wrangler.jsonc has three separate
+# `kv_namespaces` blocks (root / staging / production) and an `env` block does
+# not inherit bindings, so all three ids must be filled in -- creating one
+# namespace and pasting it everywhere leaves the other two environments bound
+# to nothing.
+npx wrangler kv namespace create CACHE --env staging
+npx wrangler kv namespace create CACHE --env production
+
 # 3. Set secrets. These are NEVER in wrangler.jsonc.
 #
 #    MONGO_URI and SALT were missing from this list until defect D72, and both are
@@ -42,8 +50,27 @@ but secrets are the right home for both: `MONGO_URI` contains a database passwor
 and `SALT` must match whatever the accounts were hashed with. **Changing `SALT`
 after accounts exist locks every existing user out** — it is not a free rotation.
 
+> **Rotation required from D71/D86.** The production Atlas password was committed to a public
+> repository before the secret scan existed. Removing it from the tree and rotating it in Atlas are
+> separate actions and **only the second one closes the hole**; the old value must be treated as
+> compromised regardless of what the history shows. Set `MONGO_URI` to the rotated value, never to
+> the one in git history.
 
-6. Set the GitHub variables the validation workflow needs, or leave it failing on
+4. Verify the config before deploying:
+
+```bash
+node scripts/check_deploy_ready.mjs production
+```
+
+Ten checks, and it is a real gate — `wrangler deploy --dry-run` cannot catch a
+placeholder KV id, because Wrangler accepts any string as an id and binds
+nothing at runtime. Two of the ten fail on a fresh clone, both for the same
+reason: the KV namespace ids do not exist until step 2 is done with an
+authenticated `wrangler`. Everything else must pass. Once the ids are in, the
+same command is green and the Worker CI step can drop its `|| true` to make it
+blocking.
+
+5. Set the GitHub variables the validation workflow needs, or leave it failing on
    purpose: repository variable `REGISTRY_API_URL`, and secret `VALIDATION_SECRET`
    with the same value as the Worker's. `Validate Packages` is **red until both
    exist** — it runs a 30-minute cron against a registry that is not deployed, and

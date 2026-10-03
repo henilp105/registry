@@ -1640,8 +1640,8 @@ So the check stays strict and the *state* is documented instead:
 - the workflow header now says, in full, that it is expected to be red until the first
   deployment, that this is the fail-fast working as intended, and that it is **not
   push-triggered** so its state says nothing about whether a commit is healthy;
-- `DEPLOYMENT.md` lists setting `REGISTRY_API_URL` and `VALIDATION_SECRET` as step 6
-  of the deployment, with the same note.
+- `DEPLOYMENT.md` lists setting `REGISTRY_API_URL` and `VALIDATION_SECRET` as step 5 of
+  the deployment, with the same note.
 
 Judge commits by `Worker (serverless API)` and `Run Tests for Backend`, which are the
 two that gate.

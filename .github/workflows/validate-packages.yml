@@ -29,7 +29,7 @@ name: Validate Packages
 # validating is the exact failure D36 was about.
 #
 # The cost of that choice is a permanently red check on `main`, which is a real one:
-# red trains people to ignore the badge. So it is stated here, and it is item 6 on
+# red trains people to ignore the badge. So it is stated here, and it is step 5 of
 # the deployment checklist in DEPLOYMENT.md. Set both, and this goes green within
 # 30 minutes with no code change.
 #
