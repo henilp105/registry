@@ -1,7 +1,7 @@
 import { Row, Col, Image } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
 import { searchPackage, setQuery } from "../store/actions/searchActions";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import React, { useCallback } from "react";
 import Icon from "./Icon";
 import "./packageItem.css";
@@ -9,14 +9,16 @@ import "./packageItem.css";
 const PackageItem = ({ packageEntity }) => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  // D135: keep the active sort when following a keyword, same as the navbar.
+  const orderBy = useSelector((state) => state.search.orderBy);
 
   const handleKeywordClick = useCallback(
     (keyword) => {
       dispatch(setQuery(keyword));
-      dispatch(searchPackage(keyword, 0));
+      dispatch(searchPackage(keyword, 0, orderBy));
       navigate("/search");
     },
-    [dispatch, navigate]
+    [dispatch, navigate, orderBy]
   );
 
   const formatDate = (timestamp) => {

@@ -35,7 +35,7 @@ const Register = () => {
 
   // Password strength indicator
   const getPasswordStrength = useCallback((password) => {
-    if (!password) return { strength: 0, label: '', color: '' };
+    if (!password) return { strength: 0, label: '' };
     
     let strength = 0;
     if (password.length >= 8) strength += 1;

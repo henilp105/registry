@@ -17,6 +17,7 @@ import Spinner from "react-bootstrap/Spinner";
 import PackageItem from "../components/packageItem";
 import ShowUserListDialog from "./showUserListDialog";
 import "./namespace.css";
+import InitialsAvatar from "../components/InitialsAvatar";
 
 const NamespacePage = () => {
   const { namespace } = useParams();
@@ -99,11 +100,7 @@ const NamespacePage = () => {
         <Col lg={3} md={4}>
           <div className="namespace-sidebar">
             <div className="namespace-card">
-              <img
-                className="namespace-avatar"
-                alt={`Avatar for ${namespace}`}
-                src={`https://www.gravatar.com/avatar/${namespace}?d=identicon&s=200`}
-              />
+              <InitialsAvatar name={namespace} className="namespace-avatar" />
               
               <h1 className="namespace-title">{namespace}</h1>
 

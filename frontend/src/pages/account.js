@@ -28,6 +28,7 @@ import {
 
 // Bootstrap is imported once, in src/index.js.
 import "./account.css";
+import InitialsAvatar from "../components/InitialsAvatar";
 
 const Account = () => {
   const dispatch = useDispatch();
@@ -172,21 +173,10 @@ const Account = () => {
         <Col lg={4} md={5}>
           <div className="account-sidebar">
             <div className="account-card">
-              <img
-                className="account-avatar"
-                alt={`Avatar for ${username}`}
-                src={`https://www.gravatar.com/avatar/${username}?d=identicon&s=200`}
-              />
+              <InitialsAvatar name={username} className="account-avatar" />
               
               <h1 className="account-username">@{username}</h1>
               
-              <p className="account-gravatar-note">
-                Profile picture powered by{" "}
-                <a href="https://gravatar.com" target="_blank" rel="noopener noreferrer">
-                  Gravatar
-                </a>
-              </p>
-
               <div className="account-quick-actions">
                 <button 
                   className="account-action-btn"

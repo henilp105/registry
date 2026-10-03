@@ -1,0 +1,33 @@
+.initials-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto var(--space-6);
+  border: 3px solid var(--primary-50);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-brand-solid);
+  color: var(--color-on-brand-solid);
+  font-weight: 700;
+  font-size: 2.5rem;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.initials-avatar.account-avatar {
+  border-width: 4px;
+  border-radius: var(--radius-full);
+  width: 140px;
+  height: 140px;
+  font-size: 3rem;
+}
+
+@media (max-width: 768px) {
+  .initials-avatar.account-avatar {
+    width: 100px;
+    height: 100px;
+    font-size: 2rem;
+  }
+}

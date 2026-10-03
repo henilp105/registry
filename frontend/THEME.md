@@ -48,10 +48,11 @@ contrast regression cannot reach the token file silently.
 **The brand is "Fortran indigo", OKLCH hue 282.** That is the measured hue of
 the official fpm mark itself (`#483ca8`, taken from the vendored logo in
 `public/brand/`). It sits in the indigo/violet-blue band between the gfortran
-/ GNU Fortran front end and the purple already declared as `theme_color` in
-`public/manifest.json` (`#734f96`, hue 306). The blue bias is deliberate: at
-306 the brand reads as marketing, at 220 it reads as a hyperlink, and 282
-reads as a compiler.
+/ GNU Fortran front end and the dark-mode canvas already declared as
+`background_color` in `public/manifest.json` (`#0d0e13`). The blue bias is
+deliberate: at 306 the brand reads as marketing, at 220 it reads as a
+hyperlink, and 282 reads as a compiler. `theme_color` in the manifest is the
+brand itself (`#5b53c0`, hue 282), matching `--color-brand-solid`.
 
 **The accent is IBM Blue 70 (`#1F70C1`, hue 252.7)**, from the IBM Design
 Language — the colour of the IBM XL Fortran toolchain. It is reserved for

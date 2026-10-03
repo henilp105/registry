@@ -36,6 +36,9 @@ export default Home;
 function HomeSearchField() {
   const [localQuery, setLocalQuery] = useState("");
   const isLoading = useSelector((state) => state.search.isLoading);
+  // D135: keep the active sort when searching from the hero, or the dropdown
+  // on /search shows one order while the results are in another.
+  const orderBy = useSelector((state) => state.search.orderBy);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const inputRef = useRef(null);
@@ -64,10 +67,10 @@ function HomeSearchField() {
     const trimmedQuery = localQuery.trim();
     if (trimmedQuery) {
       dispatch(setQuery(trimmedQuery));
-      dispatch(searchPackage(trimmedQuery, 0));
+      dispatch(searchPackage(trimmedQuery, 0, orderBy));
       navigate("/search");
     }
-  }, [localQuery, dispatch, navigate]);
+  }, [localQuery, orderBy, dispatch, navigate]);
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {
@@ -125,10 +128,11 @@ function HomeSearchField() {
 function SearchSuggestion({ query }) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const orderBy = useSelector((state) => state.search.orderBy);
 
   const handleClick = () => {
     dispatch(setQuery(query));
-    dispatch(searchPackage(query, 0));
+    dispatch(searchPackage(query, 0, orderBy));
     navigate("/search");
   };
 

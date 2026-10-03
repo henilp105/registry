@@ -8,6 +8,7 @@ import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
 import Spinner from "react-bootstrap/Spinner";
 import PackageItem from "../components/packageItem";
+import InitialsAvatar from "../components/InitialsAvatar";
 import "./namespace.css";
 
 const UserPage = () => {
@@ -66,11 +67,7 @@ const UserPage = () => {
         <Col lg={3} md={4}>
           <div className="namespace-sidebar">
             <div className="namespace-card">
-              <img
-                className="namespace-avatar"
-                alt={`Avatar for ${user}`}
-                src={`https://www.gravatar.com/avatar/${user}?d=identicon&s=200`}
-              />
+              <InitialsAvatar name={user} className="namespace-avatar" />
               
               <h1 className="namespace-title">{user}</h1>
               
