@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { login, resetErrorMessage } from "../store/actions/authActions";
 import { InfoCircle, ExclamationCircleFill, Eye, EyeSlash } from "react-bootstrap-icons";
@@ -30,6 +30,7 @@ const Login = () => {
   const [formValidationErrors, setFormValidationError] = useState({});
   const [touched, setTouched] = useState({ user_identifier: false, password: false });
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
 
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
@@ -38,9 +39,10 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate("/manage/projects");
+      // Return to where the session ended, when SessionGuard bounced us here.
+      navigate(location.state?.from || "/manage/projects");
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, location]);
 
   // Clear any stale error only when leaving the page. A cleanup keyed on
   // errorMessage resets the error *again* when a new one arrives, wiping the

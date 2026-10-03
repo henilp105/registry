@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   setAccessToken,
   setUnauthorizedHandler,
@@ -19,6 +19,7 @@ import { LOGOUT_SUCCESS } from "../store/actions/authActions";
 const SessionGuard = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const accessToken = useSelector((state) => state.auth.accessToken);
 
   // Mirror the store's token into the axios session on every change, including
@@ -31,10 +32,15 @@ const SessionGuard = () => {
     setUnauthorizedHandler(() => {
       setAccessToken(null);
       dispatch({ type: LOGOUT_SUCCESS });
-      navigate("/account/login", { replace: true });
+      // Remember where the session died so login can return the user there
+      // instead of dropping them at the default landing page.
+      navigate("/account/login", {
+        replace: true,
+        state: { from: location.pathname + location.search },
+      });
     });
     return () => setUnauthorizedHandler(null);
-  }, [dispatch, navigate]);
+  }, [dispatch, navigate, location]);
 
   return null;
 };
