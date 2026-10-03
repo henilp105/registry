@@ -1807,3 +1807,79 @@ list fails 2 of 25 checks, and dropping one `controlId` fails the label check.
 
 That is the generalisable part. A defect found by reading is fixed once. A defect
 found by reading, in a class that recurs, is fixed by a check.
+
+---
+
+## D105–D120 — legacy backend + harness round (2026-10-03)
+
+The last unaudited surface: the legacy Flask app, and the `scripts/*.cjs`
+verification harnesses.
+
+### D105 — CI caught my own mistake first
+
+The `Signing out wipes every account-scoped slice` check went red on `main` the
+moment it landed. It had been added to the `scripts-load` job, whose setup
+installs `worker/` and never `frontend/`, so `@babel/core` was absent and the
+check died with a bare `ERR_MODULE_NOT_FOUND` naming neither the script nor the
+cause. That is the CI doing exactly its job, one round earlier than expected. The
+two frontend-source checks now live in a `frontend-source` job that installs the
+frontend dependencies, the check reports a missing prerequisite in words, and
+that job also runs the production build — so the checks cannot pass against
+source that no longer compiles.
+
+### Legacy Flask — D106–D113
+
+| ID | Site | Defect | Consequence |
+|---|---|---|---|
+| D106 | `user.py` | `individual_packages` cursor iterated twice — once in a set-comprehension, once in the loop after | A pymongo Cursor is single-pass, so the second loop never ran. Every package authored or maintained outside its namespace — anything added via `POST /{username}/maintainer` — was **absent from the dashboard**, at HTTP 200 with a short list. |
+| D107 | `user.py` | `_id: {$nin: [<24-hex strings>]}` | Mongo never matches a string against an ObjectId, so the dedup was a no-op and packages reachable through both branches appeared **twice**. The D10/D11 class, uncovered. |
+| D108 | `packages.py` | `if packages:` on a Cursor | No `__bool__`/`__len__`, so always true and the 404 was unreachable. **The contract baseline recording `/packages_cli` 404-on-empty was read off this dead `else`, not observed** — the docs and the shipped backend have always disagreed. |
+| D109 | `packages.py` | `page` floored on `/packages_cli` but not `/packages` | `Cursor.skip()` raises `ValueError` on a negative offset, so unauthenticated `GET /packages?page=-1` was a **500**. |
+| D110 | `packages.py` | `/tarballs/<oid>` caught only `NoFile`, which neither `ObjectId()` nor `[0]` can raise; counter incremented before existence check | Malformed and unknown ids were **500s**, and a guessable id could move `total_downloads` for an artifact that did not exist. |
+| D111 | `packages.py` | `int(rating)` on a raw form field | `rating=abc` was a 500. The suite sends `9` — the one case that worked. |
+| D112 | `packages.py` | `view_report` subscripted `find_one` results unchecked | A valid JWT whose account had been deleted — exactly what `POST /users/delete` leaves behind — was a **500** instead of 401. |
+| D113 | `app.py` | `GET /latency` unauthenticated, ~15+ DB round-trips per request | Trivial request amplification plus per-endpoint timings and collection sizes. Now gated on `X-Admin-Token`/`LATENCY_ADMIN_TOKEN`, failing closed when unset. |
+
+### Harnesses — D115–D120
+
+The theme is one sentence: **a harness that cannot exit non-zero is
+documentation.** Six of these could not fail.
+
+- **D115** — `frontend_visual_audit.cjs`, the repo's only browser-level contrast
+  guard, failed three ways: no `process.exit`; structural checks gated on
+  `light + desktop` so dark mode produced *zero* checks; and contrast measured in
+  a hardcoded `colorScheme: "light"` context with its results printed but never
+  reaching the exit code. So the dark-mode regression it exists to catch — D54,
+  black-on-black at 1.11:1 — was never measured.
+  `frontend_review.cjs` had the same exit defect plus a console-hygiene section
+  with no console listener at all: the array was declared, reset each iteration
+  and spread while empty, so "clean across all 21 routes" was a constant.
+- **D116** — `token_journey.cjs` revoked **every** upload token with
+  `updateMany({}, …)` and restored every row including ones an operator had
+  deliberately revoked. Not scoped, and not restored in a `finally`, so any throw
+  between the two left a shared database with publishing broken for every real
+  user.
+- **D117** — `member_journey.cjs` computed the 5xx/unexpected-404 list and only
+  logged it. `auth_journey.cjs` asserted "no request sent for an invalid form"
+  against a token (always null pre-login) rather than the requests it was
+  recording, and collected the authenticated-request list its own comment called
+  "the decisive check" without reading it.
+- **D118** — `write_path_audit.mjs` computed a namespace-scoped token list and
+  never used it. If the mint had failed, the D4 assertion searched for the
+  literal string `"undefined"` — which no JSON document contains — and passed.
+- **D119** — `rate_limit_probe.cjs` documented `[API_BASE]` and ignored `argv`.
+- **D120** — five harnesses hardcoded `fpmregistry_local` instead of the
+  `mongoDbName()` helper, so `MONGO_DB_NAME` — the variable the Worker reads and
+  `tests.yml` sets — pointed them at a database the API was not writing to.
+
+### D114, and why it is the same bug
+
+The CI step whose stated purpose is *"a silently broken harness is worse than an
+absent one"* listed exactly one file. Five of the six harnesses that import
+`mongodb` were never `require`d, so the regression the comment describes — a
+deleted `require("mongodb")`, which still parses — reintroduced in any of them
+was invisible.
+
+That is D115 and D114 in the same shape, and it is why this round's fixes are
+mostly about *verdicts* rather than *behaviour*: a check that cannot fail is
+indistinguishable from no check, and both look identical in a green CI run.
