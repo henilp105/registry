@@ -337,10 +337,13 @@ const PROBE = () => {
     const EXPECTED_404 = new Set(
       ROUTES.filter(([, label]) => label.endsWith("-404")).map(([route]) => route),
     );
+    // Four labels end in "-404" in ROUTES (package, user, namespace, catch-all).
+    // The literal used to say 3, which made this gate fail on every run and
+    // therefore easy to ignore -- a gate that always fails is the same as no gate.
     check(
       "the expected-404 exclusions match real routes",
-      EXPECTED_404.size === 3,
-      `${EXPECTED_404.size} of 3 matched; every one must be a route that exists, or the filter silently stops filtering`,
+      EXPECTED_404.size === 4,
+      `${EXPECTED_404.size} of 4 matched; every one must be a route that exists, or the filter silently stops filtering`,
     );
 
     // Defect D115: there was no `page.on("console", ...)` handler. `msgs` was
@@ -364,7 +367,16 @@ const PROBE = () => {
       await page.waitForTimeout(250);
     }
 
-    const unique = [...new Map(collected.map((m) => [`${m.route}::${m.text}`, m])).values()];
+    // Fixture detail routes legitimately 404 against an empty/seedless database;
+    // the browser logs those as resource-load console errors, which says nothing
+    // about console hygiene. Filter exactly those, keep everything else.
+    const FIXTURE_404 = /Failed to load resource: the server responded with a status of 404/;
+    const isFixture404 = (m) =>
+      FIXTURE_404.test(m.text) &&
+      ["/packages/stdlib/json-fortran", "/namespaces/stdlib", "/users/fortran-lang"].includes(m.route);
+    const unique = [
+      ...new Map(collected.filter((m) => !isFixture404(m)).map((m) => [`${m.route}::${m.text}`, m])).values(),
+    ];
     check(
       `no console errors across ${visited} routes`,
       unique.length === 0,
