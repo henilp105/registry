@@ -63,6 +63,20 @@ jobs:
           cd backend
           python -m pytest tests/ -v --tb=short --color=yes
 
+      # Defect D125: scripts/test_validate_packages.py is the only test for
+      # scripts/validate_packages.py -- the validator that replaced the
+      # shell-injectable backend/validate.py -- and nothing in the repository ran
+      # it. No workflow step, no npm script, no Makefile target. Its 60-odd
+      # assertions about traversal, symlink/hardlink escapes and the FNV-1a
+      # compatibility digest were correct and never executed, so a regression in
+      # the validator that reintroduced any of those defences would have merged
+      # green.
+      #
+      # It is also the wrong file to be the only defence of: this is the code
+      # that unpacks a publisher-controlled tarball.
+      - name: Validate the validator
+        run: python -m pytest scripts/test_validate_packages.py -v --tb=short
+
       - name: Run tests with coverage
         if: github.event_name == 'pull_request'
         run: |
