@@ -60,6 +60,10 @@ export async function authenticate(request: Request, env: Env): Promise<AuthCont
     projection: { isVerified: 1, sessionsInvalidBefore: 1 },
   })) as { isVerified?: boolean; sessionsInvalidBefore?: string | Date } | null;
   if (!user) return null;
+  // A newly-unverified (or never-verified) account must not keep calling
+  // authenticated routes on a still-valid access token. The refresh route
+  // already enforced this; mirror it at the shared chokepoint.
+  if (!user.isVerified) return null;
 
   const invalidBefore = user.sessionsInvalidBefore
     ? Math.floor(new Date(user.sessionsInvalidBefore).getTime() / 1000)

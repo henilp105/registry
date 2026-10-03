@@ -43,13 +43,21 @@ function isMissingIndexError(err: unknown): boolean {
 
 async function ensureIndexesOnce(env: Env): Promise<void> {
   if (bootstrapAttempted) return;
-  bootstrapAttempted = true;
   const id = env.MONGO_POOL.idFromName(POOL_NAME);
   const pool = env.MONGO_POOL.get(id, { locationHint: "apac" });
-  const result = await pool.execute({
-    op: { kind: "bootstrap", collections: [...EXPECTED_COLLECTIONS], spec: INDEX_SPEC },
-  });
-  logger.info("lazy bootstrap after missing-index error", { result });
+  try {
+    const result = await pool.execute({
+      op: { kind: "bootstrap", collections: [...EXPECTED_COLLECTIONS], spec: INDEX_SPEC },
+    });
+    bootstrapAttempted = true;
+    logger.info("lazy bootstrap after missing-index error", { result });
+  } catch (err) {
+    // Leave the latch unset so a later request can retry: latching before the
+    // attempt meant one failed bootstrap silenced all future self-healing in
+    // this isolate.
+    logger.error("lazy bootstrap failed", { message: err instanceof Error ? err.message : String(err) });
+    throw err;
+  }
 }
 
 export default {
@@ -216,8 +224,17 @@ async function handleCron(cron: string, env: Env): Promise<void> {
         // DO round trip per R2 object -- which exhausted the 50-subrequest
         // budget on any non-trivial registry, and matched on the denormalised
         // namespace_name that old documents may lack, deleting live tarballs.
-        const liveKeys = await collectLiveTarballKeys(env);
-        const pruned = await pruneOrphanedTarballs(env, liveKeys);
+        let liveKeys: Set<string> | null = null;
+        try {
+          liveKeys = await collectLiveTarballKeys(env);
+        } catch {
+          // Skip the destructive prune on any failure to enumerate live
+          // versions: a missing key in the set deletes a real tarball.
+          logger.error("skipping tarball prune: live-key enumeration failed");
+        }
+        const pruned = liveKeys
+          ? await pruneOrphanedTarballs(env, liveKeys)
+          : { scanned: 0, removed: 0 };
         const snapshot = await buildSnapshot(env);
         const archives = await pruneArchives(env, 3);
         logger.info("weekly r2 maintenance", {

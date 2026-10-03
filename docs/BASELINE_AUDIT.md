@@ -2010,3 +2010,45 @@ most expensive operation in the system.
 
 Verified: typecheck, eslint, 359 unit tests, and `write_path_audit` (69/69, which
 includes the full token → publish → version flow) against the live worker.
+
+## D130 — authenticated-route chokepoint skipped the verified-account check
+
+`authenticate` (every authenticated route) checked token signature, account
+existence and `sessionsInvalidBefore`, but not `isVerified` — while
+`POST /auth/refresh` rejected newly-unverified accounts. A user whose
+`isVerified` was revoked kept a working access token until it expired.
+Now `authenticate` mirrors the refresh route's check.
+
+## D131 — same audit round, five smaller patches
+
+- **D131a (worker/routes/tarballs):** `collectLiveTarballKeys` swallowed DB
+  errors and returned a partial (possibly empty) key set; the weekly prune
+  then deleted every R2 object not in the set — one transient Atlas error
+  would wipe the entire tarball store. The error now propagates and the cron
+  skips the prune (the snapshot/archive steps still run).
+- **D131b (worker/routes/auth):** the logged-in "change my password" shape
+  (Shape A) accepted an access token killed by logout/password-change,
+  because only `/auth/refresh` honoured `sessionsInvalidBefore`. Shape A now
+  rejects a token issued before the last invalidation.
+- **D131c (worker/lib/cache):** two `invalidate()` calls inside the same
+  millisecond reused the previous version token, so a cache entry
+  repopulated between the writes survived. The version token now carries a
+  UUID suffix so each invalidation is unambiguous.
+- **D131d (worker/index):** the missing-index self-heal latched
+  `bootstrapAttempted` *before* the attempt, so one failed bootstrap silenced
+  all future self-healing in that isolate. The latch now sets only on success
+  and failures propagate to the request.
+- **D131e (frontend/apiClient):** the `PUBLIC_401_PATHS` substring match
+  misclassified any request whose query string contained e.g.
+  `/auth/login` as a "public" 401, suppressing the refresh retry and the
+  session-expiry sign-out. It now matches on the URL path only.
+
+## D132 — examined and *rejected*: `iat < invalidBefore` → `<=`
+
+Tokens minted in the same second as a logout share that second's
+`invalidBefore`. Switching to `<=` would also kill a token minted one
+millisecond *after* logout in the same second — including a fresh login
+immediately after a password change, which would instantly appear as a
+logout. Second-resolution JWTs cannot disambiguate; the current strict
+`<` keeps the safer user-visible behaviour while still killing every token
+from an earlier second.

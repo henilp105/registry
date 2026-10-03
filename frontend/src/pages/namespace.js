@@ -60,7 +60,9 @@ const NamespacePage = () => {
         day: "numeric"
       }).format(date);
     } catch {
-      return dateString.slice(4, 16);
+      // Surface the raw value rather than a bogus fixed-offset slice that
+      // silently masks malformed API data.
+      return String(dateString);
     }
   };
 

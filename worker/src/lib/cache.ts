@@ -185,7 +185,10 @@ export async function entityVersion(env: CacheEnv, entity: string): Promise<stri
  * read of any route keyed on this entity computes a new key and misses.
  */
 export async function invalidate(env: CacheEnv, ...entities: string[]): Promise<void> {
-  const now = String(Date.now());
+  // A same-millisecond invalidation used to reuse the previous version token,
+  // so an entry repopulated between the two writes survived. Make each
+  // invalidation unambiguous with a random suffix.
+  const now = `${Date.now()}:${crypto.randomUUID()}`;
   try {
     await Promise.all(
       entities.map((entity) => env.CACHE.put(`ver:${entity}`, now, { expirationTtl: 86_400 })),

@@ -425,10 +425,12 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     // not a uuid, so the documented signed-in "change password" shape could
     // never match a user and always 404'd.
     let identity: string | null | undefined;
+    let tokenIat: number | undefined;
     if (bearer) {
       const result = await verifyToken(bearer, env.JWT_SECRET_KEY, "access");
       if (!result.ok) return jsonError(401, "Unauthorized");
       identity = result.claims.sub;
+      tokenIat = result.claims.iat;
     } else {
       identity = await resolveUuidFromToken(env, rawToken ?? "");
     }
@@ -436,6 +438,15 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
 
     const user = await findUserByUuid(env, identity);
     if (!user) return jsonError(404, "User not found");
+
+    // A token that logout or a password change already killed must not
+    // authorize another password change, even when the caller also knows the
+    // old password (which the /auth/refresh kill-list covers for every other
+    // route). Only the bearer path carries a verifiable iat today.
+    if (tokenIat !== undefined && user.sessionsInvalidBefore) {
+      const invalidBefore = Math.floor(new Date(user.sessionsInvalidBefore as string | Date).getTime() / 1000);
+      if (tokenIat < invalidBefore) return jsonError(401, "Unauthorized");
+    }
 
     // Re-authentication is mandatory on this shape: a valid Bearer token alone
     // used to be enough to set a new password without proving knowledge of the

@@ -116,7 +116,12 @@ apiClient.interceptors.response.use(
       "/auth/refresh",
     ];
     const requestUrl = String(error?.config?.url ?? "");
-    const isPublic401 = PUBLIC_401_PATHS.some((p) => requestUrl.includes(p));
+    // Match on the URL path only: a substring test misclassified any request
+    // whose *query* happened to contain "/auth/login" (e.g. a redirect param)
+    // as a public credential-validation 401, which suppressed both the token
+    // refresh retry and the session-expiry sign-out.
+    const pathOnly = requestUrl.split("?", 1)[0] ?? requestUrl;
+    const isPublic401 = PUBLIC_401_PATHS.some((p) => pathOnly === p || pathOnly.endsWith(p));
 
     if (status === 401 && sentToken && !isForbidden && !isPublic401) {
       const original = error?.config;

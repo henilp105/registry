@@ -326,6 +326,11 @@ export async function collectLiveTarballKeys(env: Env): Promise<Set<string>> {
     }
   } catch (err) {
     logger.error("collect live keys failed", { message: err instanceof Error ? err.message : String(err) });
+    // Do NOT return the partial/empty set: the weekly prune treats every R2
+    // object not in the set as an orphan, so a transient Atlas error here used
+    // to wipe the whole tarball store. Fail loud instead — the cron aborts the
+    // prune and retries next week.
+    throw err;
   }
   return live;
 }
