@@ -143,12 +143,10 @@ Create a new user account.
 }
 ```
 
-**Response (201):**
+**Response (200):**
 ```json
 {
-  "code": 201,
-  "message": "User registered successfully",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "message": "Signup successful. Please verify your email."
 }
 ```
 
@@ -169,11 +167,9 @@ Authenticate and receive a JWT token.
 {
   "code": 200,
   "message": "Login successful",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "username": "john_doe",
-    "email": "john@example.com"
-  }
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "dGhpcyBpcyBhIHJlZnJlc2g...",
+  "username": "john_doe"
 }
 ```
 
@@ -217,8 +213,8 @@ Reset password using token from email.
 **Request Body:**
 ```json
 {
-  "token": "reset-token-from-email",
-  "new_password": "NewSecurePassword456!"
+  "uuid": "reset-token-from-email",
+  "password": "NewSecurePassword456!"
 }
 ```
 
@@ -229,7 +225,7 @@ Verify email address using verification token.
 **Request Body:**
 ```json
 {
-  "token": "email-verification-token"
+  "uuid": "email-verification-token"
 }
 ```
 
@@ -245,9 +241,9 @@ List and search packages with pagination.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | query | string | - | Search term |
-| page | integer | 1 | Page number |
+| page | integer | 0 | Page number (0-based) |
 | limit | integer | 10 | Results per page |
-| sorted_by | string | name | Sort field: `name`, `date`, `downloads` |
+| sorted_by | string | name | Sort field: `name`, `updatedat`, `createdat`, `downloads`, `author` |
 | sort | string | asc | Sort order: `asc`, `desc` |
 
 **Response:**
@@ -259,11 +255,7 @@ List and search packages with pagination.
       "name": "json-fortran",
       "namespace": "fortran-lang",
       "description": "JSON library for Fortran",
-      "version": "1.2.0",
-      "downloads": 1500,
-      "author": "jacobwilliams",
-      "license": "MIT",
-      "created_at": "2024-01-15T10:30:00Z",
+      "keywords": ["json", "parsing"],
       "updated_at": "2024-06-20T14:22:00Z"
     }
   ],
@@ -295,18 +287,16 @@ Upload a new package version. Requires authentication.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | tarball | file | Yes | Package tarball (.tar.gz) |
-| namespace | string | Yes | Target namespace |
+| upload_token | string | Yes | Namespace/package-scoped publish token |
+| package_name | string | Yes | Package name |
+| package_version | string | Yes | Semantic version |
+| package_license | string | Yes | SPDX license identifier |
+| dry_run | string | No | `"true"` to validate without persisting |
 
-**Response (201):**
+**Response (200):**
 ```json
 {
-  "code": 201,
-  "message": "Package uploaded successfully",
-  "package": {
-    "name": "my-package",
-    "namespace": "my-namespace",
-    "version": "1.0.0"
-  }
+  "message": "Package published successfully"
 }
 ```
 
@@ -436,12 +426,10 @@ Create a new namespace.
 }
 ```
 
-**Response (201):**
+**Response (200):**
 ```json
 {
-  "code": 201,
-  "message": "Namespace created successfully",
-  "namespace": "my-org"
+  "message": "Namespace created successfully"
 }
 ```
 
@@ -585,7 +573,7 @@ Add a package maintainer.
 {
   "namespace": "my-namespace",
   "package": "my-package",
-  "new_maintainer": "contributor-username"
+  "username": "contributor-username"
 }
 ```
 
@@ -600,7 +588,7 @@ Remove a package maintainer.
 {
   "namespace": "my-namespace",
   "package": "my-package",
-  "maintainer": "contributor-username"
+  "username": "contributor-username"
 }
 ```
 
@@ -614,7 +602,7 @@ Add a namespace maintainer.
 ```json
 {
   "namespace": "my-namespace",
-  "new_maintainer": "contributor-username"
+  "username": "contributor-username"
 }
 ```
 
@@ -634,7 +622,7 @@ Add a namespace administrator.
 ```json
 {
   "namespace": "my-namespace",
-  "new_admin": "admin-username"
+  "username": "admin-username"
 }
 ```
 
