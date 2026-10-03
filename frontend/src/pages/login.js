@@ -40,13 +40,16 @@ const Login = () => {
     if (isAuthenticated) {
       navigate("/manage/projects");
     }
+  }, [isAuthenticated, navigate]);
 
+  // Clear any stale error only when leaving the page. A cleanup keyed on
+  // errorMessage resets the error *again* when a new one arrives, wiping the
+  // fresh message the user is supposed to see (defect found in audit round).
+  useEffect(() => {
     return () => {
-      if (errorMessage !== null) {
-        dispatch(resetErrorMessage());
-      }
+      dispatch(resetErrorMessage());
     };
-  }, [isAuthenticated, navigate, errorMessage, dispatch]);
+  }, [dispatch]);
 
   const validateField = useCallback((name, value) => {
     switch (name) {

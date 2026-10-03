@@ -7,9 +7,10 @@ import { getAccessToken, emitUnauthorized } from "./session";
  */
 const apiClient = axios.create({
   baseURL: process.env.REACT_APP_REGISTRY_API_URL,
-  headers: {
-    "Content-Type": "multipart/form-data",
-  },
+  // No blanket Content-Type: forcing "multipart/form-data" on GETs/JSON sends a
+  // bogus header, and on FormData POSTs it can pin the header without the
+  // boundary parameter, which makes request.formData() fail server-side.
+  // Axios sets the right value per request (boundary included for FormData).
 });
 
 /**
@@ -65,7 +66,22 @@ apiClient.interceptors.response.use(
     const sentToken = error?.config?.headers?.Authorization;
     const isForbidden = error?.response?.data?.reason === "forbidden";
 
-    if (status === 401 && sentToken && !isForbidden) {
+    // Credential-validation endpoints return 401 for bad input (wrong password,
+    // expired verify/reset token), not because the session ended. An anonymous
+    // caller here carries no token and never logged out; a still-logged-in user
+    // who clicks an old verify/reset link would previously lose their session.
+    const PUBLIC_401_PATHS = [
+      "/auth/login",
+      "/auth/signup",
+      "/auth/verify-email",
+      "/auth/reset-password",
+      "/auth/forgot-password",
+      "/auth/refresh",
+    ];
+    const requestUrl = String(error?.config?.url ?? "");
+    const isPublic401 = PUBLIC_401_PATHS.some((p) => requestUrl.includes(p));
+
+    if (status === 401 && sentToken && !isForbidden && !isPublic401) {
       emitUnauthorized();
     }
     return Promise.reject(error);

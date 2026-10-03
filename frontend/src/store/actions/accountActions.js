@@ -29,7 +29,7 @@ export const getUserAccount = (accessToken) => async (dispatch) => {
   dispatch({ type: GET_USER_ACCOUNT_REQUEST });
 
   try {
-    const result = await authenticatedPost("/users/account", { accessToken }, accessToken);
+    const result = await authenticatedPost("/users/account", {}, accessToken);
     
     dispatch({
       type: GET_USER_ACCOUNT_SUCCESS,
@@ -58,7 +58,7 @@ export const reset = (oldPassword, newPassword, accessToken) => async (dispatch)
   try {
     const result = await authenticatedPost(
       "/auth/reset-password",
-      { oldpassword: oldPassword, password: newPassword, uuid: accessToken },
+      { oldpassword: oldPassword, password: newPassword },
       accessToken
     );
     
@@ -85,7 +85,7 @@ export const change = (newEmail, accessToken) => async (dispatch) => {
   try {
     const result = await authenticatedPost(
       "/auth/change-email",
-      { new_email: newEmail, accessToken },
+      { new_email: newEmail },
       accessToken
     );
     

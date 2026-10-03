@@ -141,17 +141,14 @@ const Register = () => {
     if (isAuthenticated) {
       navigate("/manage/projects");
     }
+  }, [isAuthenticated, navigate]);
 
-    return () => {
-      if (errorMessage != null) {
-        dispatch(resetErrorMessage());
-      }
-    };
-  }, [isAuthenticated, navigate, dispatch, errorMessage]);
-
-  // Reset error message on mount
+  // Reset error message on mount, and again only when leaving the page.
   useEffect(() => {
     dispatch(resetErrorMessage());
+    return () => {
+      dispatch(resetErrorMessage());
+    };
   }, [dispatch]);
 
   const togglePasswordVisibility = useCallback(() => {
