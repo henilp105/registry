@@ -22,7 +22,7 @@
 | **Error** | HTTP **non-2xx** AND JSON body `{ code, message }`. axios rejects on non-2xx; 29 sites read `error.response.data.message`. |
 | **Request encoding** | `multipart/form-data` (`FormData`) on **every** POST/PUT except `POST /auth/logout` (no body). |
 | **Token field naming** | Wire format is **snake_case**: `access_token`, `refresh_token`. Redux state is camelCase (`accessToken`). Do not unify. |
-| **`uuid` field** | Sent as a **form field**, not a header. See §4 — currently always absent, and 8 of its 10 call sites omit `Authorization` entirely. |
+| **`uuid` field** | Sent as a **form field**, not a header. See §4. It was always absent and 8 of its 10 call sites omitted `Authorization` entirely; the frontend now sends the Bearer header on every request. Where the field is still *sent*, it is a **single-use token**, not an identity (`reset-password`, `verify-email`). |
 | **`createdAt`** | Must serialise as a **string of ≥ 16 chars**. `namespace.js` does `.slice(4,16)`, `accountActions` does `.slice(0,16)`. A BSON `Date` serialising to `{}` will crash the UI. |
 | **`ver.isDeprecated`** | 🔴 **See §7.3.** The frontend reads `ver.isDeprecated === "true"` but `v2.0.1` emits `is_deprecated` as a **boolean**, so every version renders "Active". We must emit **both** keys. |
 | **`ver.download_url`** | A **root-relative path beginning with `/`**, concatenated straight onto the API base URL. |
@@ -42,7 +42,7 @@
 | POST | `/auth/forgot-password` | `email` | — | `{code:200, message}` |
 | POST | `/auth/reset-password` | `password`, `uuid` | — | `{code:200, message}` |
 | POST | `/auth/reset-password` ⚠️ 2nd caller | `oldpassword`, `password`, `uuid` | — | `{message}` only, **no `code` check** |
-| POST | `/auth/change-email` | `newemail`, `uuid` | — | `{message}` only, **no `code` check** |
+| POST | `/auth/change-email` | `new_email`, `uuid` | — | `{message}` only, **no `code` check** |
 | POST | `/auth/verify-email` | `uuid` | — | `{code:200, message, access_token, refresh_token}` |
 
 > ⚠️ `/auth/reset-password` has **two callers with different payloads**. The `account.js` path sends
@@ -183,7 +183,12 @@ Before any phase can be declared complete, the Vitest suite must assert:
 - [ ] `GET /users/{username}` returns **both** the dashboard shape and the user-page shape.
 - [ ] A tarball `GET` streams from R2 with `Content-Disposition: attachment`.
 - [ ] Package upload-token responses carry **both** `upload_token` and `uploadToken` (§7.4).
-- [ ] Identity resolves from `Authorization: Bearer` **or** a `uuid` form field.
+- [x] Identity resolves from `Authorization: Bearer`. **Superseded** — this line originally read
+      "**or** a `uuid` form field", and the `uuid` half was never implemented, deliberately. The
+      frontend's `apiClient` request interceptor now attaches the Bearer header to every call, so
+      the ten moderator paths that used to send no credential work (§4). Accepting a body field as
+      identity would let any caller assert any account; `reset-password` accepts a `uuid` field
+      because there it *is* a single-use token, verified by hash and kind, not an identity claim.
 
 ---
 
