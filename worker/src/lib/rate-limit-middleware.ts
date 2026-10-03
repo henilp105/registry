@@ -42,6 +42,7 @@ import {
   type LimitKind,
 } from "./rate-limit";
 import { logger } from "./logger";
+import { securityHeaders } from "./responses";
 
 /** Paths that must never be refused. Health checks are for monitoring. */
 const ALWAYS_ALLOWED = new Set(["/health", "/healthz", "/", "/apidocs", "/apidocs/openapi.json"]);
@@ -93,6 +94,11 @@ export async function rateLimitHeaders(
 export function rateLimitedResponse(url: URL, headers: Record<string, string>): Response {
   const merged = new Headers(headers);
   merged.set("content-type", "application/json");
+  // Every other response carries the portfolio security headers; a 429 must
+  // too, otherwise a rate-limited client gets a differently-shaped response.
+  for (const [key, value] of Object.entries(securityHeaders())) {
+    if (!merged.has(key)) merged.set(key, value);
+  }
   return new Response(
     JSON.stringify({
       code: 429,

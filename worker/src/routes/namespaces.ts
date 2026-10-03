@@ -36,6 +36,7 @@ import {
 } from "../lib/responses";
 import type { AuthContext } from "../lib/auth";
 import { validateNamespaceName } from "../lib/validators";
+import { isDuplicateKeyError } from "../lib/publish";
 import { issueUploadToken, revokeUploadToken, DEFAULT_TTL_DAYS } from "../lib/upload-tokens";
 import { logger } from "../lib/logger";
 import { deletePackageTarballs } from "../lib/storage";
@@ -158,7 +159,9 @@ async function createNamespace(request: Request, env: Env, auth: AuthContext | n
     // The unique index on `namespace` is the real guarantee; the `find_one`
     // above is only there to give a readable message. Losing that race is
     // therefore an expected outcome, not a 500.
-    if ((err as { code?: number }).code === 11000) {
+    // err.code does not survive the Durable-Object RPC boundary; match on
+    // the stable E11000 message prefix like the publish path does.
+    if (isDuplicateKeyError(err)) {
       return jsonError(400, "Namespace already exists");
     }
     throw err;

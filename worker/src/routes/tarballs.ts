@@ -90,7 +90,14 @@ export async function handleTarballRoutes(
   }
   if (prefix === "tarballs" && segments.length === 5) {
     // /tarballs/{ns}/{pkg}/{version}/{artifact}
-    return serveTarball(request, env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
+    // The artifact segment must name exactly the served artifact; ignoring it
+    // would serve /tarballs/ns/pkg/1.0.0/garbage as if it were the real file.
+    const version = stripExt(segments[3] as string);
+    const expected = `${segments[2]}-${version}.tar.gz`;
+    if (segments[4] !== expected) {
+      return jsonError(404, "Package version not found");
+    }
+    return serveTarball(request, env, ctx, segments[1] as string, segments[2] as string, version);
   }
 
   void url;

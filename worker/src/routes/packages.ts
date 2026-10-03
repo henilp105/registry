@@ -181,9 +181,15 @@ async function searchPackages(env: Env, url: URL): Promise<Response> {
   // non-deterministic -- two queries for consecutive pages could order ties
   // differently and yield duplicate or skipped rows. Every sort is broken by
   // a unique key as the last comparator.
+  // When the primary key IS `name`, a trailing `name: 1` literal would
+  // overwrite the computed entry in the same object literal and silently
+  // force ascending order. Spread the primary first, then add the tiebreakers
+  // it did not already set.
   const sort: Record<string, unknown> = usesText
     ? { score: { $meta: "textScore" }, name: 1, _id: 1 }
-    : { [sortField]: direction, name: 1, _id: 1 };
+    : sortField === "name"
+      ? { name: direction, _id: 1 }
+      : { [sortField]: direction, name: 1, _id: 1 };
 
   const pipeline: Record<string, unknown>[] = [{ $match: filter }, { $sort: sort }];
 
@@ -325,7 +331,18 @@ async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
       collection: "packages",
       pipeline: [
         { $match: filter },
-        { $sort: plan.kind === "text" ? { score: { $meta: "textScore" } } : { [sortField]: direction } },
+        {
+          // D130 follow-up: the CLI route missed the distinct-comparator fix
+          // (D81) applied to searchPackages, so its pagination could yield
+          // duplicate/skipped rows on tied sort keys. Same tiebreaker shape:
+          // unique `_id` last, `name` before it unless name is the key.
+          $sort:
+            plan.kind === "text"
+              ? { score: { $meta: "textScore" }, name: 1, _id: 1 }
+              : sortField === "name"
+                ? { name: direction, _id: 1 }
+                : { [sortField]: direction, name: 1, _id: 1 },
+        },
         { $skip: skip },
         { $limit: limit },
         { $project: { name: 1, namespace_name: 1, description: 1, versions: 1 } },

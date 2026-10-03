@@ -247,12 +247,33 @@ async function applyResult(request: Request, env: Env): Promise<Response> {
     // Rewrite the version array explicitly rather than with a positional
     // operator: version lists are small (tens), so this costs nothing, and it
     // is far easier to verify correct than building `$set` keys dynamically.
-    const doc = (await db<Record<string, unknown> | null>(env, {
+    let doc = (await db<Record<string, unknown> | null>(env, {
       kind: "findOne",
       collection: "packages",
       filter: { name: packageName, namespace_name: namespaceName },
       projection: { versions: 1, _id: 1 },
     })) as Record<string, unknown> | null;
+
+    if (!doc) {
+      // Legacy package documents predate the denormalised `namespace_name`
+      // field and can only be located by resolving the namespace ObjectId,
+      // the same fallback the read/delete paths use. Without this their
+      // verdicts 404'd forever and the package stayed pending.
+      const namespace = (await db<{ _id?: unknown } | null>(env, {
+        kind: "findOne",
+        collection: "namespaces",
+        filter: { namespace: namespaceName },
+        projection: { _id: 1 },
+      })) as { _id?: unknown } | null;
+      if (namespace && namespace._id !== undefined) {
+        doc = (await db<Record<string, unknown> | null>(env, {
+          kind: "findOne",
+          collection: "packages",
+          filter: { name: packageName, namespace: namespace._id },
+          projection: { versions: 1, _id: 1 },
+        })) as Record<string, unknown> | null;
+      }
+    }
 
     if (!doc) {
       failed += 1;

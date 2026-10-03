@@ -106,6 +106,10 @@ export function validateVersion(value: unknown): ValidationResult {
   if (typeof value !== "string" || value.length === 0) return bad("Package version is missing");
   if (value === "0.0.0") return bad("Version 0.0.0 is not a valid release version");
   if (!SEMVER_PATTERN.test(value)) return bad("Version is not valid");
+  // A prerelease of `x.tar.gz` is legal semver, but it collides with the
+  // `<ver>.tar.gz` R2 key suffix and with the stripExt() used on download
+  // routes, turning the stored key into an unserveable/pruned orphan. Reject.
+  if (value.endsWith(".tar.gz")) return bad("Version must not end with .tar.gz");
   return ok;
 }
 
