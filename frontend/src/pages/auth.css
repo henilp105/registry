@@ -62,7 +62,9 @@
 }
 
 .auth-label {
-  display: block;
+  /* inline-block so the sibling .auth-tooltip icon sits on the same line
+     as the label text, not on its own line */
+  display: inline-block;
   margin-bottom: var(--space-2);
   color: var(--color-text);
   font-size: var(--font-size-sm);
