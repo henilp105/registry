@@ -1883,3 +1883,88 @@ was invisible.
 That is D115 and D114 in the same shape, and it is why this round's fixes are
 mostly about *verdicts* rather than *behaviour*: a check that cannot fail is
 indistinguishable from no check, and both look identical in a green CI run.
+
+---
+
+## D121–D126 — verification and infrastructure layer (2026-10-03)
+
+With the application code audited end to end (D65–D120), this round covered what
+is left: the archive workflow, the compose files, and the one test suite that
+nothing ran.
+
+### D121–D124 — the database-archive workflow
+
+`Registry Database Archive` runs fortnightly and uploads a `mongodump` of the
+registry database minus the `users` collection. That exclusion is the entire
+safety property of the file — `users` holds password hashes, emails and account
+uuids — so a workflow that quietly does nothing is worse than no workflow.
+
+- **D121** — `generate_tarball.py` used `subprocess.call`, which **returns** the
+  child's exit status and never raises `CalledProcessError`. The `except` clause
+  was therefore unreachable, the status was discarded, and a `mongodump` that
+  failed on bad credentials, a missing binary or an unreachable host printed
+  "Database backup created successfully" and **exited 0**. The workflow then
+  uploaded whatever was in `static/` — on a fresh clone, the committed test
+  fixture. Now the status and the artefact are both checked.
+- **D122** — the workflow pinned `actions/upload-artifact@v2`, which GitHub has
+  retired. It fails at runtime rather than uploading, so the schedule had stopped
+  producing archives while appearing to run.
+- **D123** — `generate_tarball.py` read `MONGO_USER_NAME`/`MONGO_PASSWORD`, never
+  used them (the URI carries the credentials), and opened a `MongoClient` at
+  import time to discard it. The `KeyError` handler printed a message and fell
+  through, leaving `--uri=None`.
+- **D124** — `echo "${{ secrets.ENV_FILE }}" > backend/.env` spliced a secret
+  into shell *source* before bash parsed it, so anything bash treats specially
+  in that secret executed. Passed through `env:` and referenced as `"$ENV_FILE"`.
+
+### D125 — the only test for the validator, run by nothing
+
+`scripts/test_validate_packages.py` is the only test for
+`scripts/validate_packages.py` — the file that replaced the shell-injectable
+`backend/validate.py`. No workflow step, no npm script, no target. Its assertions
+about traversal, symlink and hardlink escapes, the size caps, and the FNV-1a
+compatibility digest were correct and **never executed**.
+
+This is D115 and D118 one level up: a check that cannot fail becomes invisible,
+and then a check that is never run is the same thing. It now runs in the
+always-green backend gate — which matters more than usual, because this is the
+code that unpacks a publisher-controlled tarball.
+
+### D126 — public default secrets
+
+Both compose files fell back to literals committed to a public repository:
+
+```
+SALT=${SALT:-change_this_salt}          SALT=${SALT:-MYSALT}
+JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_this_jwt_secret}
+SUDO_PASSWORD=${SUDO_PASSWORD:-admin}
+```
+
+So a deployment that forgot to export a variable did not fail — it started,
+signed tokens with a key printed on GitHub, and shipped an `admin`/`admin`
+account. That is the failure CWE-1188 exists for: an insecure *default* rather
+than an insecure configuration, because the setting being wrong is visible in a
+review and the default being wrong is invisible until someone uses it.
+
+All three now use `${VAR:?message}`, which refuses to render the file when the
+variable is unset or empty and names it. `.env.example` carries the generation
+command and leaves the values blank, because a filled-in example is exactly what
+gets pasted into a shell history.
+
+The one remaining literal — `SALT=MYSALT` on the ephemeral validator container —
+is commented to record that it is deliberate: that container runs against a
+throwaway database and is destroyed after use.
+
+### Remaining scanner findings, and why they stay
+
+Four findings remain in the SAST sweep, and all four are triaged rather than
+"fixed":
+
+| Finding | Why it stays |
+|---|---|
+| `account.js:91,94,96` — "Hardcoded Secret: Password" | `errors.oldPassword = "Old password is required"` — a validation *message*, matched by a `password = "<string>"` regex. Rewriting correct code to appease a regex is how a scanner gets switched off. |
+| `validate_packages.py:9` — "Command Injection: shell=True" | A **docstring** quoting the D7 defect this file replaced. `scripts/check_no_shell_injection.mjs` is the real gate and it parses Python to skip docstrings and comments; this sweep does not. |
+
+The general note is D114's: a scanner that cries wolf is indistinguishable from
+one that is broken, and both look identical in a green run. The real gate is the
+one that can tell the difference, and it is the one wired into CI.
