@@ -54,7 +54,10 @@ const namespaceReducer = (state = initialState, action) => {
       return {
         ...state,
         isLoading: false,
-        notFound: true,
+        // Defect D85: any failure — 500, 429, offline — used to claim the
+        // namespace does not exist, and namespace.js redirects to /404 on
+        // `notFound`. Not-found is a property of the *status*, not the error.
+        notFound: action.payload?.httpStatus === 404,
         error: action.payload?.message || "Namespace not found",
       };
 

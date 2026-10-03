@@ -25,7 +25,9 @@ export const ratePackage = (data, accessToken) => async (dispatch) => {
       type: RATE_PACKAGE_FAILURE,
       payload: {
         message: "Unauthorized to rate packages. Please login to rate packages.",
-        statuscode: "403",
+        // Defect D85: a string here made the reducer's numeric comparisons
+        // fail; every other path in this file sends a number.
+        statuscode: 403,
       },
     });
     return;

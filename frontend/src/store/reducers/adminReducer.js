@@ -23,6 +23,7 @@ import {
 const initialState = {
   isAdmin: false,
   isLoading: false,
+  checked: false,
   error: null,
   message: null,
   statuscode: null,
@@ -44,6 +45,10 @@ const adminReducer = (state = initialState, action) => {
         isAdmin: true,
         isLoading: false,
         error: null,
+        // Defect D85: the admin page rendered <NoPage/> on the initial
+        // `isAdmin: false` while the check was still in flight. `checked`
+        // distinguishes "not a real admin" from "not known yet".
+        checked: true,
       };
 
     case ADMIN_AUTH_FAILURE:
@@ -52,6 +57,7 @@ const adminReducer = (state = initialState, action) => {
         isAdmin: false,
         isLoading: false,
         error: action.payload.message,
+        checked: true,
       };
 
     // Delete user

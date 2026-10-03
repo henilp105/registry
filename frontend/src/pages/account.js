@@ -374,9 +374,17 @@ const Account = () => {
       </Modal>
 
       {/* Change Email Modal */}
-      <Modal show={showEmailModal} onHide={handleCloseEmailModal} centered className="account-modal">
+      <Modal
+        show={showEmailModal}
+        onHide={handleCloseEmailModal}
+        centered
+        className="account-modal"
+        // Defect D85: the email dialog had no accessible name at all, unlike
+        // the password dialog. Screen readers announced "dialog" with nothing.
+        aria-labelledby="change-email-modal"
+      >
         <Modal.Header closeButton>
-          <Modal.Title>
+          <Modal.Title id="change-email-modal">
             <Envelope className="me-2" />
             Change Email
           </Modal.Title>

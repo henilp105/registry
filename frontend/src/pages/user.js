@@ -15,7 +15,7 @@ const UserPage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { email, dateJoined, projects, notFound, isLoading } = useSelector(
+  const { email, dateJoined, projects, notFound, isLoading, error } = useSelector(
     (state) => state.user
   );
 
@@ -45,6 +45,16 @@ const UserPage = () => {
           <span className="visually-hidden">Loading...</span>
         </Spinner>
         <p className="namespace-loading-text">Loading user profile...</p>
+      </Container>
+    );
+  }
+
+  if (error && !isLoading) {
+    return (
+      <Container className="namespace-container">
+        <div className="alert alert-danger" role="alert">
+          Could not load this user profile: {error}
+        </div>
       </Container>
     );
   }

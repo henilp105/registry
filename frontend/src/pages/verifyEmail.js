@@ -20,7 +20,7 @@ const VerifyEmail = () => {
   }, [dispatch, uuid]);
 
   const isSuccess = statuscode === 200;
-  const hasError = statuscode && statuscode !== 200;
+  const hasError = Boolean(error) || (statuscode && statuscode !== 200);
   const displayMessage = message || error;
 
   return (

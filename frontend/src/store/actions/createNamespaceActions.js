@@ -4,10 +4,21 @@ import { authenticatedPost, getErrorMessage, isSuccessResponse } from "../utils"
 export const CREATE_NAMESPACE_REQUEST = "CREATE_NAMESPACE_REQUEST";
 export const CREATE_NAMESPACE_SUCCESS = "CREATE_NAMESPACE_SUCCESS";
 export const CREATE_NAMESPACE_FAILURE = "CREATE_NAMESPACE_FAILURE";
+/** Clears the slice on unmount — defect D85. */
+export const CREATE_NAMESPACE_RESET = "CREATE_NAMESPACE_RESET";
 
 // Legacy aliases for backward compatibility
 export const CREATE_NAMESPACE = CREATE_NAMESPACE_REQUEST;
 export const CREATE_NAMESPACE_ERROR = CREATE_NAMESPACE_FAILURE;
+
+/**
+ * Drop a finished create so the form can be opened again.
+ *
+ * The success banner and `statuscode: 200` outlived the page, and the page
+ * redirects whenever it sees 200 — so returning to /namespace/create in the
+ * same session showed the old success and bounced straight back out.
+ */
+export const resetCreateNamespace = () => ({ type: CREATE_NAMESPACE_RESET });
 
 /**
  * Create a new namespace

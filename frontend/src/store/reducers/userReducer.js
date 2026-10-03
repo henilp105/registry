@@ -36,7 +36,7 @@ const userReducer = (state = initialState, action) => {
 
     case FETCH_USER_DATA_FAILURE:
       return handleFailure(state, action.payload?.message, {
-        notFound: true,
+        notFound: action.payload?.httpStatus === 404,
       });
 
     default:

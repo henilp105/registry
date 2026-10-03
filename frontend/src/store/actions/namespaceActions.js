@@ -34,7 +34,7 @@ export const fetchNamespaceData = (namespace) => async (dispatch) => {
   } catch (error) {
     dispatch({
       type: FETCH_NAMESPACE_DATA_FAILURE,
-      payload: { message: getErrorMessage(error) },
+      payload: { message: getErrorMessage(error), httpStatus: error.response?.status ?? 0 },
     });
   }
 };

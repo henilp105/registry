@@ -40,6 +40,9 @@ const generatePackageTokenReducer = (state = initialState, action) => {
         ...state,
         successMessage: null,
         errorMessage: null,
+        // Defect D85: the previous token stayed in state, so re-opening the
+        // dialog showed the old token and hid the Generate button.
+        uploadToken: null,
       };
 
     default:

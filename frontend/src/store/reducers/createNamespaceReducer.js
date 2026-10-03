@@ -2,6 +2,7 @@ import {
   CREATE_NAMESPACE_REQUEST,
   CREATE_NAMESPACE_SUCCESS,
   CREATE_NAMESPACE_FAILURE,
+  CREATE_NAMESPACE_RESET,
 } from "../actions/createNamespaceActions";
 
 const initialState = {
@@ -45,6 +46,12 @@ const createNamespaceReducer = (state = initialState, action) => {
         statuscode: action.payload.statuscode,
         error: action.payload.message,
       };
+
+    // Defect D85: returning to the form after a successful create rendered the
+    // stale success banner and re-fired the redirect, because nothing ever
+    // cleared the slice between visits.
+    case CREATE_NAMESPACE_RESET:
+      return { ...initialState };
 
     default:
       return state;

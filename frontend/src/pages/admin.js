@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Container, Row, Col, Card, Form, Button, Alert, Modal } from "react-bootstrap";
+import { Container, Row, Col, Card, Form, Button, Alert, Modal, Spinner } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
 import {
   adminAuth,
@@ -19,7 +19,7 @@ const AdminSection = () => {
   
   const accessToken = useSelector((state) => state.auth.accessToken);
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  const { message, statuscode, isAdmin, isLoading } = useSelector((state) => state.admin);
+  const { message, statuscode, isAdmin, isLoading, checked: adminChecked } = useSelector((state) => state.admin);
 
   const [showReports, setShowReports] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
@@ -409,6 +409,14 @@ const AdminSection = () => {
           )}
         </Modal.Footer>
       </Modal>
+    </Container>
+  ) : adminChecked === false ? (
+    // Defect D85: initial `isAdmin: false` is not a verdict — the check is
+    // still in flight. Render a spinner, not a 404.
+    <Container className="py-4 text-center">
+      <Spinner animation="border" role="status">
+        <span className="visually-hidden">Checking admin access…</span>
+      </Spinner>
     </Container>
   ) : (
     <NoPage />

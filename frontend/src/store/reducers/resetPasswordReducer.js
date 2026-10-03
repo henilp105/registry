@@ -23,6 +23,9 @@ const resetPasswordReducer = (state = initialState, action) => {
         isLoading: true,
         message: null,
         error: null,
+        // Defect D85: a shared slice — the stale 200 from forgot-password
+        // leaked into reset-password and pre-disabled its form.
+        statuscode: null,
       };
 
     case FORGOT_PASSWORD_SUCCESS:
@@ -50,6 +53,7 @@ const resetPasswordReducer = (state = initialState, action) => {
         isLoading: true,
         message: null,
         error: null,
+        statuscode: null,
       };
 
     case RESET_PASSWORD_SUCCESS:

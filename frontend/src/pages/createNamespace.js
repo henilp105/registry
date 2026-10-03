@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { createNamespace } from "../store/actions/createNamespaceActions";
+import { createNamespace, resetCreateNamespace } from "../store/actions/createNamespaceActions";
 import { Container, Row, Col, Spinner } from "react-bootstrap";
 import {
   FolderPlus,
@@ -27,6 +27,13 @@ const NamespaceForm = () => {
   });
   const [formErrors, setFormErrors] = useState({});
   const [touched, setTouched] = useState({});
+
+  // Leaving the page must not leave a finished create behind (defect D85).
+  useEffect(() => {
+    return () => {
+      dispatch(resetCreateNamespace());
+    };
+  }, [dispatch]);
 
   // Redirect if not authenticated
   useEffect(() => {

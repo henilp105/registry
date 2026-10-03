@@ -21,7 +21,7 @@ const initialState = {
 const verifyEmailReducer = (state = initialState, action) => {
   switch (action.type) {
     case VERIFY_EMAIL_REQUEST:
-      return handleRequest(state);
+      return handleRequest(state, { statuscode: 0, message: "" });
 
     case VERIFY_EMAIL_SUCCESS:
       return handleSuccess(state, {

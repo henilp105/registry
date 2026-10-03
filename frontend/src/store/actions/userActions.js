@@ -30,7 +30,7 @@ export const fetchUserData = (user) => async (dispatch) => {
   } catch (error) {
     dispatch({
       type: FETCH_USER_DATA_FAILURE,
-      payload: { message: getErrorMessage(error) },
+      payload: { message: getErrorMessage(error), httpStatus: error.response?.status ?? 0 },
     });
   }
 };

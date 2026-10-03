@@ -23,7 +23,7 @@ const NamespacePage = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   
-  const { dateJoined, description, projects, notFound, isLoading } = useSelector(
+  const { dateJoined, description, projects, notFound, isLoading, error } = useSelector(
     (state) => state.namespace
   );
 
@@ -71,6 +71,21 @@ const NamespacePage = () => {
           <span className="visually-hidden">Loading...</span>
         </Spinner>
         <p className="namespace-loading-text">Loading namespace...</p>
+      </Container>
+    );
+  }
+
+  // Defect D85: a failed fetch used to claim the namespace was a 404. Any
+  // other failure now surfaces here instead.
+  if (error) {
+    return (
+      <Container className="namespace-container">
+        <div className="alert alert-danger" role="alert">
+          Could not load this namespace: {error}
+        </div>
+        <button type="button" className="btn btn-primary" onClick={() => dispatch(fetchNamespaceData(namespace))}>
+          Try again
+        </button>
       </Container>
     );
   }

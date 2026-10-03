@@ -42,7 +42,7 @@ export const verify = (uuid) => async (dispatch) => {
     dispatch({
       type: VERIFY_EMAIL_FAILURE,
       payload: {
-        statuscode: error.response?.data?.code,
+        statuscode: error.response?.data?.code ?? error.response?.status ?? 0,
         message: getErrorMessage(error),
       },
     });

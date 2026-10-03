@@ -1309,7 +1309,13 @@ private-key blocks, OpenAI/Slack-shaped keys, and named secrets assigned a liter
 
 Placeholder values are recognised so documentation examples stay legal —
 `mongodb+srv://user:pass@…` does not fail the build, but
-`mongodb+srv://henilp105_db_user:FsPIM1HkOairYjZj@…` does.
+`mongodb+srv://henilp105_db_user:<real password>@…` does.
+
+Defect D86: the second line originally carried the **live password**. The file is
+allowlisted by `check_no_secrets.mjs` — it has to be, to *talk* about the rule —
+so the scan read the doc as trusted and the credential stayed readable in a
+public repository. An allowlist entry is not a reason to print the secret it
+exemplifies; the example works just as well with a placeholder password.
 
 **Verified by mutation**: reintroducing the exact URI into `token_journey.cjs` exits
 1 and names the file, line and rule.

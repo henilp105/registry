@@ -563,7 +563,11 @@ const formatTimeAgo = (date) => {
   const updatedDate = new Date(date);
   const currentDate = new Date();
   const diffTime = currentDate.getTime() - updatedDate.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Defect D85: `Math.ceil` meant anything from 1 minute to 24 hours old
+  // rounded to 1 and read as "yesterday". `Math.floor` matches the
+  // implementation in components/packageItem.js, so the package header and
+  // the search rows stopped disagreeing.
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays === 0) return "today";
   if (diffDays === 1) return "yesterday";
@@ -575,12 +579,23 @@ const formatTimeAgo = (date) => {
 
 const sortVersions = (versions) => {
   if (!versions) return [];
+  // Defect D85: `"1.2.3-rc1".split(".").map(Number)` yields NaN for the patch
+  // segment, so every comparison against a prerelease was false and the
+  // ordering fell back to the input order. Numeric segments are compared
+  // numerically, everything else lexically as a fallback.
+  const segment = (version, index) => {
+    const raw = String(version ?? "").split(/[.+-]/)[index] ?? "";
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) && raw !== "" ? numeric : raw;
+  };
   return [...versions].sort((a, b) => {
-    const [aMajor, aMinor, aPatch] = a.version.split(".").map(Number);
-    const [bMajor, bMinor, bPatch] = b.version.split(".").map(Number);
-
-    if (aMajor !== bMajor) return bMajor - aMajor;
-    if (aMinor !== bMinor) return bMinor - aMinor;
-    return bPatch - aPatch;
+    for (let i = 0; i < 3; i += 1) {
+      const aPart = segment(a.version, i);
+      const bPart = segment(b.version, i);
+      if (aPart === bPart) continue;
+      if (typeof aPart === "number" && typeof bPart === "number") return bPart - aPart;
+      return String(bPart).localeCompare(String(aPart));
+    }
+    return 0;
   });
 };
