@@ -60,6 +60,11 @@ export function corsHeaders(request: Request, env: CorsEnv): Record<string, stri
 /** Handle a CORS preflight. Returns a Response, or null if not a preflight. */
 export function handlePreflight(request: Request, env: CorsEnv): Response | null {
   if (request.method !== "OPTIONS") return null;
+  // A real preflight carries both an Origin and an ACRM header. Answering
+  // every OPTIONS 204'd unknown paths and non-browser requests, unthrottled.
+  if (!request.headers.get("Origin") || !request.headers.get("Access-Control-Request-Method")) {
+    return null;
+  }
   return new Response(null, {
     status: 204,
     headers: {

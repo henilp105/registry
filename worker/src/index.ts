@@ -143,7 +143,7 @@ export default {
     } catch (err) {
       // Defect S20/D8: never echo an internal message or stack to the client.
       console.error("unhandled", url.pathname, err instanceof Error ? err.message : err);
-      return jsonError(500, "Internal server error", cors);
+      return jsonError(500, "Internal server error", {}, cors);
     }
   },
 

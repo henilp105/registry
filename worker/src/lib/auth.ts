@@ -65,10 +65,12 @@ export async function authenticate(request: Request, env: Env): Promise<AuthCont
   // already enforced this; mirror it at the shared chokepoint.
   if (!user.isVerified) return null;
 
-  const invalidBefore = user.sessionsInvalidBefore
-    ? Math.floor(new Date(user.sessionsInvalidBefore).getTime() / 1000)
-    : 0;
-  if (result.claims.iat < invalidBefore) return null;
+  // Compare in milliseconds: `iat` is second-precision, so flooring
+  // sessionsInvalidBefore to seconds let a token issued in the SAME wall-clock
+  // second as logout/password-change survive revocation.
+  if (user.sessionsInvalidBefore && result.claims.iat * 1000 < new Date(user.sessionsInvalidBefore).getTime()) {
+    return null;
+  }
 
   return { uuid: result.claims.sub, token, claims: result.claims };
 }

@@ -334,10 +334,10 @@ async function refresh(request: Request, env: Env): Promise<Response> {
   // Defect: logout used to only record `lastLogout` while every refresh token
   // minted before it stayed valid for its full 180-day TTL. Tokens issued
   // before the most recent logout/password-change are now rejected.
-  const invalidBefore = user.sessionsInvalidBefore
-    ? Math.floor(new Date(user.sessionsInvalidBefore as string | Date).getTime() / 1000)
-    : 0;
-  if (result.claims.iat < invalidBefore) {
+  if (
+    user.sessionsInvalidBefore &&
+    result.claims.iat * 1000 < new Date(user.sessionsInvalidBefore as string | Date).getTime()
+  ) {
     return jsonError(401, "Invalid or expired refresh token");
   }
 
@@ -428,14 +428,31 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     let tokenIat: number | undefined;
     if (bearer) {
       const result = await verifyToken(bearer, env.JWT_SECRET_KEY, "access");
-      if (!result.ok) return jsonError(401, "Unauthorized");
-      identity = result.claims.sub;
-      tokenIat = result.claims.iat;
+      if (!result.ok) {
+        // A forgot-password client (Shape B: form uuid = emailed token) that
+        // also carries a stale Authorization header must not be 401'd out of
+        // the reset flow — fall through to Shape B when oldPassword is absent.
+        if (oldPassword === undefined && rawToken) {
+          // handled by Shape B below
+        } else {
+          return jsonError(401, "Unauthorized");
+        }
+      } else {
+        identity = result.claims.sub;
+        tokenIat = result.claims.iat;
+      }
     } else {
-      identity = await resolveUuidFromToken(env, rawToken ?? "");
+      const resolved = await resolveUuidFromToken(env, rawToken ?? "");
+      identity = resolved?.uuid;
+      tokenIat = resolved?.iat;
     }
-    if (!identity) return jsonError(401, "Unauthorized");
-
+    if (!identity) {
+      // The stale-bearer case above: no oldPassword, but a reset token was
+      // supplied — let Shape B handle it instead of 401ing here.
+      if (!(oldPassword === undefined && rawToken)) {
+        return jsonError(401, "Unauthorized");
+      }
+    } else {
     const user = await findUserByUuid(env, identity);
     if (!user) return jsonError(404, "User not found");
 
@@ -444,8 +461,9 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     // old password (which the /auth/refresh kill-list covers for every other
     // route). Only the bearer path carries a verifiable iat today.
     if (tokenIat !== undefined && user.sessionsInvalidBefore) {
-      const invalidBefore = Math.floor(new Date(user.sessionsInvalidBefore as string | Date).getTime() / 1000);
-      if (tokenIat < invalidBefore) return jsonError(401, "Unauthorized");
+      if (tokenIat * 1000 < new Date(user.sessionsInvalidBefore as string | Date).getTime()) {
+        return jsonError(401, "Unauthorized");
+      }
     }
 
     // Re-authentication is mandatory on this shape: a valid Bearer token alone
@@ -467,6 +485,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
       update: { $set: { password: await hashPasswordInPool(env, password), sessionsInvalidBefore: new Date() } },
     });
     return jsonOk({ message: "Password reset successful" });
+    }
   }
 
   // ── Shape B: emailed single-use token ──────────────────────────────────────
@@ -679,10 +698,10 @@ async function consumeSingleUseToken(
  * uuid. Historically the backend ignored the field and used the JWT, so this
  * keeps both working during the transition.
  */
-async function resolveUuidFromToken(env: Env, value: string): Promise<string | null> {
+async function resolveUuidFromToken(env: Env, value: string): Promise<{ uuid: string; iat: number } | null> {
   if (!value) return null;
   const result = await verifyToken(value, env.JWT_SECRET_KEY, "access");
-  return result.ok ? result.claims.sub : null;
+  return result.ok ? { uuid: result.claims.sub, iat: result.claims.iat } : null;
 }
 
 function str(form: FormData | null, key: string): string | undefined {

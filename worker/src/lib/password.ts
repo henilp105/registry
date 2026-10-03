@@ -50,8 +50,6 @@ const PBKDF2_PREFIX = "pbkdf2$sha256$";
 const LEGACY_PREFIX = "legacy-sha256$";
 
 export const DEFAULT_PBKDF2_ITERATIONS = 210_000;
-/** Floor below which a stored hash is considered stale and gets upgraded. */
-const MIN_ACCEPTABLE_ITERATIONS = 100_000;
 
 const encoder = new TextEncoder();
 
@@ -113,7 +111,10 @@ export function needsRehash(stored: string, currentIterations = DEFAULT_PBKDF2_I
   const parsed = parseHash(stored);
   if (!parsed) return false;
   if (parsed.algorithm !== "pbkdf2") return true;
-  return parsed.iterations < Math.min(currentIterations, MIN_ACCEPTABLE_ITERATIONS);
+  // Rehash whenever the stored cost is below the configured one. The old
+  // Math.min(...) reduced this to "< MIN_ACCEPTABLE", so a cost that moved
+  // from 100k to 210k never triggered a migration.
+  return parsed.iterations < currentIterations;
 }
 
 export function parseIterations(raw: string | undefined, fallback = DEFAULT_PBKDF2_ITERATIONS): number {

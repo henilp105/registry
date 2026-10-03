@@ -37,11 +37,8 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyX2lkIiwiZXhwIjoxNjE...
 | Access Token | 90 days |
 | Refresh Token | 180 days |
 
-Configure via environment variables:
-```bash
-JWT_ACCESS_TOKEN_DAYS=90
-JWT_REFRESH_TOKEN_DAYS=180
-```
+The defaults are baked into the Worker (`worker/src/routes/auth.ts`);
+they are not currently configurable via environment variables.
 
 ---
 
@@ -86,12 +83,10 @@ curl -X POST "https://registry.fortran-lang.org/api/auth/signup" \
 - At least one number
 - At least one special character
 
-**Response:**
+**Response:** `200 OK` — no tokens are issued until the email is verified:
 ```json
 {
-  "code": 201,
-  "message": "User registered successfully. Please verify your email.",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  "message": "Signup successful. Please verify your email."
 }
 ```
 
@@ -101,10 +96,17 @@ Click the link in your verification email, or use the API:
 
 ```bash
 curl -X POST "https://registry.fortran-lang.org/api/auth/verify-email" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "token": "verification-token-from-email"
-  }'
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "uuid=verification-token-from-email"
+```
+
+On success the response also issues a fresh token pair:
+```json
+{
+  "message": "Successfully Verified Email",
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
 ```
 
 ### Login Flow
@@ -121,14 +123,10 @@ curl -X POST "https://registry.fortran-lang.org/api/auth/login" \
 **Response:**
 ```json
 {
-  "code": 200,
   "message": "Login successful",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "64a1b2c3d4e5f6",
-    "username": "fortran_dev",
-    "email": "developer@example.com"
-  }
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "username": "fortran_dev"
 }
 ```
 
@@ -172,13 +170,14 @@ curl -X POST "https://registry.fortran-lang.org/api/auth/forgot-password" \
 Use the token from the reset email:
 
 ```bash
+```bash
 curl -X POST "https://registry.fortran-lang.org/api/auth/reset-password" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "token": "reset-token-from-email",
-    "new_password": "NewSecureP@ssw0rd!"
-  }'
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "uuid=reset-token-from-email&password=NewSecureP@ssw0rd!"
 ```
+
+A signed-in user changing their own password instead sends
+`oldpassword` + `password` with a `Bearer` header (HTTP 200 on success).
 
 ### Change Email
 
@@ -187,12 +186,12 @@ Authenticated users can change their email:
 ```bash
 curl -X POST "https://registry.fortran-lang.org/api/auth/change-email" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "new_email": "new-email@example.com",
-    "password": "current-password"
-  }'
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "new_email=new-email@example.com"
 ```
+
+No current-password field is required; the change is confirmed by a link sent
+to the *new* address.
 
 ---
 
@@ -358,7 +357,7 @@ Store `FPM_UPLOAD_TOKEN` in GitHub Secrets.
 | `invalid_token` | 401 | Token is malformed | Check token format |
 | `missing_token` | 401 | No token provided | Add Authorization header |
 | `invalid_credentials` | 401 | Wrong email/password | Verify credentials |
-| `email_not_verified` | 403 | Email unverified | Complete email verification |
+| `Please verify your email` | 401 | Email unverified | Complete email verification |
 | `insufficient_permissions` | 403 | Role too low | Request appropriate access |
 
 ### Handling Expiration
@@ -399,12 +398,15 @@ Delete your account and all associated data:
 
 ```bash
 curl -X POST "https://registry.fortran-lang.org/api/users/delete" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Authorization: Bearer SITE_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "password": "your-password"
+    "username": "account-to-delete"
   }'
 ```
+
+> Site-admin only. The caller supplies the target `username`; no password is
+> requested. Deletes cascade to the user's namespaces, packages, and tarballs.
 
 > **Warning:** This action is irreversible. All packages and namespaces you own will be orphaned or deleted.
 
