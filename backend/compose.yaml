@@ -50,8 +50,11 @@ services:
     environment:
       - MONGO_URI=mongodb://mongo:27017/
       - MONGO_DB_NAME=${MONGO_DB_NAME:-fpmregistry}
-      - SALT=${SALT:-MYSALT}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_this_jwt_secret}
+      # Defect D126: `MYSALT` and `change_this_jwt_secret` are both committed to a
+      # public repository. A deployment that forgot to export either signed its
+      # tokens with a key anyone could read. `:?` refuses to render instead.
+      - SALT=${SALT:?SALT is required}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       - HOST=${HOST:-localhost}
       - RESET_EMAIL=${RESET_EMAIL:-}
       - SUDO_PASSWORD=${SUDO_PASSWORD:-}
@@ -82,6 +85,11 @@ services:
       - "5001:5001"
     environment: # these are the test environment variables.
       - MONGO_URI=mongodb://mongo:27017/
+      # Defect D126: a literal salt is normally wrong, but this container is the
+      # ephemeral package validator: it runs validate.py against a throwaway
+      # database and is destroyed afterwards, and the salt is only needed to
+      # verify legacy sha256 hashes. Recorded here so it reads as deliberate
+      # rather than as an oversight.
       - SALT=MYSALT
       - MONGO_DB_NAME=fpmregistry
       - MONGO_USER_NAME=fortran

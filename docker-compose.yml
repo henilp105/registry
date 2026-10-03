@@ -82,12 +82,24 @@ services:
       - MONGO_DB_NAME=${MONGO_DB_NAME:-fpmregistry}
       - MONGO_USER_NAME=${MONGO_USER_NAME:-}
       - MONGO_PASSWORD=${MONGO_PASSWORD:-}
-      - SALT=${SALT:-change_this_salt}
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_this_jwt_secret}
+      # Defect D126: these had literal fallbacks -- `change_this_salt` and
+      # `change_this_jwt_secret`, both of them in a public repository. A
+      # deployment that forgot to export a variable therefore started up and
+      # signed tokens with a key printed on GitHub, which is the failure mode
+      # CWE-1188 exists for: insecure default rather than insecure configuration.
+      #
+      # `:?` makes compose refuse to render the file when the variable is unset
+      # or empty, naming it, instead of silently substituting a public value.
+      # Generate one with:
+      #   python3 -c "import secrets; print(secrets.token_urlsafe(48))"
+      - SALT=${SALT:?SALT is required}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       - HOST=${HOST:-localhost}
       - RESET_EMAIL=${RESET_EMAIL:-}
       - RESET_PASSWORD=${RESET_PASSWORD:-}
-      - SUDO_PASSWORD=${SUDO_PASSWORD:-admin}
+      # `admin` as a default here means anyone who deployed without setting it
+      # has an admin account called `admin`.
+      - SUDO_PASSWORD=${SUDO_PASSWORD:?SUDO_PASSWORD is required}
       - BREVO_API_KEY=${BREVO_API_KEY:-}
       - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-}
       - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-FPM Registry}
@@ -110,7 +122,7 @@ services:
     environment:
       - MONGO_URI=mongodb://mongo:27017/
       - MONGO_DB_NAME=${MONGO_DB_NAME:-fpmregistry}
-      - SALT=${SALT:-change_this_salt}
+      - SALT=${SALT:?SALT is required - see the backend service above}
     depends_on:
       - mongo
     restart: unless-stopped
