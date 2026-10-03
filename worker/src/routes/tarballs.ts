@@ -83,14 +83,14 @@ export async function handleTarballRoutes(
   if (method !== "GET" && method !== "HEAD") return null;
 
   if (prefix === "tarballs" && segments.length === 4) {
-    return serveTarball(env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
+    return serveTarball(request, env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
   }
   if (prefix === "download" && segments.length === 4) {
-    return serveTarball(env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
+    return serveTarball(request, env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
   }
   if (prefix === "tarballs" && segments.length === 5) {
     // /tarballs/{ns}/{pkg}/{version}/{artifact}
-    return serveTarball(env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
+    return serveTarball(request, env, ctx, segments[1] as string, segments[2] as string, stripExt(segments[3] as string));
   }
 
   void url;
@@ -111,6 +111,7 @@ function stripExt(value: string): string {
  * — are served without touching R2 either.
  */
 async function serveTarball(
+  request: Request,
   env: Env,
   ctx: ExecutionContext,
   namespace: string,
@@ -137,7 +138,7 @@ async function serveTarball(
   const internal = new URL(`https://internal/dl/${namespace}/${packageName}/${version}`);
 
   return serveCached(
-    new Request(internal),
+    request,
     internal,
     TTL.tarball,
     versionToken,
@@ -183,8 +184,13 @@ export async function recordDownload(env: Env, packageIdOrName: unknown): Promis
     // D81: this was never called, so `download_count` stayed 0 and
     // `sorted_by=downloads` silently did nothing. Wired from serveTarball via
     // ctx.waitUntil -- the download response never waits on it.
+    // D81 wired the call but passed `{ name, namespace_name }`, while the
+    // branch keyed on a `namespace` member — so the object was used as the
+    // whole `_id` filter value and matched nothing. Defect D85: use the
+    // caller's object verbatim as the filter (it always carries name plus a
+    // namespace selector), and only fall back to `{ _id }` for scalars.
     const filter =
-      typeof packageIdOrName === "object" && packageIdOrName !== null && "namespace" in (packageIdOrName as Record<string, unknown>)
+      typeof packageIdOrName === "object" && packageIdOrName !== null
         ? (packageIdOrName as Record<string, unknown>)
         : { _id: packageIdOrName };
     await db(env, {
@@ -193,6 +199,26 @@ export async function recordDownload(env: Env, packageIdOrName: unknown): Promis
       filter,
       update: { $inc: { download_count: 1 } },
     });
+
+    // Legacy documents predate the denormalised `namespace_name` field (defect
+    // D85): retry with the ObjectId selector so they are not invisible.
+    if (typeof packageIdOrName === "object" && packageIdOrName !== null && "namespace_name" in (packageIdOrName as Record<string, unknown>)) {
+      const name = (packageIdOrName as Record<string, unknown>).namespace_name;
+      const ns = (await db<{ _id: unknown } | null>(env, {
+        kind: "findOne",
+        collection: "namespaces",
+        filter: { namespace: name },
+        projection: { _id: 1 },
+      })) as { _id: unknown } | null;
+      if (ns) {
+        await db(env, {
+          kind: "updateOne",
+          collection: "packages",
+          filter: { name: (packageIdOrName as Record<string, unknown>).name, namespace: ns._id, namespace_name: { $exists: false } },
+          update: { $inc: { download_count: 1 } },
+        });
+      }
+    }
   } catch (err) {
     logger.warn("download count update failed", {
       message: err instanceof Error ? err.message : String(err),

@@ -42,6 +42,7 @@ import {
   type NamespaceLike,
   type UserLike,
 } from "../lib/permissions";
+import { invalidate, ENTITY } from "../lib/cache";
 import { logger } from "../lib/logger";
 import { deletePackageTarballs } from "../lib/storage";
 import { readBody } from "./namespaces";
@@ -62,13 +63,15 @@ export async function handleUserRoutes(
 
     if (method === "GET" && segments.length === 2) return profile(request, env, action as string);
     if (method === "POST" && action === "account") return account(env, auth);
-    if (method === "POST" && action === "admin") return isAdmin(env, auth);
-    if (method === "POST" && action === "delete") return deleteUser(request, env, auth, ctx);
-
+    // Defect D85: this branch sat *after* the generic `users/admin` match,
+    // which caught `POST /users/admin/transfer` first — the documented 501
+    // was unreachable. Ordered before the generic one now.
     if (method === "POST" && action === "admin" && segments[2] === "transfer") {
       // Explicitly refused rather than left to fall through as a 404.
       return jsonError(501, "This Functionality has been disabled.");
     }
+    if (method === "POST" && action === "admin") return isAdmin(env, auth);
+    if (method === "POST" && action === "delete") return deleteUser(request, env, auth, ctx);
     return null;
   }
 
@@ -141,16 +144,23 @@ async function profile(request: Request, env: Env, username: string): Promise<Re
     db<unknown[]>(env, {
       kind: "find",
       collection: "packages",
-      // The *profile owner's* packages, not the viewer's. This filtered on
-      // `viewer?._id`, so it returned the right answer only when you opened your
-      // own profile: for any other username, and for an anonymous visitor --
-      // which is how a public profile page is normally first loaded -- the filter
-      // was `author: undefined` and matched nothing. `packages: []` at HTTP 200.
-      //
-      // Publishing someone's packages is not sensitive: they are listed on the
-      // search results and the package pages already.
-      filter: { author: user._id },
-      projection: { name: 1, namespace_name: 1 },
+      // The *profile owner's* packages — authored by them, or where they hold
+      // a maintainer seat. Defect D85: the previous filter matched only
+      // `author`, so every package the user merely maintains was invisible,
+      // and the projection dropped everything except name/namespace — the
+      // dashboard rendered `key={undefined}`, no descriptions, and never
+      // offered the maintainer actions.
+      filter: { $or: [{ author: user._id }, { maintainers: user._id }] },
+      projection: {
+        name: 1,
+        namespace: 1,
+        namespace_name: 1,
+        description: 1,
+        updated_at: 1,
+        maintainers: 1,
+        keywords: 1,
+        categories: 1,
+      },
     }),
     db<unknown[]>(env, {
       kind: "aggregate",
@@ -168,7 +178,7 @@ async function profile(request: Request, env: Env, username: string): Promise<Re
             as: "packageDocs",
           },
         },
-        { $project: { namespace: 1, description: 1, author: 1, admins: 1, maintainers: 1, packageCount: { $size: "$packageDocs" } } },
+        { $project: { _id: 1, namespace: 1, description: 1, author: 1, admins: 1, maintainers: 1, packageCount: { $size: "$packageDocs" } } },
       ],
     }),
   ]);
@@ -183,10 +193,25 @@ async function profile(request: Request, env: Env, username: string): Promise<Re
       ...(isViewer ? { email: user.email } : {}),
       createdAt: toJsonSafe(user.createdAt),
     },
-    packages: ((owned ?? []) as Record<string, unknown>[]).map((p) => ({
-      name: p.name,
-      namespace: p.namespace_name,
-    })),
+    packages: ((owned ?? []) as Record<string, unknown>[]).map((p) => {
+      // Role chips describe the *profiled* user, mirroring the legacy Flask
+      // contract (docs/BASELINE_AUDIT D32 shape).
+      const ns = (memberships ?? []).find((n) => strId((n as Record<string, unknown>)._id) === strId(p.namespace)) as Record<string, unknown> | undefined;
+      return {
+        id: strId(p._id),
+        name: p.name,
+        namespace: p.namespace_name,
+        description: p.description ?? "",
+        updated_at: toJsonSafe(p.updated_at),
+        isNamespaceAdmin: containsId(ns?.admins as IdLike[] | undefined, user._id as IdLike),
+        isNamespaceMaintainer: containsId(ns?.maintainers as IdLike[] | undefined, user._id as IdLike),
+        isPackageMaintainer: containsId(p.maintainers as IdLike[] | undefined, user._id as IdLike),
+        keywords: Array.from(new Set([
+          ...(Array.isArray(p.keywords) ? (p.keywords as string[]) : []),
+          ...(Array.isArray(p.categories) ? (p.categories as string[]) : []),
+        ])),
+      };
+    }),
     namespaces: ((memberships ?? []) as Record<string, unknown>[]).map((n) => ({
       id: strId(n._id),
       name: n.namespace,
@@ -491,6 +516,9 @@ async function addPackageMaintainer(
   });
 
   const added = result.modifiedCount > 0;
+  // Defect D85: maintainer changes never retired the cached package payload,
+  // so a newly added maintainer stayed invisible for up to the TTL.
+  await invalidate(env, ENTITY.package(namespaceName, packageName), ENTITY.namespacePackages(namespaceName));
   return jsonOk({
     message: added ? "Maintainer added successfully" : "Maintainer already added",
   });
@@ -551,6 +579,7 @@ async function removePackageMaintainer(
     update: { $pull: { maintainerOf: pkg._id } },
   });
 
+  await invalidate(env, ENTITY.package(namespaceName, packageName), ENTITY.namespacePackages(namespaceName));
   return jsonOk({
     message: result.modifiedCount > 0 ? "Maintainer removed successfully" : "Package maintainer not found",
   });
@@ -589,6 +618,7 @@ async function addNamespaceMaintainer(
     update: { $addToSet: { maintainers: target._id } },
   })) as { modifiedCount: number };
 
+  await invalidate(env, ENTITY.namespace(namespaceName), ENTITY.namespacePackages(namespaceName));
   return jsonOk({
     message: result.modifiedCount > 0 ? "Maintainer added successfully" : "Maintainer already added",
   });
@@ -633,6 +663,7 @@ async function removeNamespaceMaintainer(
     update: { $pull: { maintainers: target._id } },
   })) as { modifiedCount: number };
 
+  await invalidate(env, ENTITY.namespace(namespaceName), ENTITY.namespacePackages(namespaceName));
   return jsonOk({
     message: result.modifiedCount > 0 ? "Maintainer removed successfully" : "Namespace maintainer not found",
   });
@@ -672,6 +703,7 @@ async function addNamespaceAdmin(
     update: { $addToSet: { admins: target._id } },
   })) as { modifiedCount: number };
 
+  await invalidate(env, ENTITY.namespace(namespaceName), ENTITY.namespacePackages(namespaceName));
   return jsonOk({
     message: result.modifiedCount > 0 ? "Admin added successfully" : "Admin already added",
   });
@@ -717,6 +749,7 @@ async function removeNamespaceAdmin(
     update: { $pull: { admins: target._id } },
   })) as { modifiedCount: number };
 
+  await invalidate(env, ENTITY.namespace(namespaceName), ENTITY.namespacePackages(namespaceName));
   return jsonOk({
     message: result.modifiedCount > 0 ? "Admin removed successfully" : "Admin already removed",
   });

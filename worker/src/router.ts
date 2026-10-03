@@ -90,7 +90,7 @@ export async function route(
   // which is what structurally prevents the v0.0.1 leak of database-dump
   // filenames (defect D5).
   if (seg[0] === "registry" && seg[1] === "archives" && seg.length === 2) {
-    return listArchives(env);
+    return listArchives(request, env);
   }
   if (seg[0] === "archives" && seg.length === 2) {
     return downloadArchive(env, seg[1] as string);

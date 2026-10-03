@@ -261,8 +261,26 @@ async function signup(request: Request, env: Env, ctx: ExecutionContext): Promis
   // Verification is asynchronous: send the email without blocking the response.
   // Do not hand the token to the Worker lifecycle blindly — `waitUntil` is the
   // right primitive, but the fetch must be started before it returns.
+  // The emailed value must be a single-use `auth_tokens` token: the confirm
+  // route hashes what it receives and looks it up by `token_hash`, so handing
+  // it the raw account uuid made every signup link unusable (defect D85).
+  const rawVerifyToken = randomToken();
+  await db(env, {
+    kind: "insertOne",
+    collection: "auth_tokens",
+    doc: {
+      token_hash: await sha256Hex(rawVerifyToken),
+      kind: "verify_email",
+      user_uuid: uuid,
+      username: safeUsername,
+      expires_at: new Date(Date.now() + VERIFY_TOKEN_TTL_MINUTES * 60_000),
+      used_at: null,
+      created_at: new Date(),
+    },
+  });
+
   ctx.waitUntil(
-    sendVerificationEmail(env, safeEmail, safeUsername, uuid).then((r) => {
+    sendVerificationEmail(env, safeEmail, safeUsername, rawVerifyToken).then((r) => {
       if (!r.sent) logger.warn("verification email not delivered", { username: safeUsername });
     }),
   );
@@ -393,7 +411,17 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
 
   // ── Shape A: logged-in user changing their own password ────────────────────
   if (oldPassword !== undefined || bearer) {
-    const identity = bearer ?? (await resolveUuidFromToken(env, rawToken ?? ""));
+    // Defect D85: `bearer` was fed to `findUserByUuid` verbatim. It is a JWT,
+    // not a uuid, so the documented signed-in "change password" shape could
+    // never match a user and always 404'd.
+    let identity: string | null | undefined;
+    if (bearer) {
+      const result = await verifyToken(bearer, env.JWT_SECRET_KEY, "access");
+      if (!result.ok) return jsonError(401, "Unauthorized");
+      identity = result.claims.sub;
+    } else {
+      identity = await resolveUuidFromToken(env, rawToken ?? "");
+    }
     if (!identity) return jsonError(401, "Unauthorized");
 
     const user = await findUserByUuid(env, identity);

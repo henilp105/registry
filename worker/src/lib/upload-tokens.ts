@@ -157,6 +157,13 @@ export async function consumeUploadToken(env: Env, presented: string): Promise<T
       kind: "upload",
       revoked_at: null,
       expires_at: { $gt: now },
+      // Defect D85: `max_uses` was never enforced atomically — an exhausted
+      // token was still claimed until some other condition failed. `$or` keeps
+      // the null-ceiling (unlimited) case matchable.
+      $or: [
+        { max_uses: null },
+        { $expr: { $lt: ["$use_count", "$max_uses"] } },
+      ],
     },
     update: {
       $set: { last_used_at: now },
@@ -209,6 +216,30 @@ export async function revokeUploadToken(env: Env, tokenId: string, actorUuid: st
   if (!isHex24(tokenId)) {
     logger.info("upload token revoke matched nothing", { tokenId, actorUuid });
     return false;
+  }
+  // Defect D85: the docstring promised "creator or site admin only" but no
+  // ownership/role check existed, so any authenticated user could revoke any
+  // token by id. Non-owner and non-admin both get `false` (→ 404), so the
+  // endpoint never leaks whether a token id exists.
+  const token = (await db<{ created_by?: string } | null>(env, {
+    kind: "findOne",
+    collection: UPLOAD_TOKEN_COLLECTION,
+    filter: { _id: tokenId },
+    projection: { created_by: 1 },
+  })) as { created_by?: string } | null;
+  if (!token) return false;
+  if (token.created_by !== actorUuid) {
+    const actor = (await db<{ roles?: unknown } | null>(env, {
+      kind: "findOne",
+      collection: "users",
+      filter: { uuid: actorUuid },
+      projection: { roles: 1 },
+    })) as { roles?: unknown } | null;
+    const roles = Array.isArray(actor?.roles) ? (actor!.roles as unknown[]) : [];
+    if (!roles.includes("admin")) {
+      logger.info("upload token revoke on a foreign token", { tokenId, actorUuid });
+      return false;
+    }
   }
   const result = (await db<{ modifiedCount: number }>(env, {
     kind: "updateOne",

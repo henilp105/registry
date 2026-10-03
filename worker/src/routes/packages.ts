@@ -116,16 +116,16 @@ export async function handlePackageRoutes(
 
   // GET or POST /packages/{ns}/{pkg}/maintainers — a read over either verb.
   if ((method === "GET" || method === "POST") && segments.length === 4 && c === "maintainers") {
-    return packageMaintainers(env, a as string, b as string);
+    return packageMaintainers(request, env, a as string, b as string);
   }
 
   // GET /packages/{ns}/{pkg}/{version}
   if (method === "GET" && segments.length === 4) {
-    return getVersion(env, a as string, b as string, c as string);
+    return getVersion(request, env, a as string, b as string, c as string);
   }
 
   // GET /packages/{ns}/{pkg}
-  if (method === "GET" && segments.length === 3) return getPackage(env, a as string, b as string);
+  if (method === "GET" && segments.length === 3) return getPackage(request, env, a as string, b as string);
 
   return null;
 }
@@ -204,7 +204,10 @@ async function searchPackages(env: Env, url: URL): Promise<Response> {
     db<number>(env, {
       kind: "count",
       collection: "packages",
-      filter: usesText ? { is_deprecated: false } : filter,
+      // Defect D85: for `$text` plans this recounted with the query's
+      // `$text` clause dropped, so `total_pages` reflected the whole
+      // registry rather than the search result.
+      filter,
     }),
   ]);
 
@@ -331,7 +334,9 @@ async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
     db<number>(env, {
       kind: "count",
       collection: "packages",
-      filter: plan.kind === "text" ? { is_deprecated: false, ...extra } : filter,
+      // Defect D85: same `$text`-drop bug in the CLI route — count must use
+      // the pipeline's own filter.
+      filter,
     }),
   ]);
 
@@ -367,12 +372,12 @@ function latestVersionOf(versions: unknown): string | null {
 
 // ── GET /packages/{ns}/{pkg} ─────────────────────────────────────────────────
 
-async function getPackage(env: Env, namespaceName: string, packageName: string): Promise<Response> {
+async function getPackage(request: Request, env: Env, namespaceName: string, packageName: string): Promise<Response> {
   const entity = ENTITY.package(namespaceName, packageName);
   const version = await entityVersion(env, entity);
 
   return serveCached(
-    new Request(`https://internal/pkg/${namespaceName}/${packageName}`),
+    request,
     new URL(`https://internal/pkg/${namespaceName}/${packageName}`),
     TTL.package,
     version,
@@ -463,13 +468,13 @@ function ratingCounts(ratings: unknown): Record<string, number> {
 
 // ── GET /packages/{ns}/{pkg}/{version} ───────────────────────────────────────
 
-async function getVersion(env: Env, namespaceName: string, packageName: string, wanted: string): Promise<Response> {
+async function getVersion(request: Request, env: Env, namespaceName: string, packageName: string, wanted: string): Promise<Response> {
   const entity = ENTITY.package(namespaceName, packageName);
   const version = await entityVersion(env, entity);
 
   const internal = new URL(`https://internal/pkg/${namespaceName}/${packageName}/${wanted}`);
   return serveCached(
-    new Request(internal),
+    request,
     internal,
     TTL.version,
     version,
@@ -511,13 +516,13 @@ async function getVersion(env: Env, namespaceName: string, packageName: string, 
 
 // ── GET|POST /packages/{ns}/{pkg}/maintainers ────────────────────────────────
 
-async function packageMaintainers(env: Env, namespaceName: string, packageName: string): Promise<Response> {
+async function packageMaintainers(request: Request, env: Env, namespaceName: string, packageName: string): Promise<Response> {
   const entity = ENTITY.package(namespaceName, packageName);
   const version = await entityVersion(env, entity);
   const internal = new URL(`https://internal/pkg/${namespaceName}/${packageName}/maintainers`);
 
   return serveCached(
-    new Request(internal),
+    request,
     internal,
     TTL.members,
     version,

@@ -46,11 +46,11 @@ const SAFE_ARCHIVE_NAME = /^[A-Za-z0-9._-]{1,128}\.tar\.gz$/;
  * `archives` key still holds the names, so a client written against the legacy
  * shape keeps working.
  */
-export async function listArchives(env: Env): Promise<Response> {
+export async function listArchives(request: Request, env: Env): Promise<Response> {
   const internal = new URL("https://internal/registry/archives");
 
   return serveCached(
-    new Request(internal),
+    request,
     internal,
     TTL.namespaceIndex,
     await entityVersion(env, "archives"),
