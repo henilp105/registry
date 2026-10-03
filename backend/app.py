@@ -23,8 +23,12 @@ app = Flask(__name__)
 # ============================================================================
 # Security Configuration
 # ============================================================================
-# JWT Configuration - Use environment variable with fallback
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "fpm-registry-secret-key-change-in-production")
+# JWT Configuration — the secret comes from the environment only. A documented
+# default would ship itself to every deployment that forgot the variable
+# (defect D126); the compose files already refuse to render without it.
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+if not app.config["JWT_SECRET_KEY"]:
+    raise RuntimeError("JWT_SECRET_KEY must be set — no default secrets")
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=int(os.getenv("JWT_ACCESS_TOKEN_DAYS", 90)))
 app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=int(os.getenv("JWT_REFRESH_TOKEN_DAYS", 180)))
 app.config["JWT_TOKEN_LOCATION"] = ["headers"]

@@ -1,4 +1,4 @@
 services:
   backend:
     environment:
-      - ALERT_EMAIL=henilp105@gmail.com
+      - ALERT_EMAIL=${ALERT_EMAIL:-}

@@ -110,7 +110,10 @@ def send_alert(subject: str, body: str) -> bool:
     Returns True if email was successfully sent or attempted; False otherwise.
     """
     try:
-        alert_to = os.getenv("ALERT_EMAIL", "henilp105@gmail.com")
+        alert_to = os.getenv("ALERT_EMAIL", "")
+        if not alert_to:
+            logger.info(f"Alert suppressed (no ALERT_EMAIL configured): {subject}")
+            return False
         result = mailer.send_email(alert_to, subject, body)
         logger.info(f"Alert sent: {subject} -> {alert_to} (success={result})")
         return result
@@ -151,7 +154,7 @@ import signal
 import sys
 import datetime
 
-ALERT_EMAIL = os.getenv("ALERT_EMAIL", "henilp105@gmail.com")
+ALERT_EMAIL = os.getenv("ALERT_EMAIL", "")
 
 
 def _on_shutdown(signum, frame):
