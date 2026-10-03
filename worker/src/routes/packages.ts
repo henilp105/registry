@@ -907,6 +907,31 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
       logger.warn("rejected upload token", { reason: inspected.reason });
       return jsonError(401, "Invalid upload token");
     }
+    // The real path applies tokenAllows; the dry run must apply it too, or a
+    // package-scoped token passes a dry run for the wrong namespace/package
+    // and fails at publish time — the exact opposite of a dry run's job.
+    const ns = (await db<{ _id: unknown } | null>(env, {
+      kind: "findOne",
+      collection: "namespaces",
+      filter: { _id: toHexOrId(inspected.namespaceId) },
+      projection: { _id: 1 },
+    })) as { _id: unknown } | null;
+    if (!ns) return jsonError(404, "Namespace not found");
+    let packageId: string | null = null;
+    if (inspected.packageId) {
+      packageId = inspected.packageId;
+    } else {
+      const existing = (await db<{ _id: unknown } | null>(env, {
+        kind: "findOne",
+        collection: "packages",
+        filter: { name: packageName, namespace: ns._id },
+        projection: { _id: 1 },
+      })) as { _id: unknown } | null;
+      packageId = existing ? strId(existing._id) : null;
+    }
+    if (!tokenAllows(inspected, inspected.namespaceId, packageId)) {
+      return jsonError(401, "Invalid upload token");
+    }
     return jsonOk({ message: "Dry run Successful." });
   }
 

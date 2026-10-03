@@ -177,8 +177,10 @@ async function healthResponse(env: Env, cors: Record<string, string>): Promise<R
       body.status = "degraded";
     }
   } catch (err) {
+    // Do not echo err.message: it carries hostnames/SRV names/TLS detail.
+    if (err instanceof Error) logger.error("mongo health check failed", { detail: err.message });
     body.status = "degraded";
-    body.mongo = { connected: false, checked: true, error: err instanceof Error ? err.message : "unreachable" };
+    body.mongo = { connected: false, checked: true, error: "unreachable" };
   }
 
   return json(200, body, cors);

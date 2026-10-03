@@ -40,6 +40,7 @@ import { isDuplicateKeyError } from "../lib/publish";
 import { issueUploadToken, revokeUploadToken, DEFAULT_TTL_DAYS } from "../lib/upload-tokens";
 import { logger } from "../lib/logger";
 import { deletePackageTarballs } from "../lib/storage";
+import { ENTITY, invalidate } from "../lib/cache";
 // ── deduplicated (defect D73) ─────────────────────────────────────────────────
 //
 // `readBody` and `findUser` used to be defined here *and* exported from
@@ -426,6 +427,17 @@ async function deleteNamespace(
   });
 
   logger.info("namespace deleted", { namespace: namespaceName, packages: packageIds.length });
+
+  // The edge cache serves these keys independently of TTL once versioned;
+  // without an explicit bump, deleted namespaces/packages keep being served.
+  {
+    const entities: string[] = [
+      ENTITY.namespace(namespaceName),
+      ENTITY.namespacePackages(namespaceName),
+    ];
+    for (const pv of packageVersions) entities.push(ENTITY.package(namespaceName, pv.packageName));
+    await invalidate(env, ...entities);
+  }
 
   // R2 cleanup is scheduled rather than blocking the response.
   ctx.waitUntil(

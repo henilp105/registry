@@ -64,7 +64,7 @@ export type MongoOp =
     }
   | { kind: "count"; collection: string; filter: Document }
   | { kind: "insertOne"; collection: string; doc: Document }
-  | { kind: "updateOne"; collection: string; filter: Document; update: Document; upsert?: boolean }
+  | { kind: "updateOne"; collection: string; filter: Document; update: Document; upsert?: boolean; arrayFilters?: Document[] }
   | { kind: "updateMany"; collection: string; filter: Document; update: Document }
   | { kind: "deleteOne"; collection: string; filter: Document }
   | { kind: "deleteMany"; collection: string; filter: Document }
@@ -122,7 +122,7 @@ export type MongoOp =
 
 export type TransactionStep =
   | { kind: "insertOne"; collection: string; doc: Document }
-  | { kind: "updateOne"; collection: string; filter: Document; update: Document; upsert?: boolean }
+  | { kind: "updateOne"; collection: string; filter: Document; update: Document; upsert?: boolean; arrayFilters?: Document[] }
   | { kind: "updateMany"; collection: string; filter: Document; update: Document }
   | { kind: "deleteOne"; collection: string; filter: Document }
   | { kind: "deleteMany"; collection: string; filter: Document };
@@ -234,7 +234,9 @@ export class MongoPool extends DurableObject<PoolEnv> {
               const r = await c.updateOne(
                 step.filter as Filter<Document>,
                 step.update,
-                step.upsert ? { upsert: true, session } : { session },
+                step.upsert || step.arrayFilters
+                  ? { ...(step.upsert ? { upsert: true } : {}), ...(step.arrayFilters ? { arrayFilters: step.arrayFilters } : {}), session }
+                  : { session },
               );
               out = {
                 matchedCount: r.matchedCount,
@@ -600,7 +602,13 @@ export class MongoPool extends DurableObject<PoolEnv> {
         return { insertedId: r.insertedId };
       }
       case "updateOne": {
-        const r = await c.updateOne(filter, update as Document, op.upsert ? { upsert: true } : undefined);
+        const r = await c.updateOne(
+          filter,
+          update as Document,
+          op.upsert || op.arrayFilters
+            ? { ...(op.upsert ? { upsert: true } : {}), ...(op.arrayFilters ? { arrayFilters: op.arrayFilters } : {}) }
+            : undefined,
+        );
         return { matchedCount: r.matchedCount, modifiedCount: r.modifiedCount, upsertedId: r.upsertedId ?? null };
       }
       case "updateMany": {

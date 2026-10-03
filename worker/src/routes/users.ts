@@ -77,7 +77,9 @@ export async function handleUserRoutes(
   }
 
   // ── /{username}/maintainer | namespace/maintainer | namespace/admin ────────
-  if (method === "POST" && segments.length >= 3) {
+  // segments.length >= 2, not >= 3: `/{username}/maintainer` has exactly two
+  // segments, so the guard used to make addPackageMaintainer unreachable.
+  if (method === "POST" && segments.length >= 2) {
     const pathUsername = segments[0] as string;
     const action = segments.slice(1).join("/");
 
@@ -231,7 +233,7 @@ async function profile(request: Request, env: Env, username: string): Promise<Re
       // and `containsId` re-checks `Array.isArray` itself.
       isNamespaceAdmin: containsId(n.admins as IdLike[], viewer?._id),
       isNamespaceMaintainer: containsId(n.maintainers as IdLike[], viewer?._id),
-      isAuthor: strId(n.author) === strId(viewer?._id),
+      isAuthor: viewer !== null && strId(n.author) === strId(viewer._id),
       packageCount: n.packageCount,
     })),
   });
@@ -421,6 +423,28 @@ async function deleteUser(
   }
 
   logger.info("user deleted", { username, packagesRemoved: ownedIds.length });
+
+  // Retire cached pages that referenced the removed packages/namespaces —
+  // without this, GET /packages/{ns}/{pkg} keeps serving the deleted package
+  // from the edge cache (defect found in audit round 5).
+  {
+    const nsSeen = new Set<string>();
+    const entities: string[] = [ENTITY.user(username)];
+    for (const pkg of ownedPackages) {
+      const nsName =
+        typeof pkg.namespace_name === "string" && pkg.namespace_name.length > 0
+          ? pkg.namespace_name
+          : (namespaceNames.get(strId(pkg.namespace)) ?? "");
+      if (!nsName) continue;
+      entities.push(ENTITY.package(nsName, String(pkg.name ?? "")));
+      if (!nsSeen.has(nsName)) {
+        nsSeen.add(nsName);
+        entities.push(ENTITY.namespace(nsName), ENTITY.namespacePackages(nsName));
+      }
+    }
+    await invalidate(env, ...entities);
+  }
+
   void ctx;
   return jsonOk({ message: "User deleted" });
 }

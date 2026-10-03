@@ -246,17 +246,14 @@ async function applyResult(request: Request, env: Env): Promise<Response> {
       verified_at: new Date(),
     };
     if (result.ok) {
-      // Only the version document is mutated on success; the package-level
-      // metadata is updated once, from the first successful version.
       versionSet.validation_error = null;
     } else {
       versionSet.validation_error = result.reason ?? "validation_failed";
       versionSet.validation_message = (result.message ?? "").slice(0, 500);
     }
 
-    // Rewrite the version array explicitly rather than with a positional
-    // operator: version lists are small (tens), so this costs nothing, and it
-    // is far easier to verify correct than building `$set` keys dynamically.
+    // Package metadata refreshes from each successful result; the version
+    // element update itself is positional via arrayFilters (see below).
     let doc = (await db<Record<string, unknown> | null>(env, {
       kind: "findOne",
       collection: "packages",
@@ -290,10 +287,6 @@ async function applyResult(request: Request, env: Env): Promise<Response> {
       continue;
     }
 
-    const versions = ((doc.versions ?? []) as Record<string, unknown>[]).map((v) =>
-      String(v.version) === versionName ? { ...v, ...versionSet } : v,
-    );
-
     const packageSet: Record<string, unknown> = { updated_at: new Date() };
     if (result.ok) {
       // Metadata comes from fpm.toml and the README, extracted by the runner.
@@ -310,11 +303,18 @@ async function applyResult(request: Request, env: Env): Promise<Response> {
       packageSet.security_status = "No security issues found";
     }
 
+    // arrayFilters touch only the matching version element: the previous
+    // whole-array rewrite lost any concurrent verdict or publish that landed
+    // between the findOne and the updateOne.
+    const versionSetFields: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(versionSet)) versionSetFields[`versions.$[v].${k}`] = v;
+
     await db(env, {
       kind: "updateOne",
       collection: "packages",
-      filter: { _id: doc._id },
-      update: { $set: { versions, ...packageSet } },
+      filter: { _id: doc._id, "versions.version": versionName },
+      update: { $set: { ...versionSetFields, ...packageSet } },
+      arrayFilters: [{ "v.version": versionName }],
     });
 
     await invalidate(

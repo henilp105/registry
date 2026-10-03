@@ -10,6 +10,8 @@ import {
 const initialState = {
   data: null,
   statuscode: null,
+  httpStatus: null,
+  retryAfter: null,
   isLoading: false,
   error: null,
   isVerified: null,
@@ -22,10 +24,16 @@ const packageReducer = (state = initialState, action) => {
   switch (action.type) {
     // Fetch package data
     case FETCH_PACKAGE_DATA_REQUEST:
+      // Reset the previous outcome: a stale 404 must not redirect the next
+      // successful package view to /404 (audit round 5).
       return {
         ...state,
         isLoading: true,
         error: null,
+        statuscode: null,
+        httpStatus: null,
+        retryAfter: null,
+        data: null,
         latestId: action.payload?.id ?? state.latestId,
       };
 
@@ -35,6 +43,8 @@ const packageReducer = (state = initialState, action) => {
         ...state,
         isLoading: false,
         statuscode: action.payload.statuscode,
+        httpStatus: null,
+        retryAfter: null,
         data: action.payload.data,
         error: null,
       };
