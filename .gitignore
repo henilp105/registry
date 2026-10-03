@@ -47,3 +47,7 @@ tests/__pycache__/
 /frontend/npm-debug.log*
 /frontend/yarn-debug.log*
 /frontend/yarn-error.log*
+# root-level audit harness (playwright etc.)
+/node_modules
+/package.json
+/package-lock.json

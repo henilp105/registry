@@ -195,9 +195,9 @@ const ROUTES = [
     const cs = getComputedStyle(document.documentElement);
     const read = (n) => cs.getPropertyValue(n).trim();
     return {
-      bg: read("--color-bg"), surface: read("--color-surface"),
+      bg: read("--color-surface-canvas"), surface: read("--color-surface"),
       text: read("--color-text"), muted: read("--color-text-muted"),
-      accent: read("--color-accent"), border: read("--color-border"),
+      accent: read("--color-brand-solid"), border: read("--color-border"),
     };
   });
   report.palette = report.palette || {};
