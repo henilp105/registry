@@ -234,6 +234,16 @@ jobs:
       - name: Signing out wipes every account-scoped slice
         run: node scripts/check_session_reset.mjs
 
+      # Defect D104: 17 form fields across the admin page's action cards and all
+      # six maintainer/admin dialogs had no controlId, so react-bootstrap rendered
+      # a <label> with no `for` and a control with no `id` -- no accessible name,
+      # and clicking the label did not focus the field. The reset-password form
+      # carried a comment calling itself the only one with the omission, and it
+      # was not: an inventory written by reading one file is an inventory of one
+      # file.
+      - name: Every form field is programmatically labelled
+        run: node scripts/check_form_labels.mjs
+
       - name: Frontend Redux helpers behave
         run: |
           set -euo pipefail

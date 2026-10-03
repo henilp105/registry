@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Container, Row, Col, Card, Form, Button, Alert, Modal, Spinner } from "react-bootstrap";
 import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
 import {
   adminAuth,
   deleteUser,
@@ -19,7 +20,13 @@ const AdminSection = () => {
   
   const accessToken = useSelector((state) => state.auth.accessToken);
   const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
-  const { message, statuscode, isAdmin, isLoading, checked: adminChecked } = useSelector((state) => state.admin);
+  // Defect D99: `error` is read here for the first time. Every *_FAILURE branch
+  // of adminReducer writes the message to `error` and nulls `message`, so this
+  // effect -- which only ever fired on `message` -- produced an alert for
+  // successes and *nothing at all* for failures. An admin who deleted a package
+  // that did not exist, deleted a namespace without permission, or hit a 500 saw
+  // the confirm modal close and the form clear, which reads as success.
+  const { message, error, statuscode, isAdmin, isLoading, checked: adminChecked } = useSelector((state) => state.admin);
 
   const [showReports, setShowReports] = useState(false);
   const [alertMessage, setAlertMessage] = useState(null);
@@ -32,13 +39,25 @@ const AdminSection = () => {
   useEffect(() => {
     if (accessToken) {
       dispatch(adminAuth(accessToken));
+    } else {
+      // Defect D100: nothing dispatched for a signed-out visitor, so `checked`
+      // stayed false forever and the page below sat on its spinner with no error
+      // and no way forward. The D85 fix traded a wrong 404 for an indefinite
+      // pending state on this path; a signed-out visitor is not "pending", they
+      // are not an admin, and saying so is the honest answer.
+      dispatch({ type: "ADMIN_AUTH_FAILURE", payload: { message: "Sign in to access the admin tools" } });
     }
   }, [isAuthenticated, accessToken, dispatch]);
 
   useEffect(() => {
-    if (statuscode != null && message) {
-      setAlertVariant(statuscode >= 200 && statuscode < 300 ? "success" : "danger");
-      setAlertMessage(`${statuscode}: ${message}`);
+    // The two are mutually exclusive by construction -- the failure branches
+    // null `message`, the success branches null `error` -- so picking whichever
+    // is present cannot show a success banner carrying a failure message.
+    const text = message ?? error;
+    if (statuscode != null && text) {
+      const ok = statuscode >= 200 && statuscode < 300;
+      setAlertVariant(ok ? "success" : "danger");
+      setAlertMessage(`${statuscode}: ${text}`);
       // Auto-clear alert after 5 seconds
       const timer = setTimeout(() => {
         setAlertMessage(null);
@@ -46,7 +65,7 @@ const AdminSection = () => {
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [statuscode, message, dispatch]);
+  }, [statuscode, message, error, dispatch]);
 
   const [formData, setFormData] = useState({
     namespaceName: "",
@@ -212,7 +231,11 @@ const AdminSection = () => {
               </h5>
             </Card.Header>
             <Card.Body>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-delete-user-username">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Namespace Name</Form.Label>
                 <Form.Control
                   type="text"
@@ -222,7 +245,11 @@ const AdminSection = () => {
                   onChange={handleInputChange}
                 />
               </Form.Group>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-delete-namespace-namespace">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Package Name</Form.Label>
                 <Form.Control
                   type="text"
@@ -248,7 +275,11 @@ const AdminSection = () => {
               </h5>
             </Card.Header>
             <Card.Body>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-delete-package-namespace">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Namespace Name</Form.Label>
                 <Form.Control
                   type="text"
@@ -258,7 +289,11 @@ const AdminSection = () => {
                   onChange={handleInputChange}
                 />
               </Form.Group>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-delete-package-package">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Package Name</Form.Label>
                 <Form.Control
                   type="text"
@@ -268,7 +303,11 @@ const AdminSection = () => {
                   onChange={handleInputChange}
                 />
               </Form.Group>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-delete-release-namespace">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Release Version</Form.Label>
                 <Form.Control
                   type="text"
@@ -294,7 +333,11 @@ const AdminSection = () => {
               </h5>
             </Card.Header>
             <Card.Body>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-delete-release-package">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Namespace Name</Form.Label>
                 <Form.Control
                   type="text"
@@ -304,7 +347,11 @@ const AdminSection = () => {
                   onChange={handleInputChange}
                 />
               </Form.Group>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-delete-release-version">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Package Name</Form.Label>
                 <Form.Control
                   type="text"
@@ -330,7 +377,11 @@ const AdminSection = () => {
               </h5>
             </Card.Header>
             <Card.Body>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-deprecate-package-namespace">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Namespace Name</Form.Label>
                 <Form.Control
                   type="text"
@@ -356,7 +407,11 @@ const AdminSection = () => {
               </h5>
             </Card.Header>
             <Card.Body>
-              <Form.Group className="mb-3">
+              <Form.Group className="mb-3" controlId="admin-deprecate-package-package">
+                {/* D104: no controlId means a label with no `for` and a
+                    control with no `id` -- no accessible name, and clicking
+                    the label does not focus the field. See
+                    scripts/check_form_labels.mjs. */}
                 <Form.Label>Username</Form.Label>
                 <Form.Control
                   type="text"
@@ -418,8 +473,22 @@ const AdminSection = () => {
         <span className="visually-hidden">Checking admin access…</span>
       </Spinner>
     </Container>
-  ) : (
+  ) : isAuthenticated ? (
+    // Signed in, checked, not an admin: a real verdict, so the 404 is right.
     <NoPage />
+  ) : (
+    // Defect D100: signed out. A 404 claims a page does not exist, and a spinner
+    // claims the answer is coming. Neither is true, and the D85 spinner here was
+    // unreachable-but-infinite before this. Say what it is and offer the way out.
+    <Container className="py-5 text-center">
+      <h2>Sign in required</h2>
+      <p className="text-muted">
+        The admin tools are only available to signed-in moderators.
+      </p>
+      <Button variant="primary" as={Link} to="/account/login">
+        Go to sign in
+      </Button>
+    </Container>
   );
 };
 

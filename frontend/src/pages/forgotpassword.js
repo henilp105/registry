@@ -20,7 +20,12 @@ const ForgotPassword = () => {
   const [touched, setTouched] = useState(false);
   
   const dispatch = useDispatch();
-  const { message, statuscode, isLoading } = useSelector(
+  // Defect D98: this read `message` only, while every failure branch of the
+  // shared slice writes the text to `error` and nulls `message`. So a rejected
+  // request -- unknown address, 429, 500, or no network at all -- produced a form
+  // that went from "Sending…" back to idle with no output at all, which is
+  // indistinguishable from a request that was never sent.
+  const { message, error, statuscode, isLoading } = useSelector(
     (state) => state.resetpassword
   );
 
@@ -46,8 +51,11 @@ const ForgotPassword = () => {
 
   const handleBlur = useCallback(() => {
     setTouched(true);
-    const error = validateEmail(email);
-    setFormErrors(error ? { email: error } : {});
+    // Renamed: a local `error` here shadowed the `error` read from the store, so
+    // the render below could not have seen the server's message even after the
+    // selector was fixed.
+    const fieldError = validateEmail(email);
+    setFormErrors(fieldError ? { email: fieldError } : {});
   }, [email, validateEmail]);
 
   const handleSubmit = useCallback((e) => {
@@ -81,14 +89,17 @@ const ForgotPassword = () => {
           </p>
         </div>
 
-        {message && (
+        {(message || error) && (
           <div className={`auth-alert ${isSuccess ? 'auth-alert-success' : 'auth-alert-error'}`} role={isSuccess ? "status" : "alert"}>
             {isSuccess ? (
               <CheckCircleFill className="auth-alert-icon" />
             ) : (
               <ExclamationCircleFill className="auth-alert-icon" />
             )}
-            <span>{message}</span>
+            {/* `message` on success, `error` on failure -- the two are mutually
+                exclusive by construction, so this can never show a success
+                banner with a failure message in it. */}
+            <span>{isSuccess ? message : error}</span>
           </div>
         )}
 

@@ -8,10 +8,7 @@ import Table from "react-bootstrap/Table";
 import Nav from "react-bootstrap/Nav";
 import Tab from "react-bootstrap/Tab";
 import { Button } from "react-bootstrap";
-import {
-  fetchPackageData,
-  verifyUserRole,
-} from "../store/actions/packageActions";
+import { fetchPackageData } from "../store/actions/packageActions";
 import ShowUserListDialog from "./showUserListDialog";
 import ReportPackageForm from "./reportPackageForm";
 import RatePackageForm from "./ratePackageForm";
@@ -388,19 +385,25 @@ const PackagePage = () => {
 export default PackagePage;
 
 // View Package Maintainers Button Component
+/**
+ * Defect D103: this dispatched `verifyUserRole` on every mount. The reducer wrote
+ * `isVerified`/`isVerifying`, and grep found **no component in the app reading
+ * either** -- the button renders unconditionally and the dialog opens from its own
+ * onClick. So every visit to a package page issued an authenticated
+ * `POST /packages/{ns}/{pkg}/verify` whose response was discarded: one wasted
+ * request per page view against a route the deployment notes single out as
+ * budget-sensitive, for zero user-visible behaviour.
+ *
+ * The action, the reducer cases and the two state fields are left in place rather
+ * than deleted. They are a legitimate capability (the API returns whether the
+ * viewer may publish) and removing them would take the decision away from whoever
+ * wires up a UI that needs it. What is removed is the call that nobody reads.
+ */
 const ViewPackageMaintainersButton = ({
   namespace_name,
   package_name,
   onShowMaintainers,
 }) => {
-  const dispatch = useDispatch();
-
-  useEffect(() => {
-    if (namespace_name && package_name) {
-      dispatch(verifyUserRole(namespace_name, package_name));
-    }
-  }, [dispatch, namespace_name, package_name]);
-
   return (
     <button
       type="button"

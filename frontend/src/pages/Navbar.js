@@ -208,23 +208,34 @@ const SearchBar = () => {
 
   // Auto-search when the debounced value changes, but only for user input, and
   // only while already on the search page.
+  //
+  // Defect D102: the sort order was not passed through, so `sortedBy` fell back
+  // to "" and the request went out unsorted while `state.search.orderBy` was left
+  // claiming otherwise. After choosing "Most Downloads" and typing one more
+  // character, the results silently reverted to relevance order with the
+  // dropdown still showing the chosen sort. Read from the store rather than held
+  // locally, because `search.js` and `pagination.js` both read it from there and
+  // three sources of truth is how they came to disagree.
+  const orderBy = useSelector((state) => state.search.orderBy);
   useEffect(() => {
     if (!typedByUser.current) return;
     typedByUser.current = false;
     if (debouncedQuery.trim() && window.location.pathname === "/search") {
       dispatch(setQuery(debouncedQuery));
-      dispatch(searchPackage(debouncedQuery, 0));
+      dispatch(searchPackage(debouncedQuery, 0, orderBy));
     }
-  }, [debouncedQuery, dispatch]);
+  }, [debouncedQuery, orderBy, dispatch]);
 
+  // Same defect on the submit path (D102): a search submitted from the navbar
+  // discarded the active sort as well.
   const handleSearch = useCallback(() => {
     const trimmedQuery = localQuery.trim();
     if (trimmedQuery) {
       dispatch(setQuery(trimmedQuery));
-      dispatch(searchPackage(trimmedQuery, 0));
+      dispatch(searchPackage(trimmedQuery, 0, orderBy));
       navigate("/search");
     }
-  }, [localQuery, dispatch, navigate]);
+  }, [localQuery, orderBy, dispatch, navigate]);
 
   const handleKeyDown = (event) => {
     if (event.key === "Enter") {

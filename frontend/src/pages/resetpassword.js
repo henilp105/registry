@@ -20,7 +20,11 @@ const ResetPassword = () => {
   const [formErrors, setFormErrors] = useState({});
   const [touched, setTouched] = useState({});
   
-  const { message, statuscode, isLoading } = useSelector(
+  // Defect D98: read `error` as well as `message`. The failure branches of this
+  // shared slice null `message` and write to `error`, so an expired or unknown
+  // reset token -- or any server error -- showed a form that simply stopped
+  // spinning, with the failure invisible and the button quietly re-enabled.
+  const { message, error, statuscode, isLoading } = useSelector(
     (state) => state.resetpassword
   );
 
@@ -77,11 +81,11 @@ const ResetPassword = () => {
           Enter your new password below.
         </p>
 
-        {message && (
+        {(message || error) && (
           <Alert variant={isSuccess ? "success" : "danger"} className="mb-3">
             {isSuccess && <Icon name="check-circle" className="me-2" />}
             {!isSuccess && <Icon name="exclamation-circle" className="me-2" />}
-            {message}
+            {isSuccess ? message : error}
           </Alert>
         )}
 

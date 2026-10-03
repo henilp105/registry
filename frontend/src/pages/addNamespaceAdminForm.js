@@ -85,7 +85,16 @@ const AddNamespaceAdminFormDialog = ({ namespace, show, onHide }) => {
             Add an admin to namespace <strong>{namespace}</strong>
           </p>
 
-          <Form.Group className="mb-3">
+          <Form.Group className="mb-3" controlId="addnamespaceadmin-username">
+            {/* Defect D104: `controlId` is what ties the <label> to the control.
+              Without it react-bootstrap renders a bare <label> with no
+              `for` and the control has no `id`, so the field has no
+              accessible name -- announced only as "edit text" -- and
+              clicking the visible label does not focus it. Every other
+              form in the app (account.js, resetpassword.js, login.js)
+              passes it; these were the ones missed. Plain HTML ids, so
+              the association is assertable in CI: see
+              scripts/check_form_labels.mjs. */}
             <Form.Label>Username</Form.Label>
             <Form.Control
               type="text"
