@@ -1991,3 +1991,22 @@ a year. Now logout and both password-change paths set
 `sessionsInvalidBefore`, and `POST /auth/refresh` rejects any token whose `iat`
 precedes it. A token issued *after* a fresh login is unaffected (its `iat` is
 later).
+
+## D129 — an upload token outlived the role that minted it
+
+An upload token is a publish credential, valid for up to 30 days. `POST
+/packages` validated only the token itself: expiry, revocation, scope and use
+count, but not whether the user who minted it still had a role on the namespace.
+Removing someone as namespace admin/maintainer therefore did not stop a token
+they were already holding from publishing into that namespace — the intended
+refrigerator was "revoke the token", and revocation is an extra manual call that
+nothing in the UI nudges.
+
+`POST /packages` now re-checks membership at consume time: the token's
+`created_by` must still be the namespace author, an admin, or a maintainer, or
+the publish is refused with the same generic 401 as every other token failure.
+One extra indexed `users.findOne` per publish, which is the least frequent and
+most expensive operation in the system.
+
+Verified: typecheck, eslint, 359 unit tests, and `write_path_audit` (69/69, which
+includes the full token → publish → version flow) against the live worker.

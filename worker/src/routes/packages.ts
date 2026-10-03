@@ -891,14 +891,37 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
     return jsonError(401, "Invalid upload token");
   }
 
-  const namespace = (await db<{ _id: unknown; namespace: string } | null>(env, {
+  const namespace = (await db<{ _id: unknown; namespace: string; author?: unknown; admins?: unknown[]; maintainers?: unknown[] } | null>(env, {
     kind: "findOne",
     collection: "namespaces",
     filter: { _id: toHexOrId(verdict.namespaceId) },
-    projection: { namespace: 1 },
-  })) as { _id: unknown; namespace: string } | null;
+    projection: { namespace: 1, author: 1, admins: 1, maintainers: 1 },
+  })) as { _id: unknown; namespace: string; author?: unknown; admins?: unknown[]; maintainers?: unknown[] } | null;
 
   if (!namespace) return jsonError(404, "Namespace not found");
+
+  // A token minted while the creator was author/admin/maintainer keeps full
+  // publish rights until expiry even if that role is later removed. Re-check
+  // the role at consume time, not just at mint time, so revocation means
+  // revocation today rather than "revoke after the fact".
+  {
+    const creator = (await db<{ _id: unknown } | null>(env, {
+      kind: "findOne",
+      collection: "users",
+      filter: { uuid: verdict.createdBy },
+      projection: { _id: 1 },
+    })) as { _id: unknown } | null;
+    const id = creator ? String(creator._id) : "";
+    const stillMember =
+      id &&
+      [namespace.author, ...(namespace.admins ?? []), ...(namespace.maintainers ?? [])]
+        .filter(Boolean)
+        .some((m) => String((m as { toString(): string }).toString()) === id || String(m) === id);
+    if (!stillMember) {
+      logger.warn("upload token creator lost namespace role", { namespace: namespace.namespace });
+      return jsonError(401, "Invalid upload token");
+    }
+  }
 
   const existing = (await db<(Record<string, unknown> & { _id: unknown }) | null>(env, {
     kind: "findOne",
