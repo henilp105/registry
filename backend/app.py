@@ -48,8 +48,20 @@ app.config["JSONIFY_PRETTYPRINT_REGULAR"] = False  # Faster JSON responses
 # ============================================================================
 # CORS Configuration
 # ============================================================================
-# TODO: Disable permissive CORS in production - currently allowing everything for development
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+# Defect D3: `origins: "*"` combined with `supports_credentials: true` lets any
+# site make credentialed requests. Use an explicit allow-list; localhost
+# development origins are only added when Flask runs in debug mode.
+_allowed_origins = [
+    o.strip()
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+if app.debug:
+    _allowed_origins += ["http://localhost:3000", "http://127.0.0.1:3000"]
+if not _allowed_origins:
+    # Fail closed: same-origin requests need no CORS headers at all.
+    _allowed_origins = []
+CORS(app, resources={r"/*": {"origins": _allowed_origins}}, supports_credentials=True)
 
 # ============================================================================
 # JWT Manager

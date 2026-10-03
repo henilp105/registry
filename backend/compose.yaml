@@ -56,6 +56,7 @@ services:
       - SALT=${SALT:?SALT is required}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
       - HOST=${HOST:-localhost}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost,https://localhost}
       - RESET_EMAIL=${RESET_EMAIL:-}
       - SUDO_PASSWORD=${SUDO_PASSWORD:-}
       - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}

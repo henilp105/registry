@@ -181,8 +181,14 @@ def signup():
         uuid = generate_uuid()
         hashed_password = hash_password(password)
         
-        # Check if this is the first admin user
-        is_admin = password == SUDO_PASSWORD and SUDO_PASSWORD
+        # Check if this is the first admin user. The SUDO_PASSWORD match alone
+        # is not sufficient: it must also be the *first* account, otherwise any
+        # holder of the shared value mints an admin forever (defect D1).
+        is_admin = (
+            password == SUDO_PASSWORD
+            and SUDO_PASSWORD
+            and db.users.estimated_document_count() == 0
+        )
         
         user = User(
             id=None,
@@ -318,13 +324,11 @@ def verify_email():
     if not user.isVerified:
         db.users.update_one({"uuid": uuid}, {"$set": {"isVerified": True}})
 
-    access_token = create_access_token(identity=user.uuid)
-    refresh_token = create_refresh_token(identity=user.uuid)
-
+    # Defect D2: this route used to mint a full access+refresh token pair for
+    # anyone presenting a uuid — which also served as an account-takeover key.
+    # Verification proves mailbox control, not a session; the user logs in.
     return jsonify({
-        "message": "Successfully Verified Email", 
-        "access_token": access_token, 
-        "refresh_token": refresh_token, 
+        "message": "Successfully Verified Email. Please log in.",
         "code": 200
     }), 200
 
