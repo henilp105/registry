@@ -226,6 +226,14 @@ jobs:
       - name: No shell-interpolated subprocess in Python
         run: node scripts/check_no_shell_injection.mjs
 
+      # Defect D97: only `auth` was cleared on logout, and `logout()` navigates
+      # without a page reload -- so signing in as a different account in the same
+      # tab showed user B the previous account's packages, namespaces and role
+      # chips. A cross-account disclosure that no per-page `if` could be trusted
+      # to prevent, since the bug was the *absence* of a reset.
+      - name: Signing out wipes every account-scoped slice
+        run: node scripts/check_session_reset.mjs
+
       - name: Frontend Redux helpers behave
         run: |
           set -euo pipefail
