@@ -27,6 +27,31 @@ export { MongoPool };
 
 const VERSION = "3.0.0";
 
+// Self-healing bootstrap guard. The cron that creates collections/indexes
+// runs hourly, so on a fresh deploy every $text search 500s for up to an hour.
+// When a read fails because an index does not exist yet, we run the same
+// idempotent bootstrap the cron runs and retry the read once -- instead of
+// making the user wait for the clock. One attempt per isolate: a second
+// identical failure means the problem is not a missing index and retrying
+// would just burn CPU.
+let bootstrapAttempted = false;
+
+function isMissingIndexError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /text index required|no such index|index.*not.*found|ns not found/i.test(msg);
+}
+
+async function ensureIndexesOnce(env: Env): Promise<void> {
+  if (bootstrapAttempted) return;
+  bootstrapAttempted = true;
+  const id = env.MONGO_POOL.idFromName(POOL_NAME);
+  const pool = env.MONGO_POOL.get(id, { locationHint: "apac" });
+  const result = await pool.execute({
+    op: { kind: "bootstrap", collections: [...EXPECTED_COLLECTIONS], spec: INDEX_SPEC },
+  });
+  logger.info("lazy bootstrap after missing-index error", { result });
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     // Preflight first — it never reaches the router.
@@ -73,7 +98,19 @@ export default {
         }
       }
 
-      const response = await route(request, env, ctx, url);
+      let response: Response | null;
+      try {
+        response = await route(request, env, ctx, url);
+      } catch (err) {
+        // Fresh deploy: indexes are created by the hourly cron, so a search
+        // can fail before the first tick. Repair and retry the read once.
+        if (request.method === "GET" && isMissingIndexError(err)) {
+          await ensureIndexesOnce(env);
+          response = await route(request, env, ctx, url);
+        } else {
+          throw err;
+        }
+      }
       if (response) {
         // Copy the CORS headers on without rebuilding the body.
         const merged = new Headers(response.headers);

@@ -1968,3 +1968,15 @@ Four findings remain in the SAST sweep, and all four are triaged rather than
 The general note is D114's: a scanner that cries wolf is indistinguishable from
 one that is broken, and both look identical in a green run. The real gate is the
 one that can tell the difference, and it is the one wired into CI.
+
+## D127 — a fresh deploy 500'd every search until the first hourly cron
+
+Indexes and collections were only created by the hourly `17 * * * *` cron, so a
+fresh Atlas database served `GET /packages?q=…` as
+`500 $text: "no such collection 'fpmregistry.packages'" / text index required`
+for up to an hour after deploy, and `POST /packages` uniqueness was enforced by
+application-level races until then. The Worker now detects a missing-index /
+missing-collection failure on the request path, runs the same idempotent
+`bootstrap` the cron runs, and retries the read once (GET only, one attempt per
+isolate). Verified live: dropped `packages_text`, reloaded, and the retry path
+recreated all 27 indexes and returned 200.
