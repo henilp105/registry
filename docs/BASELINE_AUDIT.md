@@ -1760,3 +1760,50 @@ inserts. The policy now lives in `db/retry-safety.ts` — its own module, becaus
 `mongo-pool.ts` imports `cloudflare:workers` and cannot be tested in Node — and it
 defaults to *not* retrying, so a future op kind has to be argued for rather than
 inherited.
+
+---
+
+## D97–D104 — frontend audit round (2026-10-03)
+
+D85–D89 covered the Redux store and a few pages. D90–D96 covered `worker/src/lib`
+and `worker/src/db`. This round read the rest of the frontend: all ~30 page and
+dialog components, `components/`, `store/reducers/shape.js` and `store/utils/`.
+
+The theme worth naming first, because it accounts for five of these eight: **a
+field that is written but never read, or read but never written.** Neither shows
+up in `react-scripts build`, in typecheck, or in review — the store is plain
+objects, and every individual line is correct. Each of the five was invisible
+because *something* on both sides existed.
+
+| ID | Site | Defect | Consequence |
+|---|---|---|---|
+| **D97** | `rootReducer` / `logout` | only `auth` was cleared on logout, and `logout()` navigates without a reload | **Cross-account data disclosure.** Signing in as B in the same tab showed B user A's packages, namespaces, role chips and descriptions under a greeting addressed to B. |
+| D98 | `forgotpassword.js`, `resetpassword.js` | read `message`; every failure branch writes `error` and nulls `message` | A rejected reset request — unknown address, 429, 500, no network — produced **no output at all**, indistinguishable from a request never sent. |
+| D99 | `admin.js` | same shape: the alert effect fired only on `message` | Every failed admin action was **silent**. The confirm modal closed and the form cleared, which reads as success. |
+| D100 | `admin.js` | nothing dispatched for a signed-out visitor | `/admin` **spun forever** with no error and no way forward. D85 had traded a wrong 404 for an indefinite pending state. |
+| D101 | `namespaceAdminReducer`, `namespaceMaintainersReducer` | `isLoading` read by four dialogs, written by no reducer | Submit button never disabled, no progress shown; a slow request could be **submitted repeatedly**, each one a write. |
+| D102 | `Navbar.js` | `searchPackage` called without the sort | Choosing "Most Downloads" then typing one character **silently reverted** results to relevance order while the dropdown still claimed the chosen sort. |
+| D103 | `package.js` | `verifyUserRole` dispatched on every mount; `isVerified`/`isVerifying` read by nothing | One wasted authenticated POST per package page view, on a route the deployment notes call budget-sensitive. |
+| D104 | `admin.js` + 6 dialogs | 17 `Form.Group`s with no `controlId` | **No accessible name** on any of them — announced only as "edit text" — and clicking the label did not focus the field. |
+
+### The lesson, which is narrower than "audit harder"
+
+D104's predecessor is a comment in `resetpassword.js` reading *"This is the only
+form in the app with the omission."* It was not the only one; it was the only one
+whose author had read that file. An inventory produced by reading is an inventory
+of what was read.
+
+So the two fixes here are both **checks**, not just edits:
+
+- `scripts/check_session_reset.mjs` discovers the slice map from the source, so a
+  slice added later is covered without editing it, and asserts both directions —
+  account slices are wiped, `search` and `archives` are *not*.
+- `scripts/check_form_labels.mjs` asserts every `Form.Group` in `src/` carries a
+  `controlId` or an explicit `id`.
+
+Both are wired into `Worker (serverless API)` CI, and both were verified by
+mutation rather than by inspection: reintroducing `dashboard` into the preserve
+list fails 2 of 25 checks, and dropping one `controlId` fails the label check.
+
+That is the generalisable part. A defect found by reading is fixed once. A defect
+found by reading, in a class that recurs, is fixed by a check.
