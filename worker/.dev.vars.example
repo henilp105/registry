@@ -2,7 +2,7 @@
 
 # Target cluster: MongoDB 8.0.34, ap-south-1 (verified).
 MONGO_URI=mongodb+srv://USER:PASSWORD@cluster0.kdreahb.mongodb.net/?appName=Cluster0
-MONGO_DB_NAME=fpmregistry
+MONGO_DB_NAME=fpmregistry_local
 
 # Signing key for HS256 JWTs. Generate with:
 #   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
