@@ -43,6 +43,7 @@ import {
   type UserLike,
 } from "../lib/permissions";
 import { invalidate, ENTITY } from "../lib/cache";
+import { memberOf, notMemberOf, pullBothForms } from "../db/bson";
 import { logger } from "../lib/logger";
 import { deletePackageTarballs } from "../lib/storage";
 import { readBody } from "./namespaces";
@@ -150,7 +151,7 @@ async function profile(request: Request, env: Env, username: string): Promise<Re
       // and the projection dropped everything except name/namespace — the
       // dashboard rendered `key={undefined}`, no descriptions, and never
       // offered the maintainer actions.
-      filter: { $or: [{ author: user._id }, { maintainers: user._id }] },
+      filter: { $or: [{ author: user._id }, { maintainers: memberOf(user._id) }] },
       projection: {
         name: 1,
         namespace: 1,
@@ -504,7 +505,7 @@ async function addPackageMaintainer(
   const result = (await db<{ modifiedCount: number }>(env, {
     kind: "updateOne",
     collection: "packages",
-    filter: { _id: pkg._id, maintainers: { $ne: target._id } },
+    filter: { _id: pkg._id, maintainers: notMemberOf(target._id) },
     update: { $addToSet: { maintainers: target._id } },
   })) as { modifiedCount: number };
 
@@ -568,8 +569,8 @@ async function removePackageMaintainer(
   const result = (await db<{ modifiedCount: number }>(env, {
     kind: "updateOne",
     collection: "packages",
-    filter: { _id: pkg._id, maintainers: target._id },
-    update: { $pull: { maintainers: target._id } },
+    filter: { _id: pkg._id, maintainers: memberOf(target._id) },
+    update: { $pull: { maintainers: pullBothForms(target._id) } },
   })) as { modifiedCount: number };
 
   await db(env, {

@@ -33,10 +33,10 @@ Browse packages through the web interface at [https://registry.fortran-lang.org]
 
 ```bash
 # Search for packages
-curl "https://registry.fortran-lang.org/api/packages?query=json"
+curl "https://registry.fortran-lang.org/packages?query=json"
 
 # Get package details
-curl "https://registry.fortran-lang.org/api/packages/fortran-lang/json-fortran"
+curl "https://registry.fortran-lang.org/packages/fortran-lang/json-fortran"
 ```
 
 #### Adding Dependencies
@@ -65,7 +65,7 @@ fpm test
 
 1. **Sign up** at the registry website or via API:
    ```bash
-   curl -X POST "https://registry.fortran-lang.org/api/auth/signup" \
+   curl -X POST "https://registry.fortran-lang.org/auth/signup" \
      -H "Content-Type: application/json" \
      -d '{
        "username": "your-username",
@@ -78,7 +78,7 @@ fpm test
 
 3. **Login** to get your authentication token:
    ```bash
-   curl -X POST "https://registry.fortran-lang.org/api/auth/login" \
+   curl -X POST "https://registry.fortran-lang.org/auth/login" \
      -H "Content-Type: application/json" \
      -d '{
        "email": "your-email@example.com",
@@ -93,7 +93,7 @@ fpm test
 Namespaces organize packages under a common identifier (like an organization or username):
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/namespaces" \
+curl -X POST "https://registry.fortran-lang.org/namespaces" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -126,7 +126,7 @@ source-dir = "src"
 
 1. **Generate an upload token**:
    ```bash
-   curl -X POST "https://registry.fortran-lang.org/api/namespaces/my-namespace/uploadToken" \
+   curl -X POST "https://registry.fortran-lang.org/namespaces/my-namespace/uploadToken" \
      -H "Authorization: Bearer YOUR_JWT_TOKEN"
    ```
 
@@ -139,7 +139,7 @@ source-dir = "src"
    ```bash
    tar -czvf my-package-0.1.0.tar.gz .
    
-   curl -X POST "https://registry.fortran-lang.org/api/packages" \
+   curl -X POST "https://registry.fortran-lang.org/packages" \
      -H "Authorization: Bearer YOUR_JWT_TOKEN" \
      -F "tarball=@my-package-0.1.0.tar.gz" \
      -F "namespace=my-namespace"

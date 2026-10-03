@@ -119,7 +119,7 @@ version = "2.0.0-rc.1"
 ### Step 1: Create a Namespace
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/namespaces" \
+curl -X POST "https://registry.fortran-lang.org/namespaces" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -131,7 +131,7 @@ curl -X POST "https://registry.fortran-lang.org/api/namespaces" \
 ### Step 2: Generate Upload Token
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/namespaces/my-namespace/uploadToken" \
+curl -X POST "https://registry.fortran-lang.org/namespaces/my-namespace/uploadToken" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -157,7 +157,7 @@ tar -czvf my-package-1.0.0.tar.gz \
   .
 
 # Upload
-curl -X POST "https://registry.fortran-lang.org/api/packages" \
+curl -X POST "https://registry.fortran-lang.org/packages" \
   -H "Authorization: Bearer YOUR_UPLOAD_TOKEN" \
   -F "tarball=@my-package-1.0.0.tar.gz" \
   -F "namespace=my-namespace"
@@ -176,7 +176,7 @@ After upload, packages undergo automatic verification:
 Check verification status:
 
 ```bash
-curl "https://registry.fortran-lang.org/api/packages/my-namespace/my-package"
+curl "https://registry.fortran-lang.org/packages/my-namespace/my-package"
 ```
 
 ```json
@@ -271,13 +271,13 @@ Browse packages at [https://registry.fortran-lang.org](https://registry.fortran-
 
 ```bash
 # Basic search
-curl "https://registry.fortran-lang.org/api/packages?query=json"
+curl "https://registry.fortran-lang.org/packages?query=json"
 
 # With filters
-curl "https://registry.fortran-lang.org/api/packages?query=math&license=MIT&sorted_by=downloads&sort=desc"
+curl "https://registry.fortran-lang.org/packages?query=math&license=MIT&sorted_by=downloads&sort=desc"
 
 # Pagination
-curl "https://registry.fortran-lang.org/api/packages?page=2&limit=20"
+curl "https://registry.fortran-lang.org/packages?page=2&limit=20"
 ```
 
 ### Search Parameters
@@ -301,7 +301,7 @@ curl "https://registry.fortran-lang.org/api/packages?page=2&limit=20"
 Package owners can add other users as maintainers:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/your-username/maintainer" \
+curl -X POST "https://registry.fortran-lang.org/your-username/maintainer" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -314,7 +314,7 @@ curl -X POST "https://registry.fortran-lang.org/api/your-username/maintainer" \
 ### Removing Maintainers
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/your-username/maintainer/remove" \
+curl -X POST "https://registry.fortran-lang.org/your-username/maintainer/remove" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -327,7 +327,7 @@ curl -X POST "https://registry.fortran-lang.org/api/your-username/maintainer/rem
 ### Viewing Maintainers
 
 ```bash
-curl "https://registry.fortran-lang.org/api/packages/my-namespace/my-package/maintainers"
+curl "https://registry.fortran-lang.org/packages/my-namespace/my-package/maintainers"
 ```
 
 ---
@@ -339,7 +339,7 @@ curl "https://registry.fortran-lang.org/api/packages/my-namespace/my-package/mai
 Mark a package as deprecated (still visible but discouraged):
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-package/deprecate" \
+curl -X POST "https://registry.fortran-lang.org/packages/my-namespace/my-package/deprecate" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -353,7 +353,7 @@ curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-pac
 Remove a specific version:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-package/1.0.0/delete" \
+curl -X POST "https://registry.fortran-lang.org/packages/my-namespace/my-package/1.0.0/delete" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -366,7 +366,7 @@ curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-pac
 Remove an entire package (requires admin):
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-package/delete" \
+curl -X POST "https://registry.fortran-lang.org/packages/my-namespace/my-package/delete" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -385,7 +385,7 @@ curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-pac
 Authenticated users can rate packages (1-5 stars):
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/ratings/my-namespace/my-package" \
+curl -X POST "https://registry.fortran-lang.org/ratings/my-namespace/my-package" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -398,7 +398,7 @@ curl -X POST "https://registry.fortran-lang.org/api/ratings/my-namespace/my-pack
 Report problematic packages:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/report/my-namespace/my-package" \
+curl -X POST "https://registry.fortran-lang.org/report/my-namespace/my-package" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

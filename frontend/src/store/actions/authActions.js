@@ -54,14 +54,10 @@ export const login = (userIdentifier, password) => async (dispatch) => {
 };
 
 /**
- * Purge the persisted `auth` slice from localStorage.
- *
- * redux-persist writes `persist:root` under this key. Removing it means a
- * stale access/refresh token cannot be resurrected by a later page load even if
- * the logout round-trip itself failed.
+ * Key redux-persist writes the root state under. On logout the `auth` slice is
+ * removed from it, so a stale access/refresh token cannot be resurrected by a
+ * later page load even if the logout round-trip itself failed.
  */
-export const PURGE_PERSISTED_AUTH = "PURGE_PERSISTED_AUTH";
-
 const persistedAuthStorageKey = "persist:root";
 
 /**
@@ -89,7 +85,6 @@ export const logout = (accessToken) => async (dispatch) => {
     } catch {
       // A blocked or corrupt localStorage must not prevent signing out.
     }
-    dispatch({ type: PURGE_PERSISTED_AUTH });
     dispatch({ type: LOGOUT_SUCCESS });
   };
 

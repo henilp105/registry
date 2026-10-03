@@ -178,7 +178,11 @@ async function serveTarball(
       // Count the fetch only once we know the artifact exists — a 400/404
       // path segment or a missing object is not a "download". The increment
       // rides along on ctx.waitUntil so the response never waits on it.
-      ctx.waitUntil(recordDownload(env, { name: packageName, namespace_name: namespace }));
+          // HEAD must not count: uptime probes answer it without a client
+      // downloading anything, and the result feeds sorted_by=downloads.
+      if (request.method === "GET") {
+        ctx.waitUntil(recordDownload(env, { name: packageName, namespace_name: namespace }));
+      }
 
       return new Response(result.body, { status: 200, headers });
     },

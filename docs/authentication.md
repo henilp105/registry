@@ -67,7 +67,7 @@ sequenceDiagram
 #### Step 1: Sign Up
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/auth/signup" \
+curl -X POST "https://registry.fortran-lang.org/auth/signup" \
   -H "Content-Type: application/json" \
   -d '{
     "username": "fortran_dev",
@@ -95,7 +95,7 @@ curl -X POST "https://registry.fortran-lang.org/api/auth/signup" \
 Click the link in your verification email, or use the API:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/auth/verify-email" \
+curl -X POST "https://registry.fortran-lang.org/auth/verify-email" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "uuid=verification-token-from-email"
 ```
@@ -112,7 +112,7 @@ On success the response also issues a fresh token pair:
 ### Login Flow
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/auth/login" \
+curl -X POST "https://registry.fortran-lang.org/auth/login" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "developer@example.com",
@@ -135,7 +135,7 @@ curl -X POST "https://registry.fortran-lang.org/api/auth/login" \
 Include the token in the `Authorization` header for authenticated requests:
 
 ```bash
-curl "https://registry.fortran-lang.org/api/users/account" \
+curl "https://registry.fortran-lang.org/users/account" \
   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
 
@@ -148,7 +148,7 @@ curl "https://registry.fortran-lang.org/api/users/account" \
 Request a password reset email:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/auth/forgot-password" \
+curl -X POST "https://registry.fortran-lang.org/auth/forgot-password" \
   -H "Content-Type: application/json" \
   -d '{
     "email": "developer@example.com"
@@ -171,7 +171,7 @@ Use the token from the reset email:
 
 ```bash
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/auth/reset-password" \
+curl -X POST "https://registry.fortran-lang.org/auth/reset-password" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "uuid=reset-token-from-email&password=NewSecureP@ssw0rd!"
 ```
@@ -184,7 +184,7 @@ A signed-in user changing their own password instead sends
 Authenticated users can change their email:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/auth/change-email" \
+curl -X POST "https://registry.fortran-lang.org/auth/change-email" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "new_email=new-email@example.com"
@@ -231,7 +231,7 @@ Super Admin (sudo)
 Some operations require sudo/admin verification:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/users/admin" \
+curl -X POST "https://registry.fortran-lang.org/users/admin" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -248,7 +248,7 @@ For automated package uploads (CI/CD), use upload tokens instead of JWT:
 ### Generate Namespace Upload Token
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/namespaces/my-namespace/uploadToken" \
+curl -X POST "https://registry.fortran-lang.org/namespaces/my-namespace/uploadToken" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -263,7 +263,7 @@ curl -X POST "https://registry.fortran-lang.org/api/namespaces/my-namespace/uplo
 ### Generate Package Upload Token
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-package/uploadToken" \
+curl -X POST "https://registry.fortran-lang.org/packages/my-namespace/my-package/uploadToken" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
@@ -275,7 +275,7 @@ fpm publish --token "fpm_upload_ns_abc123xyz..."
 
 Or via API:
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/packages" \
+curl -X POST "https://registry.fortran-lang.org/packages" \
   -H "Authorization: Bearer fpm_upload_ns_abc123xyz..." \
   -F "tarball=@my-package-1.0.0.tar.gz" \
   -F "namespace=my-namespace"
@@ -388,7 +388,7 @@ if not is_token_valid(token):
 Explicitly invalidate a session:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/auth/logout" \
+curl -X POST "https://registry.fortran-lang.org/auth/logout" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -397,7 +397,7 @@ curl -X POST "https://registry.fortran-lang.org/api/auth/logout" \
 Delete your account and all associated data:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/users/delete" \
+curl -X POST "https://registry.fortran-lang.org/users/delete" \
   -H "Authorization: Bearer SITE_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{

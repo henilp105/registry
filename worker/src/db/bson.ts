@@ -79,6 +79,51 @@ export function isIdLike(value: unknown): boolean {
  */
 const OPERAND_KEYS = new Set(["$search", "$regex", "$options", "$comment"]);
 
+/**
+ * Escape hatch for fragments that must reach MongoDB exactly as written.
+ *
+ * The rewrite converts every 24-hex string into an ObjectId, which is right
+ * for id fields but wrong for operands that quote both *forms* of a legacy
+ * field at once (a legacy package's `maintainers` array holds hex strings
+ * while every new document holds ObjectIds). Wrapping the fragment in
+ * `rawBson` passes it through toBsonQueries untouched.
+ */
+const RAW = Symbol.for("fpm.bson.raw");
+
+export function rawBson<T>(value: T): T {
+  return { [RAW]: value } as unknown as T;
+}
+
+/** Both stored forms of a user id: ObjectId (worker-written) and the legacy hex string. */
+function idPair(id: unknown): { oid: ObjectId; hex: string } | null {
+  const hex =
+    typeof id === "string"
+      ? id
+      : typeof (id as { toHexString?: unknown })?.toHexString === "function"
+        ? (id as { toHexString(): string }).toHexString()
+        : null;
+  if (!hex || !HEX24.test(hex)) return null;
+  return { oid: new ObjectId(hex), hex };
+}
+
+/** Array-contains either form of the id (member of legacy or modern docs). */
+export function memberOf(id: unknown): unknown {
+  const pair = idPair(id);
+  return pair ? rawBson({ $in: [pair.oid, pair.hex] }) : id;
+}
+
+/** Array does NOT contain either form of the id. */
+export function notMemberOf(id: unknown): unknown {
+  const pair = idPair(id);
+  return pair ? rawBson({ $nin: [pair.oid, pair.hex] }) : id;
+}
+
+/** `$pull` condition matching either form of the id, for update documents. */
+export function pullBothForms(id: unknown): unknown {
+  const pair = idPair(id);
+  return pair ? rawBson({ $in: [pair.oid, pair.hex] }) : id;
+}
+
 export function toBsonQueries<T = unknown>(value: unknown): T {
   if (Array.isArray(value)) return value.map(toBsonQueries) as T;
 
@@ -92,6 +137,11 @@ export function toBsonQueries<T = unknown>(value: unknown): T {
 
   // Already the right type; leave alone so a Date does not become a plain object.
   if (value instanceof Date || value instanceof ObjectId) return value as T;
+
+  // Explicit raw fragment: never rewritten.
+  if (RAW in (value as Record<PropertyKey, unknown>)) {
+    return (value as Record<PropertyKey, unknown>)[RAW] as T;
+  }
 
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {

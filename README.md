@@ -78,8 +78,8 @@ docker compose up -d
 
 **Access Points:**
 - 🌐 **Frontend**: http://localhost
-- 🔌 **API**: http://localhost/api/
-- 📖 **API Docs**: http://localhost/api/apidocs/
+- 🔌 **API**: http://localhost/
+- 📖 **API Docs**: http://localhost/apidocs/
 
 ```bash
 # View logs

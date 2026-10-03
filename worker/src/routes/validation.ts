@@ -96,8 +96,10 @@ export async function handleValidationRoutes(
  * List versions awaiting verification.
  *
  * `unable_to_verify` is the marker. It is set at upload and cleared on a
- * successful validation, so a package that fails stays in the queue for a human
- * rather than looping forever.
+ * successful validation. A FAILED verdict also stamps `validation_error`, and
+ * the queue below excludes any version carrying one — otherwise a failed
+ * package would be re-queued forever and the runner would re-POST the same
+ * failure in a loop (defect: validation retries with no new input).
  */
 async function pendingWork(env: Env, url: URL): Promise<Response> {
   const requested = Number(url.searchParams.get("limit") ?? "10");
@@ -121,7 +123,12 @@ async function pendingWork(env: Env, url: URL): Promise<Response> {
             $filter: {
               input: { $ifNull: ["$versions", []] },
               as: "v",
-              cond: { $ne: ["$$v.unable_to_verify", false] },
+              cond: {
+                $and: [
+                  { $ne: ["$$v.unable_to_verify", false] },
+                  { $eq: [{ $ifNull: ["$$v.validation_error", null] }, null] },
+                ],
+              },
             },
           },
         },
@@ -134,6 +141,9 @@ async function pendingWork(env: Env, url: URL): Promise<Response> {
     const namespaceName = String(doc.namespace_name ?? "");
     for (const version of (doc.versions ?? []) as Record<string, unknown>[]) {
       if (version.unable_to_verify === false) continue;
+      // A version that already failed validation stays visible but must not be
+      // re-offered: nothing about the artifact changed since the verdict.
+      if (version.validation_error != null) continue;
       const versionName = String(version.version ?? "");
       jobs.push({
         namespace: namespaceName,

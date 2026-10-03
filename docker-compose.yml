@@ -60,7 +60,7 @@ services:
       dockerfile: Dockerfile
       args:
         # Inlined into the bundle at build time by CRA's DefinePlugin.
-        REACT_APP_REGISTRY_API_URL: ${REACT_APP_REGISTRY_API_URL:-https://registry.fortran-lang.org}
+        REACT_APP_REGISTRY_API_URL: ${REACT_APP_REGISTRY_API_URL:-}
     expose:
       - "80"
     depends_on:

@@ -5,8 +5,8 @@ Complete REST API documentation for the FPM Registry. All endpoints use JSON for
 ## Base URL
 
 ```
-Production: https://registry.fortran-lang.org/api
-Development: http://localhost/api
+Production: https://registry.fortran-lang.org
+Development: http://localhost
 ```
 
 ## Response Format
@@ -712,12 +712,13 @@ together would let one user deny service to everyone else behind the same IP.
 
 ### What is not counted
 
-Requests served from the edge cache do not reach the limiter, because they do not
-reach the database either. That is the intended outcome rather than a gap:
-flooding cached reads is the cheap way to load this registry — Cloudflare serves
-them and the Atlas operations/second cap is untouched. What the limiter exists to
-prevent is pressure on the database, and every request that touches MongoDB is
-accounted for.
+Requests served from the edge cache are still counted: the limiter sits
+**before** the router and the Cache API, so every non-exempt request spends
+budget regardless of whether it later hits MongoDB. That is deliberate — the
+limiter protects Worker CPU and downstream Atlas pressure from floods of
+cacheable reads just the same, and Cloudflare's cache is the escape valve, not
+the throttle. Only exempt paths (`/health`, `/`, `/apidocs`, `/apidocs/openapi.json`)
+are free, and there is no separate "cached reads are free" budget.
 
 `/health`, `/`, `/apidocs` and `/apidocs/openapi.json` are never limited, so a
 monitoring check cannot be starved by client traffic.
@@ -740,5 +741,5 @@ now implemented and verified by `scripts/rate_limit_probe.cjs`.
 ## Interactive Documentation
 
 For interactive API exploration, visit the Swagger UI at:
-- **Production:** https://registry.fortran-lang.org/apidocs
-- **Development:** http://localhost/api/apidocs
+- **Production:** https://registry.fortran-lang.orgdocs
+- **Development:** http://localhost/apidocs

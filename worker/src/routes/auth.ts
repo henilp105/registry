@@ -419,8 +419,12 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
   const policy = validatePassword(password);
   if (!policy.ok) return jsonError(400, policy.message);
 
-  // ── Shape A: logged-in user changing their own password ────────────────────
-  if (oldPassword !== undefined || bearer) {
+  // A forgot-password client that also carries a session (a logged-in SPA
+  // visiting the emailed reset link) must not be trapped in Shape A: with no
+  // oldpassword it is proving mailbox control, not session control, so it
+  // belongs in Shape B. Only an explicit oldpassword routes to Shape A.
+  const preferEmailedToken = oldPassword === undefined && rawToken !== undefined && rawToken !== "";
+  if (!preferEmailedToken && (oldPassword !== undefined || bearer)) {
     // Defect D85: `bearer` was fed to `findUserByUuid` verbatim. It is a JWT,
     // not a uuid, so the documented signed-in "change password" shape could
     // never match a user and always 404'd.

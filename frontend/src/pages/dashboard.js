@@ -34,6 +34,9 @@ const Dashboard = () => {
   const isLoading = useSelector((state) => state.dashboard.isLoading || state.auth.isLoading);
   const error = useSelector((state) => state.dashboard.error);
 
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+
   // The four maintainer/admin dialogs report their success via their slice's
   // successMessage. When one appears, the packages/namespaces just mutated,
   // so refetch what the dashboard shows (D84): the user never saw the new
@@ -47,8 +50,6 @@ const Dashboard = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maintainerSuccess, nsMaintainerSuccess, nsAdminSuccess]);
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (username === null) {

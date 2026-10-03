@@ -41,7 +41,7 @@ fortran-lang/                  # Namespace
 ### Create via API
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/namespaces" \
+curl -X POST "https://registry.fortran-lang.org/namespaces" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -126,7 +126,7 @@ Some namespaces are reserved:
 Only existing admins can add new admins:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/your-username/admin" \
+curl -X POST "https://registry.fortran-lang.org/your-username/admin" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -146,7 +146,7 @@ curl -X POST "https://registry.fortran-lang.org/api/your-username/admin" \
 ### Removing an Admin
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/your-username/admin/remove" \
+curl -X POST "https://registry.fortran-lang.org/your-username/admin/remove" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -158,7 +158,7 @@ curl -X POST "https://registry.fortran-lang.org/api/your-username/admin/remove" 
 ### Viewing Admins
 
 ```bash
-curl "https://registry.fortran-lang.org/api/namespaces/my-namespace/admins" \
+curl "https://registry.fortran-lang.org/namespaces/my-namespace/admins" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -179,7 +179,7 @@ curl "https://registry.fortran-lang.org/api/namespaces/my-namespace/admins" \
 Admins can add maintainers to the namespace:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/your-username/namespace/maintainer" \
+curl -X POST "https://registry.fortran-lang.org/your-username/namespace/maintainer" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -191,7 +191,7 @@ curl -X POST "https://registry.fortran-lang.org/api/your-username/namespace/main
 ### Removing a Maintainer
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/your-username/namespace/maintainer/remove" \
+curl -X POST "https://registry.fortran-lang.org/your-username/namespace/maintainer/remove" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -203,7 +203,7 @@ curl -X POST "https://registry.fortran-lang.org/api/your-username/namespace/main
 ### Viewing Maintainers
 
 ```bash
-curl "https://registry.fortran-lang.org/api/namespaces/my-namespace/maintainers" \
+curl "https://registry.fortran-lang.org/namespaces/my-namespace/maintainers" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -226,7 +226,7 @@ Upload tokens enable publishing packages without exposing account credentials.
 Only namespace admins can generate tokens:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/namespaces/my-namespace/uploadToken" \
+curl -X POST "https://registry.fortran-lang.org/namespaces/my-namespace/uploadToken" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -254,7 +254,7 @@ curl -X POST "https://registry.fortran-lang.org/api/namespaces/my-namespace/uplo
 fpm publish --token YOUR_UPLOAD_TOKEN
 
 # With curl
-curl -X POST "https://registry.fortran-lang.org/api/packages" \
+curl -X POST "https://registry.fortran-lang.org/packages" \
   -H "Authorization: Bearer YOUR_UPLOAD_TOKEN" \
   -F "tarball=@package.tar.gz"
 ```
@@ -264,7 +264,7 @@ curl -X POST "https://registry.fortran-lang.org/api/packages" \
 Generate tokens for individual packages:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-package/uploadToken" \
+curl -X POST "https://registry.fortran-lang.org/packages/my-namespace/my-package/uploadToken" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -275,7 +275,7 @@ curl -X POST "https://registry.fortran-lang.org/api/packages/my-namespace/my-pac
 ### Viewing Namespace Details
 
 ```bash
-curl "https://registry.fortran-lang.org/api/namespaces/my-namespace"
+curl "https://registry.fortran-lang.org/namespaces/my-namespace"
 ```
 
 **Response:**
@@ -292,7 +292,7 @@ curl "https://registry.fortran-lang.org/api/namespaces/my-namespace"
 ### Listing Namespace Packages
 
 ```bash
-curl "https://registry.fortran-lang.org/api/namespaces/my-namespace/packages"
+curl "https://registry.fortran-lang.org/namespaces/my-namespace/packages"
 ```
 
 **Response:**
@@ -334,7 +334,7 @@ curl "https://registry.fortran-lang.org/api/namespaces/my-namespace/packages"
 Only namespace admins can delete namespaces:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/api/namespaces/my-namespace/delete" \
+curl -X POST "https://registry.fortran-lang.org/namespaces/my-namespace/delete" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -369,12 +369,12 @@ acme-corp/                           # Organization namespace
 
 ```bash
 # 1. Add as namespace maintainer (admin action)
-curl -X POST "https://registry.fortran-lang.org/api/cto/namespace/maintainer" \
+curl -X POST "https://registry.fortran-lang.org/cto/namespace/maintainer" \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -d '{"namespace": "acme-corp", "new_maintainer": "new-hire"}'
 
 # 2. Add to specific packages (maintainer action)
-curl -X POST "https://registry.fortran-lang.org/api/lead-dev/maintainer" \
+curl -X POST "https://registry.fortran-lang.org/lead-dev/maintainer" \
   -H "Authorization: Bearer MAINTAINER_TOKEN" \
   -d '{"namespace": "acme-corp", "package": "acme-core", "new_maintainer": "new-hire"}'
 ```
@@ -383,17 +383,17 @@ curl -X POST "https://registry.fortran-lang.org/api/lead-dev/maintainer" \
 
 ```bash
 # 1. Remove from all packages
-curl -X POST "https://registry.fortran-lang.org/api/lead-dev/maintainer/remove" \
+curl -X POST "https://registry.fortran-lang.org/lead-dev/maintainer/remove" \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -d '{"namespace": "acme-corp", "package": "acme-core", "maintainer": "former-employee"}'
 
 # 2. Remove from namespace
-curl -X POST "https://registry.fortran-lang.org/api/cto/namespace/maintainer/remove" \
+curl -X POST "https://registry.fortran-lang.org/cto/namespace/maintainer/remove" \
   -H "Authorization: Bearer ADMIN_TOKEN" \
   -d '{"namespace": "acme-corp", "maintainer": "former-employee"}'
 
 # 3. Regenerate upload tokens (security measure)
-curl -X POST "https://registry.fortran-lang.org/api/namespaces/acme-corp/uploadToken" \
+curl -X POST "https://registry.fortran-lang.org/namespaces/acme-corp/uploadToken" \
   -H "Authorization: Bearer ADMIN_TOKEN"
 ```
 
