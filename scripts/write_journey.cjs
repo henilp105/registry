@@ -23,11 +23,15 @@
  * reflected back into the UI.
  */
 
-const { signIn } = require("./_signed_in.cjs");
 const { MongoClient } = require("mongodb");
 const { mongoUri, mongoDbName } = require("./_env.cjs");
 
 const APP = process.argv[2] ?? "http://127.0.0.1:5173";
+// See member_journey.cjs: _signed_in.cjs reads APP_BASE at module load,
+// so it must agree with this file's origin before it is required, or the
+// session token is written and read under different origins.
+process.env.APP_BASE = APP;
+const { signIn } = require("./_signed_in.cjs");
 const API = process.argv[3] ?? "http://127.0.0.1:8787";
 const URI = mongoUri("write_journey.cjs");
 

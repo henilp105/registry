@@ -29,11 +29,19 @@
  * never reach.
  */
 
-const { signIn } = require("./_signed_in.cjs");
 const { mongoUri, mongoDbName } = require("./_env.cjs");
 
 const APP = process.argv[2] ?? "http://127.0.0.1:5173";
 const API = process.argv[3] ?? "http://127.0.0.1:8787";
+
+// _signed_in.cjs reads APP_BASE at module load. If we leave it unset while the
+// caller passes a different origin (e.g. localhost vs 127.0.0.1), the session
+// token is written and read under *different origins* -- login appears to
+// succeed, the page redirects to login, and the first authed field locator
+// times out 30 s later with a misleading error. Defect D120 was the same
+// class: an env var and an argv that silently disagreed.
+process.env.APP_BASE = APP;
+const { signIn } = require("./_signed_in.cjs");
 const { MongoClient } = require("mongodb");
 
 const URI = mongoUri("member_journey.cjs");
