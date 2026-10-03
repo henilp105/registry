@@ -226,7 +226,16 @@ export async function serveCached(
 ): Promise<Response> {
   if (ttl > 0) {
     const hit = await cacheGet(url, version);
-    if (hit) return hit;
+    if (hit) {
+      // A cache HIT must also honour a conditional request — previously only
+      // the MISS path produced a 304, so every revalidation got a full body.
+      const hitEtag = hit.headers.get("etag");
+      const inm = request.headers.get("if-none-match");
+      if (hitEtag && inm && inm.split(",").some((t) => t.trim() === hitEtag)) {
+        return new Response(null, { status: 304, headers: new Headers(hit.headers) });
+      }
+      return hit;
+    }
   }
 
   const fresh = await loader();
@@ -262,8 +271,16 @@ export async function serveCached(
     }
   }
 
-  // Defect D80: never re-buffer a large artifact into the Cache API.
-  if (ttl > 0 && !tooLargeForEtag) await cachePut(url, fresh, ttl, version);
+  // Defect D80: never re-buffer a large artifact into the Cache API. Store the
+  // response that already carries the etag, so a cache HIT can serve its own
+  // revalidation — previously the cached entry was stored *without* it.
+  if (ttl > 0 && !tooLargeForEtag) {
+    const stored = new Response(fresh.clone().body, {
+      status: fresh.status,
+      headers,
+    });
+    await cachePut(url, stored, ttl, version);
+  }
 
   return new Response(fresh.body, { status: fresh.status, headers });
 }

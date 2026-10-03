@@ -1,3 +1,8 @@
+> **Legacy document.** It describes the pre-v3 Flask backend. The current
+> runtime is the Cloudflare Worker under `worker/` — see `README.md`,
+> `docs/API_CONTRACT.md`, and `docs/SERVERLESS_MIGRATION_PLAN.md` for the live
+> architecture, auth (Bearer JWT) and routes.
+
 # Backend Overview
 
 ## Server

@@ -76,7 +76,10 @@ Detailed health check including database connectivity.
 }
 ```
 
-### GET /latency
+### GET /latency (legacy Flask only — not routed by the Worker)
+
+> This endpoint does not exist on the serverless runtime; it belonged to the
+> retired Flask deployment. The Worker answers 404 for it.
 
 Performance testing endpoint. Measures response times across all API endpoints.
 
@@ -406,9 +409,12 @@ Generate an upload token for this package.
 }
 ```
 
-### GET /tarballs/:oid
+### GET /tarballs/{namespace}/{package}/{version}
 
-Download a package tarball by its object ID.
+Download a package tarball. `GET /download/{namespace}/{package}/{version}` is
+the legacy spelling and serves the same object. The ObjectId-based
+`GET /tarballs/:oid` shape was dropped on the serverless runtime; clients
+holding a cached legacy URL must re-fetch package metadata.
 
 **Response:** Binary tarball file (application/gzip)
 

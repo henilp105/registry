@@ -2052,3 +2052,25 @@ immediately after a password change, which would instantly appear as a
 logout. Second-resolution JWTs cannot disambiguate; the current strict
 `<` keeps the safer user-visible behaviour while still killing every token
 from an earlier second.
+
+## D133 — cache revalidation and rate-limit keying fixes
+
+- **D133a** `serveCached` stored the cache entry *before* the ETag was set,
+  and returned cache HITs without ever consulting `if-none-match`. Result: the
+  advertised 304 path only ever fired on a MISS, and cached bodies replayed
+  with no revalidation metadata. Cache HITs now honour conditional GETs, and
+  the cached entry carries the ETag.
+- **D133b** the rate-limit client key stripped `/:\d+$/` as a "port", which
+  also ate the trailing group of IPv6 literals (`2001:db8::5` ->
+  `2001:db8:`), merging distinct anonymous clients into one bucket. Port
+  stripping is now IPv4-only; `x-real-ip` is consulted when
+  `cf-connecting-ip` is absent (nginx-style deployments), and comma-separated
+  forwarding lists collapse to their first entry.
+
+## D134 — stale documentation brought to the Worker reality
+
+- `docs/api-reference.md` documented `GET /tarballs/:oid` (dropped shape;
+  real shape is `GET /tarballs/{namespace}/{package}/{version}`) and
+  `GET /latency` (legacy Flask only; the Worker does not route it).
+- `docs/API.md` described the Flask server as current. It now carries a
+  banner pointing at the Worker docs.

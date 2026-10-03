@@ -152,10 +152,21 @@ export function headersFor(decision: Decision): Record<string, string> {
 export function clientKey(request: Request, identity: string | null, cfConnectingIp: string | undefined): string {
   if (identity) return `u:${identity}`;
 
-  const ip = cfConnectingIp ?? request.headers.get("cf-connecting-ip") ?? "unknown";
-  // Strip a port if one somehow arrived, and cap the length so a hostile header
-  // cannot bloat the counter store's keys.
-  return `a:${ip.replace(/:\d+$/, "").slice(0, 45)}`;
+  const ipHeader =
+    cfConnectingIp ??
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-real-ip") ??
+    "unknown";
+  // Client-sent lists may carry "client, proxy1, proxy2" — only the first hop
+  // identifies the anonymous caller for bucketing.
+  const first = ipHeader.split(",")[0]?.trim() ?? ipHeader;
+  // Strip a port only from IPv4-with-port: the old /:\d+$/ replace also ate the
+  // trailing group of IPv6 literals ("2001:db8::5" -> "2001:db8:"), collapsing
+  // distinct clients into one rate-limit bucket.
+  const ipv4WithPort = first.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+  const ip = ipv4WithPort ? (ipv4WithPort[1] as string) : first;
+  // Cap the length so a hostile header cannot bloat the counter store's keys.
+  return `a:${ip.slice(0, 45)}`;
 }
 
 /**
