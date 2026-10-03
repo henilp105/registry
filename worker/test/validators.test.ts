@@ -102,6 +102,10 @@ describe("validateVersion", () => {
   it.each(["1.0", "v1.0.0", "1", "somerandomstring", "1.0.0.0"])("rejects %s", (v) => {
     expect(validateVersion(v).ok).toBe(false);
   });
+
+  it("rejects versions ending in .tar.gz (would collide with the R2 key suffix)", () => {
+    expect(validateVersion("1.0.0-rc.tar.gz").ok).toBe(false);
+  });
 });
 
 describe("validateLicense", () => {
