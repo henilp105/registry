@@ -39,12 +39,17 @@
 
 const { chromium } = require("playwright");
 const { MongoClient } = require("mongodb");
-const { mongoUri } = require("./_env.cjs");
+const { mongoUri, mongoDbName } = require("./_env.cjs");
 
 const APP = process.argv[2] ?? "http://127.0.0.1:5173";
 const API = process.argv[3] ?? "http://127.0.0.1:8787";
 const URI = mongoUri("auth_journey.cjs");
-const DB = "fpmregistry_local";
+// Defect D120: hardcoded "fpmregistry_local" rather than `mongoDbName()`, the
+// helper that resolves MONGO_DB_NAME -- the variable the Worker itself reads and
+// the one .github/workflows/tests.yml sets. With it set to anything else, every
+// "was it really written to the database" assertion below read a database the API
+// under test was not writing to.
+const DB = mongoDbName();
 
 let passed = 0;
 const failures = [];
@@ -166,7 +171,14 @@ const readToken = (page) =>
     /required/i.test(t),
     (t.match(/[A-Z][^.]*required[^.]*\./g) ?? []).slice(0, 2).join(" "),
   );
-  check("no request was sent for an invalid form", (await readToken(page)) === null);
+  // Defect D117: this asserted on a *token*, not on the requests the harness had
+  // been recording since line 152. On the register page before login the token
+  // is always null, so the check was true by construction: deleting the
+  // register form's client-side validation entirely would still have reported
+  // PASS while the request went out. `calls` is the thing that actually shows
+  // whether a request was made.
+  check("no API request was sent for an invalid form", calls.length === 0,
+    `${calls.length} request(s): ${calls.slice(0, 2).join(" | ")}`);
 
   // Mismatched confirmation is a distinct check from an empty one.
   await fill("username", USER);
@@ -272,11 +284,35 @@ const readToken = (page) =>
   // exists for. Without this, a persisted-but-unmirrored token would pass the two
   // checks above and still fail every authenticated request.
   const authed = [];
-  const onReq = (r) => { if (r.url().includes(":8787")) authed.push(r.url().replace(API, "")); };
+  let authedWithHeader = 0;
+  const onReq = (r) => {
+    if (!r.url().includes(":8787")) return;
+    authed.push(r.url().replace(API, ""));
+    // `Authorization` may arrive as a header object or a plain value depending on
+    // the Playwright version, so both spellings are accepted.
+    const headers = r.headers();
+    const raw = headers.authorization ?? headers.Authorization ?? "";
+    if (raw.toLowerCase().startsWith("bearer ") && raw.length > "bearer ".length) {
+      authedWithHeader += 1;
+    }
+  };
   page.on("request", onReq);
   await page.goto(`${APP}/manage/account`, { waitUntil: "networkidle" }).catch(() => {});
   await page.waitForTimeout(900);
   page.off("request", onReq);
+
+  // Defect D117: `authed` was collected here and never read again, so the
+  // comment above it described "the decisive check" while nothing checked it.
+  // This is the D65 class the harness exists for: a token persisted into
+  // localStorage that never reaches the Authorization header. The two checks
+  // above it pass in exactly that case, so without this the regression would
+  // pass every check in this file.
+  check("the rehydrated token is actually sent on authenticated requests",
+    authed.length > 0,
+    `no API request was made while /manage/account was open`);
+  check("those requests carried an Authorization header",
+    authed.length > 0 && authedWithHeader > 0,
+    `${authedWithHeader} of ${authed.length} API requests carried a header`);
 
   // ── 7. the authenticated views, never rendered before ──────────────────────
   console.log("\n[authenticated views — never rendered until now]");

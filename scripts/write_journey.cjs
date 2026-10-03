@@ -25,7 +25,7 @@
 
 const { signIn } = require("./_signed_in.cjs");
 const { MongoClient } = require("mongodb");
-const { mongoUri } = require("./_env.cjs");
+const { mongoUri, mongoDbName } = require("./_env.cjs");
 
 const APP = process.argv[2] ?? "http://127.0.0.1:5173";
 const API = process.argv[3] ?? "http://127.0.0.1:8787";
@@ -60,7 +60,14 @@ async function until(fn, { tries = 40, gap = 300 } = {}) {
   const text = () => readText(page);
   const client = new MongoClient(URI);
   await client.connect();
-  const db = client.db("fpmregistry_local");
+    // Defect D120: hardcoded "fpmregistry_local" instead of `mongoDbName()`.
+  // `MONGO_DB_NAME` is the variable the Worker itself reads and the one
+  // .github/workflows/tests.yml sets, so with it set to anything else this
+  // harness read a database the API under test was not writing to -- or
+  // failed with "registration did not create ..." while the run was fine.
+  // Four harnesses now resolve the name the same way member_journey.cjs
+  // already did.
+const db = client.db(mongoDbName());
 
   const pageErrors = [];
   page.on("pageerror", (e) => pageErrors.push(String(e).split("\n")[0]));

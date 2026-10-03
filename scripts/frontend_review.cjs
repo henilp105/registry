@@ -40,6 +40,22 @@ const note = (severity, area, message) => {
   console.log(`  ${severity.padEnd(7)} ${area.padEnd(22)} ${message}`);
 };
 
+/**
+ * A check that can fail the run.
+ *
+ * Defect D115: several sections of this file printed PASS/FAIL to stdout and
+ * never recorded the result, so the summary at the end could not be derived from
+ * them and the process exited 0 regardless. `check` records a BUG on failure, so
+ * a failing assertion is visible in `findings.json` and in the exit code rather
+ * than only in a scrollback nobody reads.
+ */
+const checks = [];
+const check = (name, pass, detail) => {
+  checks.push({ name, pass, detail: detail || "" });
+  console.log(`  ${pass ? "PASS   " : "FAIL   "}${name}${detail ? " — " + detail : ""}`);
+  if (!pass) note("BUG", "check", `${name}${detail ? ` — ${detail}` : ""}`);
+};
+
 /** Routes, including the five the earlier audit never opened. */
 const ROUTES = [
   ["/", "home"],
@@ -303,28 +319,59 @@ const PROBE = () => {
   {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const page = await ctx.newPage();
-    const msgs = [];
     const collected = [];
     // The three not-found routes legitimately produce an API 404, which the
     // browser logs as a console error. That is the route working, so it is
     // excluded -- otherwise a real console error has to compete with three
     // expected ones on every run.
-    const EXPECTED_404 = new Set([
-      "/packages/stdlib/nope", "/users/nobody", "/namespaces/no-such-namespace",
-    ]);
+    //
+    // Defect D115: two of these three strings did not match any route in ROUTES.
+    // The list said "/packages/stdlib/nope" and "/users/nobody"; ROUTES says
+    // "/packages/stdlib/does-not-exist" and "/users/no-such-user". So two of the
+    // three intended exclusions were not in force and their 404s were counted as
+    // console errors -- which would have made the check permanently noisy, and
+    // therefore easy to disable.
+    //
+    // Built from ROUTES by matching the route *label*, so a route cannot be
+    // renamed out of the exclusion list without this noticing.
+    const EXPECTED_404 = new Set(
+      ROUTES.filter(([, label]) => label.endsWith("-404")).map(([route]) => route),
+    );
+    check(
+      "the expected-404 exclusions match real routes",
+      EXPECTED_404.size === 3,
+      `${EXPECTED_404.size} of 3 matched; every one must be a route that exists, or the filter silently stops filtering`,
+    );
+
+    // Defect D115: there was no `page.on("console", ...)` handler. `msgs` was
+    // declared, never written, reset to length 0 on every iteration, and then
+    // spread into `collected` -- so `unique.length === 0` was a constant and
+    // "console clean across all 21 routes" printed unconditionally. The listener
+    // is what makes the array mean anything.
+    let currentRoute = null;
+    page.on("console", (msg) => {
+      // `error` only. `warning` and `info` are noise for this purpose; a
+      // deprecation notice is not the defect class this section is looking for.
+      if (msg.type() === "error") collected.push({ route: currentRoute, text: msg.text() });
+    });
+
+    let visited = 0;
     for (const [route] of ROUTES) {
-      msgs.length = 0;
+      if (EXPECTED_404.has(route)) continue;
+      currentRoute = route;
+      visited += 1;
       await page.goto(APP + route, { waitUntil: "networkidle", timeout: 20000 }).catch(() => {});
       await page.waitForTimeout(250);
-      if (EXPECTED_404.has(route)) continue;
-      collected.push(...msgs);
     }
-    const unique = [...new Set(collected)];
-    if (unique.length === 0) console.log("  PASS    console                clean across all 21 routes");
-    else {
-      for (const m of unique.slice(0, 8)) note("WARN", "console", m);
-      if (unique.length > 8) note("WARN", "console", `...and ${unique.length - 8} more`);
-    }
+
+    const unique = [...new Map(collected.map((m) => [`${m.route}::${m.text}`, m])).values()];
+    check(
+      `no console errors across ${visited} routes`,
+      unique.length === 0,
+      unique.slice(0, 3).map((m) => `${m.route}: ${m.text}`).join(" | "),
+    );
+    for (const m of unique.slice(0, 8)) note("WARN", "console", `${m.route}: ${m.text}`);
+    if (unique.length > 8) note("WARN", "console", `...and ${unique.length - 8} more`);
     await ctx.close();
   }
 
@@ -335,6 +382,22 @@ const PROBE = () => {
   console.log(`BUG ${bySeverity("BUG")}   WARN ${bySeverity("WARN")}   ERROR ${bySeverity("ERROR")}   A11Y ${bySeverity("A11Y")}`);
   console.log(`uncaught exceptions: ${consoleErrors.length}`);
   console.log(`5xx responses: ${failedRequests.length}`);
-  fs.writeFileSync(`${OUT}/findings.json`, JSON.stringify({ findings, consoleErrors, failedRequests }, null, 2));
+
+  // Defect D115: the file ended here with no `process.exit`, so it exited 0
+  // unconditionally -- the console-hygiene check above could not fail the run,
+  // let alone the process. It is now a real gate.
+  const failedChecks = checks.filter((c) => !c.pass);
+  console.log(`checks: ${checks.length - failedChecks.length}/${checks.length} passed`);
+
+  fs.writeFileSync(
+    `${OUT}/findings.json`,
+    JSON.stringify({ findings, consoleErrors, failedRequests, checks }, null, 2),
+  );
   console.log(`\nreport: ${OUT}/findings.json`);
+
+  // Non-zero on a failed check, on an uncaught page exception, or on any 5xx.
+  // All three are defects; none of them should be able to exit 0.
+  process.exit(
+    failedChecks.length === 0 && consoleErrors.length === 0 && failedRequests.length === 0 ? 0 : 1,
+  );
 })();

@@ -391,9 +391,17 @@ async function until(fn, { tries = 40, gap = 300 } = {}) {
   console.log("\n[hygiene]");
   check("no uncaught exceptions", pageErrors.length === 0,
     pageErrors.slice(0, 2).join(" | ").slice(0, 140));
+  // Defect D117: this computed exactly the 5xx and unexpected-404 calls the
+  // journey should never make, and then only `console.log`'d them. The one
+  // assertion that would catch a 500 anywhere in the membership flow was
+  // collected and thrown away, so the harness exited 0 having checked nothing
+  // about API health. It is now a check.
   const unexpected = calls.filter(
     (c) => /^5\d\d/.test(c) || c.includes("namespace/admin") === false && /^404/.test(c) && !c.includes("users/"),
   );
+  check("no 5xx and no unexpected 404 from any membership call",
+    unexpected.length === 0,
+    unexpected.slice(0, 3).join(" | "));
   if (unexpected.length) console.log(`         calls: ${JSON.stringify(calls.slice(0, 12))}`);
 
   await nsCol.deleteMany({ namespace: NS });

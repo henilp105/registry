@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const { MongoClient } = require("mongodb");
-const { mongoUri } = require("./_env.cjs");
+const { mongoUri, mongoDbName } = require("./_env.cjs");
 /**
  * Does the rate limiter actually refuse anything?
  *
@@ -12,7 +12,12 @@ const { mongoUri } = require("./_env.cjs");
  * 429 handler existed that nothing raised.
  */
 
-const API = "http://127.0.0.1:8787";
+// Defect D119: the header documents `node scripts/rate_limit_probe.cjs
+// [API_BASE]`, but `process.argv[2]` was never read -- `API` was a constant. An
+// operator pointed it at a deployed registry, believed they were probing the
+// target, and had actually been probing their own laptop. Now honoured, with a
+// line printed so the log says which host was measured.
+const API = process.argv[2] ?? "http://127.0.0.1:8787";
 const URI = mongoUri("rate_limit_probe.cjs");
 
 let passed = 0;
@@ -41,7 +46,14 @@ async function hit(path, { method = "GET", f, bearer, ip } = {}) {
 (async () => {
   const c = new MongoClient(URI);
   await c.connect();
-  const db = c.db("fpmregistry_local");
+    // Defect D120: hardcoded "fpmregistry_local" instead of `mongoDbName()`.
+  // `MONGO_DB_NAME` is the variable the Worker itself reads and the one
+  // .github/workflows/tests.yml sets, so with it set to anything else this
+  // harness read a database the API under test was not writing to -- or
+  // failed with "registration did not create ..." while the run was fine.
+  // Four harnesses now resolve the name the same way member_journey.cjs
+  // already did.
+const db = c.db(mongoDbName());
 
   const stamp = Date.now().toString(36);
   console.log(`\nrate-limit enforcement against ${API}\n`);

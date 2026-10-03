@@ -22,7 +22,7 @@
 
 const { signIn } = require("./_signed_in.cjs");
 const { MongoClient } = require("mongodb");
-const { mongoUri } = require("./_env.cjs");
+const { mongoUri, mongoDbName } = require("./_env.cjs");
 
 const APP = process.argv[2] ?? "http://127.0.0.1:5173";
 const API = process.argv[3] ?? "http://127.0.0.1:8787";
@@ -123,7 +123,14 @@ const tokenInDom = (page) =>
   const { page, USER, cleanup } = await signIn();
   const client = new MongoClient(URI);
   await client.connect();
-  const db = client.db("fpmregistry_local");
+    // Defect D120: hardcoded "fpmregistry_local" instead of `mongoDbName()`.
+  // `MONGO_DB_NAME` is the variable the Worker itself reads and the one
+  // .github/workflows/tests.yml sets, so with it set to anything else this
+  // harness read a database the API under test was not writing to -- or
+  // failed with "registration did not create ..." while the run was fine.
+  // Four harnesses now resolve the name the same way member_journey.cjs
+  // already did.
+const db = client.db(mongoDbName());
   const tokens = db.collection("upload_tokens");
 
   const pageErrors = [];
@@ -269,21 +276,56 @@ const tokenInDom = (page) =>
 
   // ── 6. revocation really revokes ───────────────────────────────────────────
   console.log("\n[revocation]");
-  await tokens.updateMany({}, { $set: { revoked_at: new Date() } });
-  const afterRevoke = await publish(shown, { pkg: pkgA, version: "9.9.9" });
-  if (afterRevoke.status === RATE_LIMITED) {
-    check("a revoked token is refused", false,
-      "SKIPPED: the upload bucket (5/hour) was exhausted, so this proves nothing");
-  } else {
-    check("a revoked token is refused", afterRevoke.status >= 400,
-      `${afterRevoke.status} ${JSON.stringify(afterRevoke.body)?.slice(0, 70)}`);
-    const bumped = (await db.collection("packages").findOne({ name: pkgA }))?.versions ?? [];
-    check("the revoked token wrote nothing",
-      !bumped.some((v) => v.version === "9.9.9"),
-      JSON.stringify(bumped.map((v) => v.version)));
-  }
+  // Defect D116: this was `updateMany({}, ...)` on the whole upload_tokens
+  // collection -- it revoked *every* upload token in the database, and the
+  // matching restore set `revoked_at: null` on every row including ones a real
+  // operator had deliberately revoked. Two consequences, both bad:
+  //
+  //   (a) pointed at any shared cluster, the run resurrects revoked publish
+  //       credentials as working ones, and revokes live ones for everyone else;
+  //   (b) the restore was not in a `finally`, so any throw between the two --
+  //       a fetch failure, a `publish` network error -- left the database with
+  //       *all* upload tokens revoked and publishing broken for every real user.
+  //
+  // Scoped to the tokens this run actually created, and restored in a `finally`
+  // so the restore happens on the failure path too. `namespace_id: made._id` is
+  // the same scoping the token lookup at line 217 already uses, and for the same
+  // reason: this harness writes to a database it does not own.
+  const runTokenHashes = [];
+  if (rec?.token_hash) runTokenHashes.push(rec.token_hash);
 
-  await tokens.updateMany({}, { $set: { revoked_at: null } });
+  try {
+    await tokens.updateMany(
+      { token_hash: { $in: runTokenHashes } },
+      { $set: { revoked_at: new Date() } },
+    );
+    const revokedCount = await tokens.countDocuments({ token_hash: { $in: runTokenHashes }, revoked_at: { $ne: null } });
+    check("exactly this run's tokens were revoked",
+      runTokenHashes.length > 0 && revokedCount === runTokenHashes.length,
+      `${revokedCount} of ${runTokenHashes.length} — a count other than that means the filter was too wide`);
+
+    const afterRevoke = await publish(shown, { pkg: pkgA, version: "9.9.9" });
+    if (afterRevoke.status === RATE_LIMITED) {
+      check("a revoked token is refused", false,
+        "SKIPPED: the upload bucket (5/hour) was exhausted, so this proves nothing");
+    } else {
+      check("a revoked token is refused", afterRevoke.status >= 400,
+        `${afterRevoke.status} ${JSON.stringify(afterRevoke.body)?.slice(0, 70)}`);
+      const bumped = (await db.collection("packages").findOne({ name: pkgA }))?.versions ?? [];
+      check("the revoked token wrote nothing",
+        !bumped.some((v) => v.version === "9.9.9"),
+        JSON.stringify(bumped.map((v) => v.version)));
+    }
+  } finally {
+    // Restored unconditionally. A harness that can leave a shared database in a
+    // broken state is worse than no harness.
+    await tokens.updateMany(
+      { token_hash: { $in: runTokenHashes } },
+      { $set: { revoked_at: null } },
+    ).catch(() => {
+      console.error(`  could not restore ${runTokenHashes.length} token(s); they stay revoked`);
+    });
+  }
 
   // ── 7. privilege escalation ────────────────────────────────────────────────
   console.log("\n[another account]");

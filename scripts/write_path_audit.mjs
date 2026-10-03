@@ -260,12 +260,31 @@ async function makeTarball(name = "harness") {
   // document -- `v0.0.1` pushed them onto `namespaces.upload_tokens[]` forever
   // with no sweep, growing the document to MongoDB's 16 MB cap (defect D4).
   const stored = await db.collection("upload_tokens").find({}).toArray();
-  const mine = stored.filter((t) => t.namespace === nsDoc?._id?.toHexString() || t.scope?.namespace === NS);
-  check("an upload token was persisted", stored.length > 0, `${stored.length} rows`);
+  // Defect D118: `mine` was computed here and never used, so both checks below
+  // ran against the *whole* collection:
+  //
+  //   - "an upload token was persisted" passed if any token from any earlier run
+  //     existed, even if this run's mint failed outright;
+  //   - "the token is stored hashed" searched for `String(uploadToken)`, which is
+  //     the literal string "undefined" when the mint failed -- and no JSON
+  //     document contains that substring, so the check passed vacuously.
+  //
+  // The second is the D4 assertion -- "a plaintext publish credential must not
+  // be recoverable from a database dump" -- and it could pass while the run
+  // minted nothing at all. Scoped to this run's namespace, and the plaintext
+  // search now requires a token to search for.
+  const nsId = nsDoc?._id?.toHexString?.() ?? String(nsDoc?._id ?? "");
+  const mine = stored.filter(
+    (t) => String(t.namespace_id ?? "") === nsId || t.namespace === nsId || t.scope?.namespace === NS,
+  );
+  check("this run's upload token was persisted", mine.length > 0,
+    `${mine.length} row(s) scoped to ${NS}; ${stored.length} in the collection overall`);
   check(
     "the token is stored hashed, never in the clear",
-    stored.length > 0 && JSON.stringify(stored).indexOf(String(uploadToken)) === -1,
-    "raw token absent from storage",
+    Boolean(uploadToken) && mine.length > 0 && JSON.stringify(mine).indexOf(uploadToken) === -1,
+    typeof uploadToken === "string"
+      ? "raw token absent from this run's rows"
+      : `no token was returned (${String(uploadToken)}), so there was nothing to search for`,
   );
   check(
     "no token lives on the namespace document (D4)",

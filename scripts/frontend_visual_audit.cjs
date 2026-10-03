@@ -29,6 +29,23 @@
  * Not wired into CI: it needs a browser and a running API, and the free GitHub
  * Actions minutes are better spent elsewhere. Run it before a release.
  *
+ * ── Defect D115: this could not fail ─────────────────────────────────────────
+ * Three ways, all of which had to be fixed before its verdict meant anything:
+ *
+ *   1. It ended with no `process.exit`, so it exited 0 no matter what it found.
+ *   2. The structural checks were gated on `scheme === "light" &&
+ *      viewport.name === "desktop"`, so dark mode and both non-desktop
+ *      viewports produced **zero** checks -- while the header above claimed the
+ *      audit covered both schemes across two viewports.
+ *   3. The contrast measurements were computed in a hardcoded `colorScheme:
+ *      "light"` context and their PASS/FAIL lines were printed but never pushed
+ *      to `report.checks`. So the dark-mode contrast regression this file exists
+ *      to catch -- D54, black-on-black at 1.11:1 -- was never measured, and even
+ *      the light-mode result could not reach the exit code.
+ *
+ * The lesson is the general one: a harness that cannot exit non-zero is
+ * documentation. `scripts/frontend_review.cjs` had the same defect (D115).
+ *
  * `frontend/public/index.html` and `src/theme/theme.js` are asserted separately
  * in `.github/workflows/worker.yml` (`theme-contract`), because those two copies
  * of the theme writer have to stay in sync and once did not.
@@ -139,16 +156,23 @@ const ROUTES = [
 
         report.routes.push({ viewport: viewport.name, scheme, route, status, facts, logs, errors, failed });
 
-        if (scheme === "light" && viewport.name === "desktop") {
-          check(`renders content at ${route}`, facts.childCount > 0 && facts.textLength > 20,
-            `${facts.childCount} root children, ${facts.textLength} chars`);
-          check(`no page exception at ${route}`, errors.length === 0, errors.join(" | "));
-          check(`no failed requests at ${route}`, failed.length === 0, failed.slice(0, 2).join(" | "));
-          check(`no broken glyphs at ${route}`, facts.brokenGlyphs === 0, `${facts.brokenGlyphs} empty`);
-          check(`canvas rendered at ${route}`, facts.emptyCanvases === 0,
-            `${facts.canvases} canvas, ${facts.emptyCanvases} empty`);
-          check(`exactly one <main> at ${route}`, facts.mainCount === 1, `${facts.mainCount}`);
-        }
+        // Defect D115: this was gated on `scheme === "light" &&
+        // viewport.name === "desktop"`, so the dark scheme and both non-desktop
+        // viewports collected data and produced **zero checks**. The header
+        // claimed the audit covered "contrast ... in both schemes, across two
+        // viewports". Every scheme/viewport combination is now checked -- and
+        // the combination is named in the check, because a failure that does not
+        // say which one it came from is much harder to act on.
+        const where = `${scheme}/${viewport.name}`;
+        check(`renders content at ${route} [${where}]`,
+          facts.childCount > 0 && facts.textLength > 20,
+          `${facts.childCount} root children, ${facts.textLength} chars`);
+        check(`no page exception at ${route} [${where}]`, errors.length === 0, errors.join(" | "));
+        check(`no failed requests at ${route} [${where}]`, failed.length === 0, failed.slice(0, 2).join(" | "));
+        check(`no broken glyphs at ${route} [${where}]`, facts.brokenGlyphs === 0, `${facts.brokenGlyphs} empty`);
+        check(`canvas rendered at ${route} [${where}]`, facts.emptyCanvases === 0,
+          `${facts.canvases} canvas, ${facts.emptyCanvases} empty`);
+        check(`exactly one <main> at ${route} [${where}]`, facts.mainCount === 1, `${facts.mainCount}`);
         await page.close();
       }
       await context.close();
@@ -156,7 +180,14 @@ const ROUTES = [
   }
 
   // ── the Fortran palette, read from the live computed styles ──────────────
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "light" });
+  //
+  // Defect D115: the contrast context was hardcoded `colorScheme: "light"`, so
+  // the dark-mode regression this file was written for -- D54's black-on-black
+  // navbar and the transparent Register CTA, both 1.0-1.1:1 -- was never
+  // measured at all. It now runs once per scheme.
+  const contrastByScheme = {};
+  for (const scheme of ["light", "dark"]) {
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme });
   const page = await ctx.newPage();
   await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 
@@ -169,8 +200,10 @@ const ROUTES = [
       accent: read("--color-accent"), border: read("--color-border"),
     };
   });
-  report.palette = palette;
-  console.log("\n  computed palette (light):", JSON.stringify(palette, null, 2).replace(/\n/g, "\n  "));
+  report.palette = report.palette || {};
+  report.palette[scheme] = palette;
+  contrastByScheme[scheme] = { palette, contrast: null };
+  console.log(`\n  computed palette (${scheme}):`, JSON.stringify(palette, null, 2).replace(/\n/g, "\n  "));
 
   // Contrast, computed from the *rendered* colours rather than the token file.
   const contrast = await page.evaluate(() => {
@@ -201,16 +234,25 @@ const ROUTES = [
     }
     return out;
   });
-  report.contrast = contrast;
-  console.log("\n  contrast measured from rendered DOM:");
+  // Defect D115: these PASS/FAIL lines used to be printed and then discarded --
+  // they were never pushed to `report.checks`, so they affected nothing and the
+  // contrast regression this whole file exists for could not fail the run.
+  console.log(`\n  contrast measured from rendered DOM (${scheme}):`);
   for (const c of contrast) {
-    const ok = c.ratio >= 4.5;
-    console.log(`    ${ok ? "PASS" : "FAIL"}  ${c.sel.padEnd(7)} ${String(c.ratio).padStart(6)}:1  ${c.fg} on ${c.bg}`);
+    // 3:1 for large text and UI boundaries, 4.5:1 for body copy. Both schemes are
+    // held to the same bar: a contrast rule that is only enforced in light mode
+    // is not a contrast rule.
+    check(`contrast ${scheme} ${c.sel} >= 4.5:1`, c.ratio >= 4.5,
+      `${c.ratio}:1 (${c.fg} on ${c.bg})`);
   }
+  contrastByScheme[scheme].contrast = contrast;
 
-  fs.writeFileSync("/tmp/opencode/browser-report.json", JSON.stringify(report, null, 2));
   await page.close();
   await ctx.close();
+  }
+  report.contrast = contrastByScheme;
+
+  fs.writeFileSync("/tmp/opencode/browser-report.json", JSON.stringify(report, null, 2));
   await browser.close();
 
   const failedChecks = report.checks.filter((c) => !c.pass);
@@ -221,4 +263,10 @@ const ROUTES = [
   const withFailed = report.routes.filter((r) => r.failed.length);
   console.log(`routes with failed requests: ${withFailed.length}`);
   for (const r of withFailed.slice(0, 8)) console.log(`   ${r.route} [${r.scheme}/${r.viewport}]: ${r.failed[0].slice(0, 140)}`);
+
+  // Defect D115: the file ended here with no `process.exit`, so it exited 0
+  // unconditionally -- the sole browser-level contrast guard in the repository
+  // could not fail. It is now a real gate: a non-zero exit is what makes a
+  // harness's verdict mean anything, and `report.checks` is what it reads.
+  process.exit(failedChecks.length === 0 ? 0 : 1);
 })();
