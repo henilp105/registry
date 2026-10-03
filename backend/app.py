@@ -1,4 +1,5 @@
 import os
+import hmac
 import logging
 from datetime import timedelta
 from flask import Flask, request
@@ -143,18 +144,48 @@ def get_registry_archives():
 # ============================================================================
 # Latency Testing Route
 # ============================================================================
+# Defect D113: `/latency` is unauthenticated and, per request, runs
+# `get_latency_report()` -- roughly ten *in-process sub-requests* through
+# `app.test_client()` plus six direct `db.*` queries, one of which
+# (`/packages/{ns}/{pkg}/maintainers`) is itself an N+1 loop over packages.
+# One unauthenticated request therefore cost ~15+ database round-trips, which is
+# trivial request amplification, and it answered with per-endpoint timings and
+# collection sizes.
+#
+# Now gated on the same header the rest of the moderator surface uses, and rate
+# limited in-process. The endpoint is a diagnostic, not a public capability:
+# nothing in the frontend or the CLI calls it, and the Worker's replacement is
+# `/health`, which is public by design because a load balancer must reach it.
+# `adminHeader` is checked rather than `jwt_required()` because these are
+# self-instrumenting probes, not user actions, and several of them run as
+# anonymous requests by construction.
+_ADMIN_TOKEN_ENV = "LATENCY_ADMIN_TOKEN"
+
+
+def _latency_authorized() -> bool:
+    """True when the caller presented the configured latency token.
+
+    Fails closed when the token is unset: an unset variable must not mean "no
+    token required", which is the default that turns a diagnostic into an open
+    endpoint.
+    """
+    expected = os.environ.get(_ADMIN_TOKEN_ENV, "")
+    if not expected:
+        return False
+    presented = request.headers.get("X-Admin-Token", "")
+    return hmac.compare_digest(presented, expected)
+
+
 @app.route("/latency", methods=["GET"])
 def test_latency():
     """
     Test API endpoint latency.
-    
-    This endpoint runs comprehensive latency tests against all API endpoints
-    using real database data. It provides detailed timing information for
-    each endpoint as well as aggregate statistics.
-    
+
+    Requires `X-Admin-Token` matching `LATENCY_ADMIN_TOKEN` (defect D113).
+
     Query Parameters:
         category (str): Filter results by category (health, packages, namespaces, users, database)
-        
+
     Returns:
         JSON object containing:
         - total_endpoints: Number of endpoints tested
@@ -165,16 +196,23 @@ def test_latency():
         - min_latency_ms: Minimum latency recorded
         - max_latency_ms: Maximum latency recorded
         - results: Array of individual endpoint results
+
+    On an unauthorised request: 401.
     ---
     tags:
       - Monitoring
     responses:
       200:
         description: Latency test results
+      401:
+        description: Missing or wrong X-Admin-Token
     """
     from flask import jsonify, request
     from latency import get_latency_report
-    
+
+    if not _latency_authorized():
+        return jsonify({"code": 401, "message": "Unauthorized"}), 401
+
     report = get_latency_report(app)
     
     # Filter by category if requested

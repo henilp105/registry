@@ -183,7 +183,20 @@ jobs:
           # `npm ci` in worker/ provides the mongodb driver the harnesses need.
           (cd worker && npm ci --silent --no-audit --no-fund)
           fail=0
-          for f in scripts/rate_limit_probe.cjs; do
+          # Defect D114: this loop had exactly one entry. The job's stated
+          # purpose is that "a silently broken one is worse than an absent one" --
+          # and the step that was supposed to guarantee it covered 1 of the 6
+          # harnesses that import `mongodb`. The regression the comment describes
+          # (a deleted `require("mongodb")`, which still parses) reintroduced in
+          # any of the other five was invisible.
+          #
+          # `frontend_review.cjs`, `frontend_visual_audit.cjs` and `serve_build.cjs`
+          # are excluded: they drive a browser or a static server and pull
+          # playwright, which is not installed here. They are covered by the
+          # `node --check` parse step above.
+          for f in scripts/auth_journey.cjs scripts/member_journey.cjs \
+                   scripts/token_journey.cjs scripts/write_journey.cjs \
+                   scripts/rate_limit_probe.cjs scripts/_signed_in.cjs; do
             cp "$f" worker/_loadcheck.cjs
             node -e "require('./worker/_loadcheck.cjs')" >/dev/null 2>&1 || true
             # Loading runs main(); we only care that it does not die on a missing

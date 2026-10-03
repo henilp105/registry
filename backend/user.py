@@ -102,9 +102,33 @@ def profile(username):
             {"author": user_id},
             {"maintainers": user_id}
         ],
-        "_id": {"$nin": list(processed_package_ids)} if processed_package_ids else {}
     })
     
+    # Defect D106: `individual_packages` was a Cursor, iterated once by the
+    # set-comprehension below and then iterated *again* by the loop after it. A
+    # pymongo Cursor is single-pass -- `next()` raises StopIteration as soon as
+    # `_empty` is set, which is precisely why `rewind()` exists. So the second
+    # loop never ran and the second batch of packages was silently absent:
+    # every package the user authors or maintains but that is not a member of
+    # the owning namespace -- i.e. anything added through
+    # `POST /{username}/maintainer` -- never appeared on the dashboard, at HTTP
+    # 200 with a short list, which reads as "you have no packages".
+    #
+    # Materialised once, up front. That list() is what a Cursor is not.
+    individual_packages = list(individual_packages)
+
+    # Defect D107: `processed_package_ids` holds `str(package["_id"])` strings
+    # and the Mongo filter above put them in `_id: {$nin: [...]}`. `_id` is an
+    # ObjectId and Mongo never matches a 24-character string against one, so the
+    # deduplication was a no-op and any package reachable through both branches
+    # was emitted twice. The same "string matched against an ObjectId field"
+    # class as D10/D11, in a place those did not cover. Filtering here compares
+    # like with like.
+    individual_packages = [
+        pkg for pkg in individual_packages
+        if str(pkg["_id"]) not in processed_package_ids
+    ]
+
     # Bulk fetch namespaces for individual packages
     namespace_ids = {pkg["namespace"] for pkg in individual_packages}
     namespace_map = {}

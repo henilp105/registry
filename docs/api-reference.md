@@ -80,6 +80,14 @@ Detailed health check including database connectivity.
 
 Performance testing endpoint. Measures response times across all API endpoints.
 
+> **Requires `X-Admin-Token`** matching the `LATENCY_ADMIN_TOKEN` environment
+> variable; without it the endpoint answers `401` and runs nothing. Defect D113:
+> it was unauthenticated, and each call ran ~10 in-process sub-requests plus six
+> direct queries — roughly 15+ database round-trips per unauthenticated request,
+> answered with per-endpoint timings and collection sizes. It now fails closed
+> when the variable is unset, because an unset token must not mean "no token
+> required".
+
 **Query Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|

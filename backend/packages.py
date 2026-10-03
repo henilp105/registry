@@ -2,6 +2,7 @@ from app import app
 from mongo import db
 from mongo import file_storage
 from bson.objectid import ObjectId
+from bson.errors import InvalidId
 from flask import request, jsonify, abort, send_from_directory
 from gridfs.errors import NoFile
 from datetime import datetime, timedelta
@@ -85,7 +86,13 @@ def search_packages():
         if sorted_by.lower() in parameters.keys()
         else "name"
     )
-    page = int_validation(page,0)
+    # Defect D109: `int_validation` accepts a negative integer, and
+    # `Cursor.skip()` raises `ValueError("skip must be >= 0")` (verified in
+    # pymongo/synchronous/cursor.py). So unauthenticated `GET /packages?page=-1`
+    # reached the blanket `Exception` handler in server.py and answered **500**.
+    # `/packages_cli` already floors its own page with `max(0, ...)`; this route
+    # did not.
+    page = max(0, int_validation(page, 0))
     query = unquote(query.strip().lower())
     packages_per_page = 10
 
@@ -204,7 +211,23 @@ def search_packages_cli():
     # Ensure packages_per_page is at least 1 to avoid division by zero
     packages_per_page = max(1, min(packages_per_page, total_documents) if total_documents > 0 else packages_per_page)
 
-    packages = (
+    # Defect D108: `packages` was a Cursor, and `if packages:` on a Cursor is
+    # always true -- pymongo's Cursor defines neither `__bool__` nor `__len__`
+    # (verified against pymongo/synchronous/cursor.py), so the object is truthy
+    # whatever it holds. The `else: 404` below was therefore unreachable: this
+    # route has never answered 404, for any input.
+    #
+    # That matters more here than it looks. `docs/API_CONTRACT.md` and
+    # `worker/src/routes/packages.ts` both record the `/packages_cli` empty
+    # result as a **404**, and `scripts/write_path_audit.mjs` asserts it -- but
+    # that contract was read off this dead `else` branch, not observed. So the
+    # documented behaviour and the legacy backend have always disagreed, and the
+    # Worker now agrees with the docs and this file does not.
+    #
+    # Materialised rather than tested for truthiness: `total_documents` is
+    # already known from the count above, so there is nothing to gain from a
+    # second query, and materialising is what makes the branch mean what it says.
+    packages = list(
         db.packages.find(mongo_db_query)
         .sort(sorted_by, sort)
         .limit(packages_per_page)
@@ -520,33 +543,53 @@ def check_token_expiry(upload_token_created_at):
 @app.route("/tarballs/<oid>", methods=["GET"])
 @swag_from("documentation/get_tarball.yaml", methods=["GET"])
 def serve_gridfs_file(oid):
+    # Defect D110: the only `except` clause caught `NoFile`, which neither
+    # `ObjectId(oid)` nor `[0]` on an empty list can raise -- the former raises
+    # `bson.errors.InvalidId`, the latter `IndexError`. Both escaped to the blanket
+    # `Exception` handler in server.py, so `GET /tarballs/<garbage>` and
+    # `GET /tarballs/<well-formed-but-unknown-oid>` both answered **500** where
+    # the sibling route answers 404.
+    #
+    # `InvalidId` is now imported rather than caught blind, so a malformed id is a
+    # documented 400-shaped 404 instead of a crash.
     try:
-        file = list(db.tarballs.files.find({'_id':ObjectId(oid)}))[0]
-        
-        file_path = os.path.join("static/packages/", file['metadata']['url'])
-        package_version_doc = db.tarballs.files.update_one(
-            {"_id": ObjectId(oid)},
-            {
-                "$inc": {
-                    "downloads_stats.total_downloads": 1,
-                    f"downloads_stats.dates.{str(datetime.now())[:10]}": 1,
-                }
-            },
-        )
-        if package_version_doc.modified_count > 0:
-            if os.path.exists(file_path):
-                return send_from_directory("static/packages/", file['metadata']['url'], as_attachment=True)
-            # Return the file data as a Flask response object
-            # return send_file(
-            #     file,
-            #     download_name=file.filename,
-            #     as_attachment=True,
-            #     mimetype=file.content_type,
-            # )
+        object_id = ObjectId(oid)
+    except (InvalidId, TypeError):
         return jsonify({"message": "Package version not found", "code": 404}), 404
 
-    except NoFile:
-        abort(404)
+    # Cursor materialised and closed: the previous `list(...)` expression left the
+    # cursor to the garbage collector, which on a hot path means an unbounded
+    # number of server-side cursors held open at once.
+    cursor = db.tarballs.files.find({"_id": object_id})
+    try:
+        file = next(iter(cursor), None)
+    finally:
+        cursor.close()
+
+    if file is None:
+        return jsonify({"message": "Package version not found", "code": 404}), 404
+
+    # The download counter is incremented only once the artifact is known to
+    # exist. It was incremented *before* that check, so every request for a
+    # tarball whose blob was missing still inflated `total_downloads` -- a
+    # counter that could be moved by anyone who could guess an id.
+    file_path = os.path.join("static/packages/", file['metadata']['url'])
+    if not os.path.exists(file_path):
+        return jsonify({"message": "Package version not found", "code": 404}), 404
+
+    db.tarballs.files.update_one(
+        {"_id": object_id},
+        {
+            "$inc": {
+                "downloads_stats.total_downloads": 1,
+                f"downloads_stats.dates.{str(datetime.now())[:10]}": 1,
+            }
+        },
+    )
+
+    return send_from_directory(
+        "static/packages/", file['metadata']['url'], as_attachment=True
+    )
 
 
 def check_version(current_version, new_version):
@@ -968,7 +1011,20 @@ def post_ratings(namespace, package):
     if not rating:
         return jsonify({"code": 400, "message": "Rating is missing"}), 400
 
-    if int(rating) < 1 or int(rating) > 5:
+    # Defect D111: `int(rating)` on a raw form field. `rating=abc` raised
+    # ValueError, which the blanket `Exception` handler in server.py turned into a
+    # 500 -- so the documented 400 for an out-of-range rating was reachable only
+    # for a *numeric* out-of-range value, and the test suite sends `9`, which is
+    # exactly the case that worked.
+    try:
+        rating_value = int(rating)
+    except (TypeError, ValueError):
+        return (
+            jsonify({"code": 400, "message": "Rating should be between 1 and 5"}),
+            400,
+        )
+
+    if rating_value < 1 or rating_value > 5:
         return (
             jsonify({"code": 400, "message": "Rating should be between 1 and 5"}),
             400,
@@ -991,7 +1047,7 @@ def post_ratings(namespace, package):
         {"name": package, "namespace": namespace_doc["_id"]},
         {
             "$set": {
-                f"ratings.users.{user['_id']}": int(rating),
+                f"ratings.users.{user['_id']}": rating_value,
             },
         },
     )
@@ -1084,16 +1140,34 @@ def view_report():
 
     user = db.users.find_one({"uuid": uuid})
 
+    # Defect D112: no null check before subscripting. A valid, unexpired JWT
+    # whose account has since been deleted -- which is exactly what
+    # `POST /users/delete` does, leaving the token valid for its remaining
+    # lifetime -- raised `TypeError: 'NoneType' is not subscriptable` and answered
+    # **500** instead of 401. `delete_package` already null-checks first; this
+    # route did not.
+    if not user:
+        return jsonify({"message": "Unauthorized", "code": 401}), 401
+
     if "admin" in user["roles"]:
         non_viewed_reports = list()
         malicious_reports = db.packages.find({"malicious_report.isViewed": False})
         for package in list(malicious_reports):
             for user_id, report in package.get("malicious_report", {}).get("users", {}).items():
                 if not report.get("isViewed", False):
-                    report['name'] = db.users.find_one({"_id": ObjectId(user_id)}, {"username": 1})["username"]
+                    # Defect D112: these subscripted `find_one` results without
+                    # checking them, so a report left behind by a deleted user or
+                    # namespace 500'd the whole listing. A report about a
+                    # deleted account is exactly what a moderator most needs to
+                    # see; skipping it is right, crashing is not.
+                    reporter = db.users.find_one({"_id": ObjectId(user_id)}, {"username": 1})
+                    namespace_doc = db.namespaces.find_one({"_id": package["namespace"]}, {"namespace": 1})
+                    if not reporter or not namespace_doc:
+                        continue
+                    report['name'] = reporter["username"]
                     del report["isViewed"]
                     report["package"] = package["name"]
-                    report["namespace"] = db.namespaces.find_one({"_id": package["namespace"]}, {"namespace": 1})["namespace"]
+                    report["namespace"] = namespace_doc["namespace"]
                     non_viewed_reports.append(report)
 
         return jsonify({"message": "Malicious Reports fetched Successfully", "code": 200, "reports": non_viewed_reports}), 200

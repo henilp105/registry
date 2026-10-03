@@ -28,6 +28,10 @@ env:
     RESET_PASSWORD: resetpass
     SUDO_PASSWORD: fortranpass
     IS_CI: true
+    # Defect D113: GET /latency now fails closed without this, so the suite needs
+    # a value. The latency tests themselves assert on a live endpoint rather than
+    # on auth, so any non-empty string satisfies them.
+    LATENCY_ADMIN_TOKEN: ci-latency-token-not-a-secret
     # 40 bytes: PyJWT warns below the 32-byte minimum for HS256 (RFC 7518 3.2).
     JWT_SECRET_KEY: fpm-registry-test-secret-key-v2-0123456789ab
 
