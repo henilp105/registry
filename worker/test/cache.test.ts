@@ -21,6 +21,34 @@ describe("cacheKey", () => {
     expect(a).not.toBe(b);
   });
 
+  it("cannot be collided by percent-encoding (D94)", () => {
+    // `searchParams` yields decoded components. Concatenating them raw made
+    // `?a=1&b=2` and `?a=1%26b%3D2` produce the *same* key -- two different
+    // requests, one cached response.
+    const two = cacheKey(new URL("https://x/packages?a=1&b=2"));
+    const smuggled = cacheKey(new URL("https://x/packages?a=1%26b%3D2"));
+    expect(smuggled).not.toBe(two);
+
+    // Same class, different pair of parameters.
+    const inline = cacheKey(new URL("https://x/packages?query=a&limit=5"));
+    const injected = cacheKey(new URL("https://x/packages?query=a%26limit%3D5"));
+    expect(injected).not.toBe(inline);
+
+    // And a smuggled `&` must not be able to impersonate a second parameter that
+    // is present in one request and absent in the other.
+    const withLimit = cacheKey(new URL("https://x/packages?query=a&limit=5"));
+    const hiddenLimit = cacheKey(new URL("https://x/packages?query=a%26limit%3D5&limit=0"));
+    expect(hiddenLimit).not.toBe(withLimit);
+  });
+
+  it("still folds duplicate parameter names rather than dropping them", () => {
+    // Sorting is on name alone and the pairs keep their relative order, so
+    // `?a=1&a=2` and `?a=2&a=1` remain distinct values of a real multiset.
+    const first = cacheKey(new URL("https://x/packages?a=1&a=2"));
+    const second = cacheKey(new URL("https://x/packages?a=2&a=1"));
+    expect(first).not.toBe(second);
+  });
+
   it("folds in the invalidation version", () => {
     const before = cacheKey(new URL("https://x/packages/ns/pkg"), "0");
     const after = cacheKey(new URL("https://x/packages/ns/pkg"), "1712345678");

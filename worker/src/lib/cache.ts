@@ -87,7 +87,21 @@ export const TTL = {
  */
 export function cacheKey(url: URL, version?: string): string {
   const params = [...url.searchParams.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  const query = params.length > 0 ? `?${params.map(([k, v]) => `${k}=${v}`).join("&")}` : "";
+  // Defect D94: `searchParams` yields *decoded* names and values, and these were
+  // concatenated raw. `?a=1&b=2` and `?a=1%26b%3D2` decode to the same pairs and
+  // so produced the identical key -- two different requests sharing one cached
+  // response. Encoding each component restores injectivity: distinct inputs
+  // cannot collide.
+  //
+  // Latent rather than live: every `serveCached` caller currently passes a
+  // query-less internal URL, and search is not cached. This is a trap for the
+  // first caller that keys a cache on a real query string, not a current bug.
+  const query =
+    params.length > 0
+      ? `?${params
+          .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+          .join("&")}`
+      : "";
   const v = version ? `@${version}` : "";
   return `https://cache.local${url.pathname}${query}${v}`;
 }

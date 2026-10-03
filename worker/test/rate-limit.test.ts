@@ -50,6 +50,44 @@ describe("limitKindFor", () => {
   it("does not match a path that merely starts with /auth-ish text", () => {
     expect(limitKindFor("GET", "/authors")).toBe("general");
   });
+
+  it("buckets by path segment, the way the router matches (D92)", () => {
+    // `POST //auth/login` reaches the real login handler -- the router does
+    // `path.split("/").filter(Boolean)`, which yields ["auth","login"] -- but a
+    // `startsWith("/auth/")` check is false on it, so the attempt was counted
+    // against the 100/min general bucket instead of the 10/min auth one. Same
+    // for the 5/hour upload bucket: `//packages` published at 100/min.
+    expect(limitKindFor("POST", "//auth/login")).toBe("auth");
+    expect(limitKindFor("POST", "///auth/signup")).toBe("auth");
+    expect(limitKindFor("POST", "//packages")).toBe("upload");
+    expect(limitKindFor("GET", "//packages/stdlib/json-fortran")).toBe("general");
+  });
+
+  it("still counts a doubled slash inside a path, not just a doubled leading one", () => {
+    // `["packages", "", "stdlib"]` -- the empty segment is dropped, so this is
+    // the same route as `/packages/stdlib`, and it must land in one bucket
+    // rather than depending on where the empty segment fell.
+    expect(limitKindFor("GET", "/packages//stdlib")).toBe("general");
+    expect(limitKindFor("POST", "/auth//login")).toBe("auth");
+  });
+
+  it("agrees with the router on every path both of them would route", () => {
+    // The property that matters: whatever the router treats as `auth`, the
+    // limiter must treat as `auth`. Derived from the same segmentation, so a
+    // change to one cannot silently desynchronise the other.
+    const paths = [
+      "/auth/login", "/auth/signup", "/auth/logout", "/auth/verify-email",
+      "/auth/change-email", "/auth/forgot-password", "/auth/reset-password",
+      "/packages", "/packages/stdlib/json-fortran", "/packages/stdlib/json-fortran/delete",
+      "/namespaces", "/namespace/stdlib", "/users/someone", "/ratings/a/b",
+      "/report/a/b", "/report/view", "/registry/archives", "/tarballs/usage", "/health", "/",
+    ];
+    for (const path of paths) {
+      const seg = path.split("/").filter(Boolean);
+      const routerSaysAuth = seg[0] === "auth";
+      expect(limitKindFor("POST", path) === "auth", path).toBe(routerSaysAuth);
+    }
+  });
 });
 
 describe("consume: the documented budgets", () => {

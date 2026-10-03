@@ -60,6 +60,25 @@ export function isIdLike(value: unknown): boolean {
  * Applies to filters, updates, pipelines and inserted documents alike, which is
  * what makes the hex form returned by `toRpcSafe` safe to use anywhere.
  */
+/**
+ * Operator keys whose string value is an *operand*, never an id.
+ *
+ * Defect D95. The rewrite below is indiscriminate: it converts any 24-hex string
+ * anywhere in a query into an ObjectId, which is what makes `{"_id": "<hex>"}`
+ * work against documents the Flask app wrote. But `$search` takes a *search
+ * term*. `GET /packages?query=0123456789abcdef01234567` is a text plan (>= 2
+ * chars, no `*`/`$`), so `buildMatchFilter` emits
+ * `{$text: {$search: "0123..."}}`, the rewrite made it an ObjectId, and
+ * MongoDB rejected the whole pipeline. Since the aggregate and the count sit in
+ * one `Promise.all`, that was a 500 on a public search rather than an empty
+ * result.
+ *
+ * Excluding the operand keys is precise rather than blanket: `_id`, `namespace`
+ * and friends still convert, and `$in` members still convert, because there a
+ * 24-hex string really is an id.
+ */
+const OPERAND_KEYS = new Set(["$search", "$regex", "$options", "$comment"]);
+
 export function toBsonQueries<T = unknown>(value: unknown): T {
   if (Array.isArray(value)) return value.map(toBsonQueries) as T;
 
@@ -76,7 +95,7 @@ export function toBsonQueries<T = unknown>(value: unknown): T {
 
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    out[k] = toBsonQueries(v);
+    out[k] = OPERAND_KEYS.has(k) ? v : toBsonQueries(v);
   }
   return out as T;
 }

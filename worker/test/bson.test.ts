@@ -238,3 +238,59 @@ describe("toMillis: reading a Date back out of MongoDB", () => {
     expect(toMillis(toRpcSafe<unknown>(when))).toBe(when.getTime());
   });
 });
+
+describe("toBsonQueries: operator operands are not ids (D95)", () => {
+  const HEX_QUERY = "0123456789abcdef01234567";
+
+  /**
+   * The rewrite is what makes `{"_id": "<hex>"}` match documents the Flask app
+   * wrote, so it cannot simply be narrowed to `_id`. But it used to convert *any*
+   * 24-hex string anywhere -- including `$search`, where the string is a search
+   * term. MongoDB then rejected the pipeline, and because the aggregate and the
+   * count were in one `Promise.all`, a public search 500'd.
+   */
+  it("leaves a 24-hex $search term as a string", () => {
+    const converted = toBsonQueries<{ $text: { $search: unknown } }>({
+      $text: { $search: HEX_QUERY },
+    });
+    expect(converted.$text.$search).toBe(HEX_QUERY);
+  });
+
+  it("still converts an id in the same query", () => {
+    const converted = toBsonQueries<{ _id: unknown; $text: { $search: unknown } }>({
+      _id: HEX_QUERY,
+      $text: { $search: HEX_QUERY },
+    });
+    expect(converted._id).toBeInstanceOf(ObjectId);
+    expect(converted.$text.$search).toBe(HEX_QUERY);
+  });
+
+  it("converts $in members, where a 24-hex string really is an id", () => {
+    const converted = toBsonQueries<{ _id: { $in: unknown[] } }>({
+      _id: { $in: [HEX_QUERY, HEX_QUERY.toUpperCase()] },
+    });
+    expect(converted._id.$in.every((v) => v instanceof ObjectId)).toBe(true);
+  });
+
+  it("leaves a hex-looking $regex alone rather than turning it into an ObjectId", () => {
+    const converted = toBsonQueries<{ name: { $regex: unknown; $options: unknown } }>({
+      name: { $regex: HEX_QUERY, $options: "i" },
+    });
+    expect(converted.name.$regex).toBe(HEX_QUERY);
+    expect(converted.name.$options).toBe("i");
+  });
+
+  it("leaves $comment alone", () => {
+    const converted = toBsonQueries<{ $comment: unknown }>({ $comment: HEX_QUERY });
+    expect(converted.$comment).toBe(HEX_QUERY);
+  });
+
+  it("agrees with isIdLike everywhere except under an operator key", () => {
+    // The property that keeps the original behaviour intact: outside operator
+    // operands, isIdLike and the converter must still agree exactly.
+    for (const value of [HEX_QUERY, HEX_QUERY.toUpperCase(), "a".repeat(64), "1.0.0", "", "x"]) {
+      const converted = toBsonQueries<{ v: unknown }>({ v: value }).v;
+      expect(converted instanceof ObjectId, value).toBe(isIdLike(value));
+    }
+  });
+});

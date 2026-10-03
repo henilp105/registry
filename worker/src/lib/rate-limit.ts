@@ -38,13 +38,25 @@ export const LIMITS = {
 
 export type LimitKind = keyof typeof LIMITS;
 
-/** Which bucket a route belongs to. */
+/**
+ * Which bucket a route belongs to.
+ *
+ * Matches on **path segments**, not on the raw pathname string, and it has to:
+ * the router matches on `path.split("/").filter(Boolean)`, and those two do not
+ * agree on a path with an empty segment. `POST //auth/login` routes to the real
+ * login handler -- `seg` is `["auth","login"]` -- while `startsWith("/auth/")` is
+ * false, so the attempt was counted against the 100/min general bucket instead
+ * of the 10/min auth one (defect D92). Deriving the bucket from the same
+ * segmentation the router uses is what closes it, and it means a change to the
+ * router's matching rules cannot silently desynchronise the limiter from it.
+ */
 export function limitKindFor(method: string, path: string): LimitKind {
-  if (path.startsWith("/auth/")) return "auth";
+  const seg = path.split("/").filter(Boolean);
+  if (seg[0] === "auth") return "auth";
   // Uploads are the expensive, quota-consuming write. Matched on the exact route
   // rather than "any POST", so a namespace or package deletion is not throttled
   // as though it were a publish.
-  if (path === "/packages" && method === "POST") return "upload";
+  if (seg.length === 1 && seg[0] === "packages" && method === "POST") return "upload";
   return "general";
 }
 

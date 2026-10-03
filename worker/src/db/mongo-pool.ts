@@ -28,7 +28,8 @@
  *   1. Lazily open one `MongoClient` and keep it alive for the DO's lifetime.
  *   2. Serialise writes through this single object, which removes the
  *      read-modify-write races documented as defect D22 (ratings counts).
- *   3. Retry idempotent operations once on a transient Mongo error.
+ *   3. Retry **idempotent** operations once on a transient Mongo error. Defect
+ *      D93 made that claim true; before this it retried everything.
  */
 
 import { DurableObject } from "cloudflare:workers";
@@ -36,6 +37,7 @@ import { toBsonQueries, toRpcSafe } from "./bson";
 import { LIMITS, consume, type LimitKind } from "../lib/rate-limit";
 import { hashPassword, parseIterations, verifyPassword } from "../lib/password";
 import { sha256HexBytes } from "../lib/tokens";
+import { isReplaySafe } from "./retry-safety";
 import {
   MongoClient,
   type ClientSession,
@@ -354,7 +356,19 @@ export class MongoPool extends DurableObject<PoolEnv> {
         // response -- which is precisely the gap that only real data finds.
         return toRpcSafe(result);
       } catch (err) {
-        if (attempt >= 1 || !isRetryable(err)) throw err;
+        // Defect D93: this retried *every* operation kind, while the file header
+        // claimed only idempotent ones. `isRetryable` matches ShutdownInProgress
+        // (91) and network errors raised while reading the reply to a write the
+        // server had already committed -- ambiguous outcomes, not confirmed
+        // failures. Replaying such an op verbatim duplicates it: a retried
+        // `insertOne` on `auth_tokens` or `upload_tokens` leaves two documents,
+        // and a replayed `transaction` re-runs its whole cascade.
+        //
+        // Replaying reads and pure writes only. The write kinds below are
+        // idempotent by construction: they are filtered on a field the write
+        // itself changes (`revoked_at: null`, `used_at: null`,
+        // `versions.version: { $ne }`), so a second application matches nothing.
+        if (attempt >= 1 || !isRetryable(err) || !isReplaySafe(request.op)) throw err;
         // The socket may have died under us; drop it so the retry reconnects.
         await this.#reset();
       }
