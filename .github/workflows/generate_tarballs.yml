@@ -1,25 +1,60 @@
-# Github action to generate  of the registry database archives
+# Registry database archive
 #
+# Produces a full `mongodump` of the registry database, minus the `users`
+# collection, and attaches it as a build artefact.
+#
+# ── Defect D122: this workflow could not have worked ──────────────────────────
+# It pinned `actions/upload-artifact@v2`, which GitHub retired. The action is
+# disabled: the step fails at runtime with a deprecation error rather than
+# uploading anything, so the schedule silently stopped producing archives while
+# the workflow itself showed as having run. Now v4.
+#
+# ── Defect D124: a secret was interpolated into a shell string ───────────────
+#     echo "${{ secrets.ENV_FILE }}" > backend/.env
+# `run:` bodies are shell, so GitHub substitutes `${{ }}` into the script text
+# *before* bash sees it. Anything in that secret that bash treats specially —
+# `$(...)`, a backtick, `;` — executes. The canonical form is to pass it through
+# `env:` and reference `"$VAR"` in the script, so the value is data rather than
+# source. A repository secret holding a multi-line .env blob is exactly the shape
+# where a stray backtick is a real possibility.
+#
+# ── Why this still exists at all ─────────────────────────────────────────────
+# The Worker serves `/registry/archives` from R2 and deliberately does **not**
+# serve database dumps (defect D5: an unauthenticated mongodump listing is a
+# read of everything, including what the Flask app used to put in it). This
+# workflow is the deliberate, operators-only escape hatch for a full restore —
+# not the public artefact path. It is not on `push`, and its artefact is scoped
+# to a workflow run.
 
-name:  Registry Database Archive
+name: Registry Database Archive
 
 on:
   workflow_dispatch:
   schedule:
+    # 00:00 UTC on the 1st and 15th.
     - cron: "0 0 1,15 * *"
+
+permissions:
+  # Nothing is read from the API and nothing is pushed. The archive is attached
+  # to this run and nowhere else.
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      - name: checkout source
+      - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
 
-      - name: Setup mongo tools - only shell
+      - name: Setup mongo tools — shell only
         uses: boly38/action-mongo-tools@stable
         with:
           mongo-shell: "false"
@@ -28,15 +63,59 @@ jobs:
       - name: Install python libraries
         run: pip3 install --user -r backend/requirements.txt
 
-      - name: load env file
+      # Defect D124: the secret arrives as an environment variable and is
+      # referenced as `"$ENV_FILE"`. It is never spliced into the script text.
+      - name: Write the env file
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
         run: |
-          echo "${{ secrets.ENV_FILE }}" > backend/.env
+          set -euo pipefail
+          if [ -z "${ENV_FILE:-}" ]; then
+            echo "::error::Repository secret ENV_FILE is not set."
+            echo "It must hold a .env with at least MONGO_DB_NAME and MONGO_URI."
+            exit 1
+          fi
+          printf '%s\n' "$ENV_FILE" > backend/.env
 
-      - name: generate tarball
-        run: cd backend && python generate_tarball.py
+      # Defect D121: this used to exit 0 even when `mongodump` failed, because
+      # `subprocess.call` returns the child's status rather than raising, so the
+      # script's `except CalledProcessError` was unreachable. It printed
+      # "Database backup created successfully" and uploaded whatever stale
+      # archive happened to be in static/. `generate_tarball.py` now checks the
+      # exit code and the artefact itself, and exits non-zero on either failure.
+      - name: Generate the archive
+        working-directory: backend
+        run: python generate_tarball.py
 
-      - name: Archives
-        uses: actions/upload-artifact@v2
+      - name: Check the archive is fresh and non-empty
+        run: |
+          set -euo pipefail
+          # Belt and braces against the failure mode D121 described: an artefact
+          # from a previous run sitting in static/ would be uploaded and the
+          # green tick would mean nothing. The committed test fixture in
+          # backend/static/registry.tar.gz is exactly such a stale file, so it is
+          # matched by name and rejected.
+          archive=$(ls -1t backend/static/registry-*.tar.gz 2>/dev/null | head -1 || true)
+          if [ -z "$archive" ]; then
+            echo "::error::no registry-<date>.tar.gz was produced."
+            exit 1
+          fi
+          if [ "$archive" = "backend/static/registry.tar.gz" ]; then
+            echo "::error::$archive is the committed test fixture, not a fresh dump."
+            exit 1
+          fi
+          size=$(stat -c %s "$archive")
+          if [ "$size" -lt 1024 ]; then
+            echo "::error::$archive is $size bytes, which cannot be a database dump."
+            exit 1
+          fi
+          echo "ok: $archive ($size bytes)"
+
+      # Defect D122: v2 is retired by GitHub and fails at runtime.
+      - name: Upload the archive
+        uses: actions/upload-artifact@v4
         with:
-          name: Registry Database Archive
-          path: backend/static/
+          name: registry-database-archive
+          path: backend/static/registry-*.tar.gz
+          retention-days: 14
+          if-no-files-found: error
