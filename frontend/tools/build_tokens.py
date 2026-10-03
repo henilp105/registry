@@ -35,8 +35,7 @@ HEADER = '''/* =================================================================
      * The brand ramp is "Fortran indigo" at OKLCH hue 282. That is the hue of
        the official fpm mark itself (#483ca8, measured from the vendored logo),
        which sits in the indigo/violet-blue band between the gfortran / GNU
-       Fortran front end and the purple already declared as theme_color in
-       public/manifest.json (#734f96 = hue 306). The blue bias matters: at 306
+       Fortran front end and the theme_color now declared in public/manifest.json (#5b53c0 = hue 282). The blue bias matters: at 306
        the brand reads as marketing, at 220 it reads as a hyperlink.
      * The accent ramp is IBM Blue 70 (#1F70C1, hue 252.7) from the IBM Design
        Language - the colour of the IBM XL Fortran toolchain. Reserved for
@@ -165,75 +164,10 @@ FOOTER = '''/* =================================================================
   }
 }
 
-/* ==========================================================================
-   Bridge to Bootstrap 5
-   --------------------------------------------------------------------------
-   react-bootstrap (Cards, Modals, Forms, Alerts, Spinners, Dropdowns, Tabs) is
-   kept deliberately: its Modal is the accessible, focus-trapping dialog this
-   app relies on, and rebuilding that would be a regression, not an upgrade.
-   Bootstrap 5.3 is driven largely by CSS custom properties, so re-pointing
-   them at the tokens above themes most of it for free. The parts that hard-code
-   hex (.btn-*, .text-*, .alert-*, .badge.bg-*) are re-pointed once, in
-   theme/base.css. Bootstrap itself is imported exactly once, in src/index.js.
-   ========================================================================== */
-:root,
-[data-theme="dark"] {
-  --bs-body-bg: var(--color-surface-canvas);
-  --bs-body-color: var(--color-text);
-  --bs-body-color-rgb: 14, 15, 21;
-  --bs-secondary-color: var(--color-text-muted);
-  --bs-secondary-color-rgb: 75, 76, 90;
-  --bs-secondary-bg: var(--color-surface-sunken);
-  --bs-tertiary-color: var(--color-text-subtle);
-  --bs-tertiary-bg: var(--color-surface-sunken);
-  --bs-emphasis-color: var(--color-text);
-  --bs-heading-color: var(--color-text);
-
-  --bs-border-color: var(--color-border);
-  --bs-border-color-translucent: var(--color-border-subtle);
-
-  --bs-link-color: var(--color-link);
-  --bs-link-hover-color: var(--color-link-hover);
-
-  --bs-primary: var(--color-brand-solid);
-  --bs-primary-rgb: 91, 83, 192;
-  --bs-secondary: var(--color-text-muted);
-  --bs-secondary-rgb: 75, 76, 90;
-  --bs-success: var(--color-success-solid);
-  --bs-success-rgb: 38, 137, 76;
-  --bs-danger: var(--color-danger-solid);
-  --bs-danger-rgb: 207, 73, 70;
-  --bs-warning: var(--color-warning-solid);
-  --bs-warning-rgb: 229, 163, 35;
-  --bs-info: var(--color-info-solid);
-  --bs-info-rgb: 0, 134, 177;
-  --bs-light: var(--color-surface-sunken);
-  --bs-light-rgb: 243, 243, 249;
-  --bs-dark: var(--color-text);
-  --bs-dark-rgb: 14, 15, 21;
-
-  --bs-body-font-family: var(--font-sans);
-  --bs-body-font-size: var(--font-size-base);
-  --bs-body-line-height: var(--line-height-normal);
-  --bs-body-font-weight: var(--font-weight-regular);
-
-  --bs-border-radius: var(--radius-md);
-  --bs-border-radius-sm: var(--radius-sm);
-  --bs-border-radius-lg: var(--radius-lg);
-  --bs-border-radius-pill: var(--radius-full);
-
-  --bs-focus-ring-color: var(--color-focus);
-  --bs-focus-ring-width: 3px;
-  --bs-focus-ring-opacity: 1;
-
-  --bs-box-shadow-sm: var(--shadow-sm);
-  --bs-box-shadow: var(--shadow-md);
-  --bs-box-shadow-lg: var(--shadow-lg);
-
-  --bs-font-monospace: var(--font-mono);
-  --bs-code-color: var(--color-danger-text);
-  --bs-code-bg: var(--color-surface-sunken);
-}
+/* D84: the Bootstrap bridge block used to live here, where it lost the
+   cascade against Bootstrap's own :root declarations (tokens.css is imported
+   before vendor bootstrap, so bootstrap's equal-specificity rules won). It
+   now lives at the end of theme/base.css, which loads after Bootstrap. */
 '''
 
 LIGHT_TAIL = '''

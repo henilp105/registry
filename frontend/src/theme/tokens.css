@@ -11,8 +11,7 @@
      * The brand ramp is "Fortran indigo" at OKLCH hue 282. That is the hue of
        the official fpm mark itself (#483ca8, measured from the vendored logo),
        which sits in the indigo/violet-blue band between the gfortran / GNU
-       Fortran front end and the purple originally planned as theme_color in
-       public/manifest.json (#734f96 = hue 306). The blue bias matters: at 306
+       Fortran front end and the theme_color now declared in public/manifest.json (#5b53c0 = hue 282). The blue bias matters: at 306
        the brand reads as marketing, at 220 it reads as a hyperlink.
      * The accent ramp is IBM Blue 70 (#1F70C1, hue 252.7) from the IBM Design
        Language - the colour of the IBM XL Fortran toolchain. Reserved for

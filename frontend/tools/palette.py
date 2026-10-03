@@ -69,7 +69,7 @@ def ratio(a, b):
 
 # "Fortran indigo". Hue 262 sits between the violet-blue of the gfortran / GNU
 # Fortran front end and the purple already declared as theme_color in
-# public/manifest.json (#734f96, measured hue 301 at 31% saturation). Keeping
+# public/manifest.json (#5b53c0, measured hue 282). Keeping
 # the blue bias is deliberate: a pure purple reads as marketing, a blue reads
 # as a compiler.
 PRIMARY_H = 282.0
