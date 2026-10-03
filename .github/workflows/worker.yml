@@ -219,6 +219,13 @@ jobs:
           # with a live credential in the tree. This is the only check that can.
           node scripts/check_no_secrets.mjs
 
+      # Defect D87: the Worker and scripts/validate_packages.py were shell-free
+      # from day one, so every scan of the migration covered files that had
+      # already been fixed -- and missed backend/validate.py, which still built
+      # four `shell=True` commands from a package name read out of the database.
+      - name: No shell-interpolated subprocess in Python
+        run: node scripts/check_no_shell_injection.mjs
+
       - name: Frontend Redux helpers behave
         run: |
           set -euo pipefail

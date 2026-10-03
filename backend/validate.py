@@ -1,6 +1,8 @@
 import subprocess
 import toml
 import os
+import re
+import shutil
 from mongo import db, file_storage
 from bson.objectid import ObjectId
 from gridfs.errors import NoFile
@@ -45,20 +47,38 @@ def check_digests(file_path: str) -> Tuple[int, bool]:
     return (error_count, error_count == 0)
 
 
-def run_command(command: str) -> Union[str, None]:
+# Package names reach the filesystem and these subprocesses from the database.
+# Anything outside this set is refused rather than escaped: the validator must not
+# be able to be talked into running something else by a publisher (defect D7, still
+# open in the legacy Flask validator -- the Worker and the GitHub Actions
+# validator are shell-free by construction).
+_SAFE_SEGMENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")
+
+
+def safe_segment(value: str) -> str:
+    """Return `value` if it is a single safe path segment, else raise ValueError."""
+    if not value or not _SAFE_SEGMENT.match(value) or value in {".", ".."}:
+        raise ValueError(f"unsafe path segment: {value!r}")
+    return value
+
+
+def run_command(argv: List[str], cwd: Union[str, None] = None) -> Union[str, None]:
     """
-    Execute a shell command and return its output.
+    Execute a command and return its output.
 
     Args:
-        command (str): The command to execute.
+        argv (List[str]): The argument vector to execute. **Never a string.**
+            A string with ``shell=True`` is command injection; this form has no
+            shell to interpret metacharacters, so a package name is data.
+        cwd (str): Optional working directory for the command.
 
     Returns:
         Union[str, None]: The standard output of the command if successful,
                           otherwise standard error.
     """
-    result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    result = subprocess.run(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if result.returncode != 0:
-        print(f"Error executing command: {command}")
+        print(f"Error executing command: {argv}")
         print(result.stderr)
     return result.stdout if result.stdout else result.stderr
 
@@ -97,16 +117,17 @@ def process_package(packagename: str) -> Tuple[bool, Union[dict, None], str]:
             - Union[dict, None]: Parsed 'fpm.toml' content if successful, None otherwise.
             - str: Message describing the result of the package processing.
     """
-    create_dir_command = f'mkdir -p static/temp/{packagename}'
-    run_command(create_dir_command)
-    extract_command = f'tar -xzf static/temp/{packagename}.tar.gz -C static/temp/{packagename}/'
-    run_command(extract_command)
+    packagename = safe_segment(packagename)
+    workdir = f'static/temp/{packagename}'
+    # `mkdir -p` as argv, and `cwd` instead of `cd x && y`: no shell anywhere on
+    # this path, so the package name cannot become a command.
+    run_command(['mkdir', '-p', workdir])
+    run_command(['tar', '-xzf', f'static/temp/{packagename}.tar.gz', '-C', workdir])
 
-    generate_model = f"cd static/temp/{packagename} && fpm build --dump=fpm_model.json" # TODO: interim bug fix, disable after fpm v0.10.2
-    run_command(generate_model)
+    run_command(['fpm', 'build', '--dump=fpm_model.json'], cwd=workdir) # TODO: interim bug fix, disable after fpm v0.10.2
     
     # Read fpm.toml
-    toml_path = f'static/temp/{packagename}/fpm.toml'
+    toml_path = f'{workdir}/fpm.toml'
     try:
         with open(toml_path, 'r') as file:
             file_content = file.read()
@@ -146,7 +167,16 @@ def validate() -> None:
                 except NoFile:
                     print("No tarball found for " + package['name'] + " " + i['version'])
                     continue
-                packagename = package['name'] + '-' + i['version']
+                # Refuse a name that is not a single safe path segment before it
+                # becomes a directory, a tarball path and a set of argv entries.
+                # Skipping is the right response: one malformed package name must
+                # not stop the whole validation queue.
+                try:
+                    packagename = safe_segment(package['name'] + '-' + i['version'])
+                except ValueError as exc:
+                    print(f"Skipping package with unusable name: {exc}")
+                    continue
+                os.makedirs('static/temp', exist_ok=True)
                 with open(f"static/temp/{packagename}.tar.gz", "wb") as f:
                     f.write(tarball.read())
                 result = process_package(packagename)
@@ -194,9 +224,13 @@ def validate() -> None:
 
                 db.packages.update_one({"name": package['name'],"namespace":package['namespace']}, {"$set": update_data})
                 print(f"Package {packagename} verified successfully.")
-                # Clean up
-                cleanup_command = f'rm -rf static/temp/{packagename} static/temp/{packagename}.tar.gz'
-                run_command(cleanup_command)
+                # Clean up. `shutil` rather than `rm -rf` in a shell string: same
+                # result, no shell to be talked into deleting something else.
+                shutil.rmtree(f'static/temp/{packagename}', ignore_errors=True)
+                try:
+                    os.remove(f'static/temp/{packagename}.tar.gz')
+                except OSError:
+                    pass
 
 
 if __name__ == "__main__":
