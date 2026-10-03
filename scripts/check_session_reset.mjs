@@ -64,9 +64,29 @@ console.log("session reset — signing out must not leave the previous account i
  * mechanical and local; a regex over a dozen small files is cheaper than adding
  * a TS toolchain to the repo for this one check.
  */
-const { transform } = await import(
-  join(repoRoot, "frontend", "node_modules", "@babel", "core", "lib", "index.js")
-);
+/**
+ * `@babel/core` comes from `frontend/node_modules`, as a transitive dependency of
+ * react-scripts. It is imported by absolute path because a bare specifier would
+ * resolve against the repo root, which has no `node_modules` of its own.
+ *
+ * The absence of that directory is a *reported* error, not a stack trace: this
+ * script was originally added to the `scripts-load` job, which only installs
+ * `worker/`, and it failed there with a bare `ERR_MODULE_NOT_FOUND` that says
+ * nothing about the actual problem. CI caught it, which is the point — but a
+ * missing prerequisite should name itself.
+ */
+const babelPath = join(repoRoot, "frontend", "node_modules", "@babel", "core", "lib", "index.js");
+if (!existsSync(babelPath)) {
+  console.error(
+    "cannot run: frontend/node_modules is missing.\n\n" +
+      "This check imports the real reducers, so it needs the frontend's dependencies\n" +
+      "(@babel/core, a transitive dependency of react-scripts). Install them with:\n\n" +
+      "  npm ci --prefix frontend\n",
+  );
+  process.exit(1);
+}
+
+const { transform } = await import(babelPath);
 const tsPlugin = join(
   repoRoot, "frontend", "node_modules", "@babel", "plugin-transform-typescript",
 );

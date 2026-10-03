@@ -226,24 +226,6 @@ jobs:
       - name: No shell-interpolated subprocess in Python
         run: node scripts/check_no_shell_injection.mjs
 
-      # Defect D97: only `auth` was cleared on logout, and `logout()` navigates
-      # without a page reload -- so signing in as a different account in the same
-      # tab showed user B the previous account's packages, namespaces and role
-      # chips. A cross-account disclosure that no per-page `if` could be trusted
-      # to prevent, since the bug was the *absence* of a reset.
-      - name: Signing out wipes every account-scoped slice
-        run: node scripts/check_session_reset.mjs
-
-      # Defect D104: 17 form fields across the admin page's action cards and all
-      # six maintainer/admin dialogs had no controlId, so react-bootstrap rendered
-      # a <label> with no `for` and a control with no `id` -- no accessible name,
-      # and clicking the label did not focus the field. The reset-password form
-      # carried a comment calling itself the only one with the omission, and it
-      # was not: an inventory written by reading one file is an inventory of one
-      # file.
-      - name: Every form field is programmatically labelled
-        run: node scripts/check_form_labels.mjs
-
       - name: Frontend Redux helpers behave
         run: |
           set -euo pipefail
@@ -273,3 +255,66 @@ jobs:
           for f in scripts/*.py; do python3 -c "import ast,sys;ast.parse(open('$f').read())" || exit 1; done
           echo "all python scripts parse"
 
+  frontend-source:
+    name: Frontend source invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # These two checks read `frontend/src` rather than `frontend/build`, so they
+    # assert intent rather than output. They live in their own job because they
+    # are the only checks that need `frontend/node_modules` installed -- which is
+    # exactly the mistake D105 was: adding them to `scripts-load`, whose setup
+    # only installs `worker/`, so `@babel/core` was absent and the check died
+    # with an `ERR_MODULE_NOT_FOUND` that named neither the script nor the cause.
+    #
+    # `check_form_labels.mjs` needs nothing but `node`, but it is kept here so the
+    # two frontend-source invariants are read and fixed as one thing.
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+
+      # Defect D97: only `auth` was cleared on logout, and `logout()` navigates
+      # without a page reload -- so signing in as a different account in the same
+      # tab showed user B the previous account's packages, namespaces and role
+      # chips. A cross-account disclosure that no per-page `if` could be trusted
+      # to prevent, since the bug was the *absence* of a reset.
+      - name: Signing out wipes every account-scoped slice
+        run: node ../scripts/check_session_reset.mjs
+
+      # Defect D104: 17 form fields across the admin page's action cards and all
+      # six maintainer/admin dialogs had no controlId, so react-bootstrap rendered
+      # a <label> with no `for` and a control with no `id` -- no accessible name,
+      # and clicking the label did not focus the field. The reset-password form
+      # carried a comment calling itself the only one with the omission, and it
+      # was not: an inventory written by reading one file is an inventory of one
+      # file.
+      - name: Every form field is programmatically labelled
+        run: node ../scripts/check_form_labels.mjs
+
+      # Proves the tree the two checks above ran against is the tree that ships.
+      # Without this they would happily pass on source that no longer builds.
+      - name: Production build
+        run: npm run build
+        env:
+          CI: false
+
+      - name: Frontend deploy config is inlined
+        run: |
+          set -euo pipefail
+          # REACT_APP_REGISTRY_API_URL is baked in at build time by DefinePlugin,
+          # so a bundle built without it points at `undefined` and every request
+          # fails at runtime with no build-time signal. This is the same trap as
+          # the API host in .env.production, and it is invisible to any check that
+          # does not look at the *output*.
+          grep -rq 'registry.fortran-lang.org' build/static/js/ \
+            || { echo "FAIL: no registry host found in the built bundle."; exit 1; }
+          echo "ok: registry host inlined into the bundle"
