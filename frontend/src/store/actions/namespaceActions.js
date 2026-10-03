@@ -5,6 +5,9 @@ export const FETCH_NAMESPACE_DATA_REQUEST = "FETCH_NAMESPACE_DATA_REQUEST";
 export const FETCH_NAMESPACE_DATA_SUCCESS = "FETCH_NAMESPACE_DATA_SUCCESS";
 export const FETCH_NAMESPACE_DATA_FAILURE = "FETCH_NAMESPACE_DATA_FAILURE";
 
+// Monotonic request id; older responses are dropped by the reducer (defect D85).
+let nextNamespaceId = 1;
+
 // Legacy aliases for backward compatibility
 export const FETCH_NAMESPACE_DATA = FETCH_NAMESPACE_DATA_REQUEST;
 export const FETCH_NAMESPACE_DATA_ERROR = FETCH_NAMESPACE_DATA_FAILURE;
@@ -14,7 +17,9 @@ export const FETCH_NAMESPACE_DATA_ERROR = FETCH_NAMESPACE_DATA_FAILURE;
  * @param {string} namespace - Namespace name
  */
 export const fetchNamespaceData = (namespace) => async (dispatch) => {
-  dispatch({ type: FETCH_NAMESPACE_DATA_REQUEST });
+  // Defect D85: same D83 race as package/search.
+  const id = nextNamespaceId++;
+  dispatch({ type: FETCH_NAMESPACE_DATA_REQUEST, payload: { id } });
 
   try {
     const result = await get(`/namespace/${namespace}`);
@@ -22,6 +27,7 @@ export const fetchNamespaceData = (namespace) => async (dispatch) => {
     dispatch({
       type: FETCH_NAMESPACE_DATA_SUCCESS,
       payload: {
+        id,
         projects: result.data.packages,
         dateJoined: result.data.createdAt,
         // Defect D67: the API stored this from the moment the namespace was
@@ -34,7 +40,7 @@ export const fetchNamespaceData = (namespace) => async (dispatch) => {
   } catch (error) {
     dispatch({
       type: FETCH_NAMESPACE_DATA_FAILURE,
-      payload: { message: getErrorMessage(error), httpStatus: error.response?.status ?? 0 },
+      payload: { id, message: getErrorMessage(error), httpStatus: error.response?.status ?? 0 },
     });
   }
 };

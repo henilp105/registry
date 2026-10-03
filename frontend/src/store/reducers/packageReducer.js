@@ -14,6 +14,8 @@ const initialState = {
   error: null,
   isVerified: null,
   isVerifying: false,
+  // Newest in-flight fetch; stale responses are ignored (defect D85).
+  latestId: 0,
 };
 
 const packageReducer = (state = initialState, action) => {
@@ -24,9 +26,11 @@ const packageReducer = (state = initialState, action) => {
         ...state,
         isLoading: true,
         error: null,
+        latestId: action.payload?.id ?? state.latestId,
       };
 
     case FETCH_PACKAGE_DATA_SUCCESS:
+      if ((action.payload?.id ?? 0) < state.latestId) return state; // stale
       return {
         ...state,
         isLoading: false,
@@ -36,6 +40,7 @@ const packageReducer = (state = initialState, action) => {
       };
 
     case FETCH_PACKAGE_DATA_FAILURE:
+      if ((action.payload?.id ?? 0) < state.latestId) return state; // stale
       return {
         ...state,
         isLoading: false,

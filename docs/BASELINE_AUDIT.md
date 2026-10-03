@@ -1657,3 +1657,51 @@ What it does not do is hide it. The alternative — skipping the job when unconf
 would have made `main` look clean while the validation pipeline was in fact not
 running at all, which is the failure mode D36 describes and the one most worth
 avoiding.
+
+---
+
+## D85/D86 — file-wise audit round (2026-10-03)
+
+Defects D65–D84 were found by harnesses that drive the app. This round read every
+source file in `worker/src` and `frontend/src` against the routes, the contract and
+each other. Eleven defects; all fixed on `main`.
+
+### D85 — worker
+
+| Area | Defect | Consequence |
+|---|---|---|
+| `routes/auth.ts` signup | emailed the raw account uuid | `verify-email` looks up a minted `auth_tokens` token, so **every signup link 401'd** — no account could ever verify, so none could ever log in |
+| `routes/auth.ts` reset-password | fed the raw JWT to `findUserByUuid` | the documented signed-in "change password" shape always 404'd |
+| `routes/tarballs.ts` `recordDownload` | object branch keyed on a `namespace` member the caller never passed | the object became the whole `_id` filter; `download_count` stayed 0 and `sorted_by=downloads` stayed a no-op — the D81 fix did not fix it |
+| `routes/packages.ts` ×2 | count filter for `$text` plans dropped the `$text` clause | `total_pages` reflected the whole registry, not the search |
+| `lib/upload-tokens.ts` revoke | no ownership or admin check, despite the docstring | any authenticated user could revoke any token by id |
+| `lib/upload-tokens.ts` claim | `max_uses` absent from the atomic filter | an exhausted token was still claimable |
+| `routes/users.ts` router | `/users/admin/transfer` matched the generic `admin` branch first | the documented 501 was unreachable |
+| `routes/users.ts` membership writes | never called `invalidate` | a newly added maintainer was invisible for up to the cache TTL |
+| `routes/users.ts` profile | packages projected to `{name, namespace}` only, `author`-only filter; namespaces `$project` dropped `_id` | dashboard rendered `key={undefined}`, no descriptions, no role chips, no maintainer actions, and every namespace `id` was `""` |
+| `lib/cache.ts` callers | `serveCached` was handed a synthetic `Request` with no client headers | `if-none-match` was always absent, so the 304 path was dead on all cached routes |
+
+### D85 — frontend
+
+| Area | Defect | Consequence |
+|---|---|---|
+| token reducers | `RESET_*_TOKEN_MESSAGES` left `uploadToken` set | re-opening the dialog showed the previous token and hid the Generate button |
+| `resetPasswordReducer` | `statuscode` survived the next request | forgot-password's 200 leaked into reset-password and pre-disabled the form |
+| `createNamespaceReducer` | no reset between visits | the stale success banner re-rendered and the redirect re-fired |
+| `namespace`/`user` reducers | `notFound: true` on **any** failure | a 500, 429 or offline error claimed the page did not exist |
+| `adminReducer` + `admin.js` | initial `isAdmin: false` rendered `<NoPage/>` | every real admin saw a 404 flash on first visit |
+| `verifyEmail` | network failures carried no statuscode | a failed verification rendered the initial state, no error |
+| `package.js` | `Math.ceil` in `formatTimeAgo`; `NaN` semver compare | 1 minute–24 hours read as "yesterday"; prerelease/build versions sorted arbitrarily |
+| `account.js` | email modal had no `aria-labelledby` | unnamed dialog for screen readers |
+| `ratePackageActions` | `statuscode: "403"` (string) | numeric comparisons in the reducer failed |
+| package/namespace/user actions | no request sequencing (the D83 race, three more call sites) | navigating between two of them could render the older response under the newer URL |
+
+### D86 — a live credential, readable in a public repository
+
+`check_no_secrets.mjs` allowlists `docs/BASELINE_AUDIT.md` so the file can *talk*
+about the rule, and then that file quoted the real production MongoDB URI —
+password included — as the example of what fails. The scan passed; the password
+stayed public.
+
+**Rotation is still required** and is not something a commit can do: the value
+remains in git history. See the remediation note above.

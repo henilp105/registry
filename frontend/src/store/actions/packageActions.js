@@ -9,6 +9,9 @@ export const VERIFY_USER_ROLE_REQUEST = "VERIFY_USER_ROLE_REQUEST";
 export const VERIFY_USER_ROLE_SUCCESS = "VERIFY_USER_ROLE_SUCCESS";
 export const VERIFY_USER_ROLE_FAILURE = "VERIFY_USER_ROLE_FAILURE";
 
+// Monotonic request id; older responses are dropped by the reducer (defect D85).
+let nextPackageId = 1;
+
 // Legacy aliases for backward compatibility
 export const FETCH_PACKAGE_DATA = FETCH_PACKAGE_DATA_REQUEST;
 export const FETCH_PACKAGE_DATA_ERROR = FETCH_PACKAGE_DATA_FAILURE;
@@ -21,7 +24,11 @@ export const VERIFY_USER_ROLE_ERROR = VERIFY_USER_ROLE_FAILURE;
  * @param {string} packageName - Package name
  */
 export const fetchPackageData = (namespaceName, packageName) => async (dispatch) => {
-  dispatch({ type: FETCH_PACKAGE_DATA_REQUEST });
+  // Defect D85: the same D83 race, on the package page. Navigating
+  // /packages/a/x then /packages/b/y could render b/y's URL with a/x's data
+  // if the first response landed second.
+  const id = nextPackageId++;
+  dispatch({ type: FETCH_PACKAGE_DATA_REQUEST, payload: { id } });
 
   try {
     const result = await get(`/packages/${namespaceName}/${packageName}`);
@@ -30,6 +37,7 @@ export const fetchPackageData = (namespaceName, packageName) => async (dispatch)
       dispatch({
         type: FETCH_PACKAGE_DATA_SUCCESS,
         payload: {
+          id,
           statuscode: result.data.code,
           data: result.data.data,
         },
@@ -38,6 +46,7 @@ export const fetchPackageData = (namespaceName, packageName) => async (dispatch)
       dispatch({
         type: FETCH_PACKAGE_DATA_FAILURE,
         payload: {
+          id,
           statuscode: result.data.code,
           message: result.data.message,
         },
@@ -57,6 +66,7 @@ export const fetchPackageData = (namespaceName, packageName) => async (dispatch)
     dispatch({
       type: FETCH_PACKAGE_DATA_FAILURE,
       payload: {
+        id,
         statuscode: error.response?.data?.code || httpStatus || 500,
         httpStatus,
         // Seconds to wait, from the limiter. Absent on every other failure.

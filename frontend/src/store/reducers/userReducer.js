@@ -13,6 +13,8 @@ const initialState = {
   error: null,
   isLoading: false,
   notFound: false,
+  // Newest in-flight fetch; stale responses are ignored (defect D85).
+  latestId: 0,
 };
 
 /**
@@ -24,9 +26,10 @@ const initialState = {
 const userReducer = (state = initialState, action) => {
   switch (action.type) {
     case FETCH_USER_DATA_REQUEST:
-      return handleRequest(state, { notFound: false });
+      return handleRequest(state, { notFound: false, latestId: action.payload?.id ?? state.latestId });
 
     case FETCH_USER_DATA_SUCCESS:
+      if ((action.payload?.id ?? 0) < state.latestId) return state; // stale
       return handleSuccess(state, {
         email: action.payload.email,
         dateJoined: action.payload.dateJoined,
@@ -35,6 +38,7 @@ const userReducer = (state = initialState, action) => {
       });
 
     case FETCH_USER_DATA_FAILURE:
+      if ((action.payload?.id ?? 0) < state.latestId) return state; // stale
       return handleFailure(state, action.payload?.message, {
         notFound: action.payload?.httpStatus === 404,
       });

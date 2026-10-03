@@ -14,6 +14,8 @@ const initialState = {
   isLoading: false,
   notFound: false,
   error: null,
+  // Newest in-flight fetch; stale responses are ignored (defect D85).
+  latestId: 0,
 };
 
 const namespaceReducer = (state = initialState, action) => {
@@ -24,9 +26,11 @@ const namespaceReducer = (state = initialState, action) => {
         isLoading: true,
         notFound: false,
         error: null,
+        latestId: action.payload?.id ?? state.latestId,
       };
 
     case FETCH_NAMESPACE_DATA_SUCCESS:
+      if ((action.payload?.id ?? 0) < state.latestId) return state; // stale
       return {
         ...state,
         dateJoined: action.payload.dateJoined,
@@ -51,6 +55,7 @@ const namespaceReducer = (state = initialState, action) => {
       };
 
     case FETCH_NAMESPACE_DATA_FAILURE:
+      if ((action.payload?.id ?? 0) < state.latestId) return state; // stale
       return {
         ...state,
         isLoading: false,

@@ -634,7 +634,9 @@ export const ROUTES: RouteSpec[] = [
     cacheable: true,
     notes:
       "Served straight from R2 with no database read, because the key is derivable from the " +
-      "path. `/download/...` and the legacy `/tarballs/<ObjectId>` shape also route here.",
+      "path. `/download/...` routes here too. The legacy `/tarballs/<GridFS ObjectId>` shape " +
+      "deliberately does NOT: artifacts live in R2 under a derivable key and GridFS is gone, so " +
+      "such a URL identifies nothing. Clients must re-fetch metadata (see BASELINE_AUDIT D47).",
   },
   {
     path: "/tarballs/usage",
