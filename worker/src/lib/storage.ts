@@ -115,13 +115,21 @@ function assertSafeSegment(value: string, label: string): void {
 export async function hashTarball(
   body: ReadableStream<Uint8Array>,
   declaredSize: number,
+  digest: DigestFn,
 ): Promise<{ bytes: Uint8Array; total: number; sha256: string }> {
   const reader = body.getReader();
 
-  // Two accumulators: the bytes for R2, and a running hash for the digest.
+  // One accumulator: the bytes, which are needed for the R2 put. The digest
+  // itself is computed by `digest`, which routes through the Durable Object --
+  // see the `sha256` op in db/mongo-pool.ts for why it cannot happen here
+  // (defect D91): SHA-256 in the request handler exhausts the Worker's 10 ms CPU
+  // budget below 1 MB, so a 50 MB ceiling was unreachable in practice.
+  //
+  // Taking the digest as a parameter rather than importing the pool keeps this
+  // module free of `cloudflare:workers`, which is what lets storage.test.ts run
+  // in plain Node.
   const parts: Uint8Array[] = [];
   let total = 0;
-  const hasher = new Sha256();
 
   try {
     for (;;) {
@@ -137,7 +145,6 @@ export async function hashTarball(
         throw new TarballTooLarge();
       }
 
-      hasher.update(value);
       parts.push(value);
     }
   } finally {
@@ -164,8 +171,26 @@ export async function hashTarball(
     throw new Error("tarball size does not match the declared length");
   }
 
-  return { bytes, total, sha256: hasher.hex() };
+  const sha256 = await digest(bytes);
+  if (!/^[0-9a-f]{64}$/.test(sha256)) {
+    // A malformed digest must not reach a version document: it would be stored
+    // as the artifact's identity and echoed to every download as
+    // `x-checksum-sha256`.
+    throw new Error("digest computation returned an unusable value");
+  }
+
+  return { bytes, total, sha256 };
 }
+
+/**
+ * Lowercase hex SHA-256 of an artifact.
+ *
+ * Exported so the route passes the *same* function to `hashTarball`, and so a
+ * test can substitute a local implementation without importing the Durable
+ * Object.
+ */
+export type DigestFn = (bytes: Uint8Array) => Promise<string>;
+
 
 /**
  * Write already-hashed bytes to R2.
@@ -206,8 +231,9 @@ export async function putTarball(
   key: string,
   body: ReadableStream<Uint8Array>,
   declaredSize: number,
+  digest: DigestFn,
 ): Promise<StoredTarball> {
-  const { bytes, total, sha256 } = await hashTarball(body, declaredSize);
+  const { bytes, total, sha256 } = await hashTarball(body, declaredSize, digest);
   const stored = await putTarballBytes(env, key, bytes, sha256);
   return { ...stored, size: total };
 }

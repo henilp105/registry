@@ -31,7 +31,7 @@
  *      that holds an ObjectId, so it always 404'd. Fixed.
  */
 
-import { db, toJsonSafe } from "../db/client";
+import { db, sha256InPool, toJsonSafe } from "../db/client";
 import type { Env } from "../db/client";
 import {
   jsonError,
@@ -929,7 +929,7 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
   let total: number;
   let sha256: string;
   try {
-    ({ bytes, total, sha256 } = await hashTarball(tarball.stream(), tarball.size));
+    ({ bytes, total, sha256 } = await hashTarball(tarball.stream(), tarball.size, (b) => sha256InPool(env, b)));
   } catch (err) {
     if (err instanceof TarballTooLarge) {
       return jsonError(413, "Tarball exceeds the maximum upload size");

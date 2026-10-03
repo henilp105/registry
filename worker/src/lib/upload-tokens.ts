@@ -37,6 +37,7 @@
 // `./ids`. One implementation now serves both.
 import { isHex24 } from "./ids";
 import { db, type Env } from "../db/client";
+import { toMillis } from "../db/bson";
 import { randomToken, sha256Hex } from "./tokens";
 import { logger } from "./logger";
 
@@ -180,8 +181,15 @@ export async function consumeUploadToken(env: Env, presented: string): Promise<T
 
     if (!existing) return { valid: false, reason: "unknown" };
     if (existing.revoked_at) return { valid: false, reason: "revoked" };
-    if (existing.expires_at.getTime() <= now.getTime()) return { valid: false, reason: "expired" };
-    if (existing.max_uses !== null && existing.use_count >= existing.max_uses) {
+    // Defect D90: this was `existing.expires_at.getTime()`. Values that come
+    // back through the Durable Object have been through `toRpcSafe`, which
+    // renders every Date as an ISO *string* -- so `.getTime` was not a
+    // function, and any expired or exhausted token threw a TypeError out of
+    // `consumeUploadToken`. That surfaced as HTTP 500 on an unauthenticated
+    // public endpoint, on an input any caller can produce, instead of the
+    // intended 401.
+    if (toMillis(existing.expires_at) <= now.getTime()) return { valid: false, reason: "expired" };
+    if (existing.max_uses !== null && (existing.use_count ?? 0) >= existing.max_uses) {
       return { valid: false, reason: "exhausted" };
     }
     return { valid: false, reason: "unknown" };

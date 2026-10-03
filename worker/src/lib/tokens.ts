@@ -25,9 +25,19 @@ export function randomId(bytes = 16): string {
 }
 
 export function sha256Hex(value: string): Promise<string> {
-  return crypto.subtle
-    .digest("SHA-256", new TextEncoder().encode(value))
-    .then((d) => [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join(""));
+  return sha256HexBytes(new TextEncoder().encode(value));
+}
+
+/**
+ * SHA-256 hex of raw bytes.
+ *
+ * Split out from `sha256Hex` so the byte-input form has exactly one
+ * implementation. The tarball digest needs it (defect D91) and it was about to
+ * become a third hand-rolled hex formatter in this repo.
+ */
+export async function sha256HexBytes(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export function base64url(bytes: Uint8Array): string {

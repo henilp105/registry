@@ -35,6 +35,7 @@ import { DurableObject } from "cloudflare:workers";
 import { toBsonQueries, toRpcSafe } from "./bson";
 import { LIMITS, consume, type LimitKind } from "../lib/rate-limit";
 import { hashPassword, parseIterations, verifyPassword } from "../lib/password";
+import { sha256HexBytes } from "../lib/tokens";
 import {
   MongoClient,
   type ClientSession,
@@ -93,7 +94,29 @@ export type MongoOp =
    * Durable Object, so it is no longer part of the Worker's environment.
    */
   | { kind: "hashPassword"; password: string }
-  | { kind: "verifyPassword"; password: string; stored: string; salt: string };
+  | { kind: "verifyPassword"; password: string; stored: string; salt: string }
+  /**
+   * SHA-256 of an artifact, computed here rather than in the Worker handler.
+   *
+   * Defect D91. `hashTarball` ran a pure-JS SHA-256 inside the request handler,
+   * and `wrangler.jsonc` pins `limits.cpu_ms` to 10. Measured on this repo's
+   * own `Sha256`: ~13 ms per MB, so the 10 ms budget was gone before 1 MB and
+   * `MAX_TARBALL_BYTES` (50 MB) was unreachable -- every publish above roughly a
+   * megabyte returned Cloudflare error 1102. The Worker's own native
+   * `crypto.subtle.digest` is not the answer either, at ~3.5 ms per MB: still
+   * over budget by 2 MB, and `subtle.digest` has no streaming API, so it would
+   * force the whole artifact into one buffer.
+   *
+   * This is the same reasoning that moved PBKDF2 here (see the note above):
+   * the Durable Object has 30 s of CPU per request on the Free plan.
+   *
+   * `bytes` crosses the RPC boundary by structured clone, which copies. The
+   * Worker still holds its own copy for the R2 put, so peak memory is two
+   * copies rather than one -- bounded by the same 50 MB ceiling that already
+   * bounds the single copy (defect D77 halved this deliberately, so this is
+   * noted rather than assumed harmless).
+   */
+  | { kind: "sha256"; bytes: Uint8Array };
 
 export type TransactionStep =
   | { kind: "insertOne"; collection: string; doc: Document }
@@ -499,6 +522,10 @@ export class MongoPool extends DurableObject<PoolEnv> {
     }
     if (op.kind === "verifyPassword") {
       return verifyPassword(op.password, op.stored, op.salt ?? this.env.SALT);
+    }
+    if (op.kind === "sha256") {
+      // Native WebCrypto, and the DO has 30 s to spend.
+      return sha256HexBytes(op.bytes);
     }
     if (op.kind === "ensureIndexes") {
       return this.#ensureIndexes(op.spec);

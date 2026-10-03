@@ -113,3 +113,30 @@ export function toRpcSafe<T = unknown>(value: unknown): T {
 
   return value as T;
 }
+
+/**
+ * Milliseconds for a value read back out of MongoDB, whatever shape it arrived in.
+ *
+ * Exists because `toRpcSafe` above turns every Date into an ISO string, so a
+ * value read through the Durable Object is *not* a Date any more. Calling
+ * `.getTime()` on one is a `TypeError`, and a `TypeError` inside a route is a
+ * 500 — which is how an expired upload token came to answer 500 instead of 401
+ * (defect D90).
+ *
+ * Accepts a Date (used directly), an ISO string, an epoch number, or nullish
+ * (returns `fallback`). Anything unparseable returns the fallback too: this is
+ * used in expiry checks, where "I cannot read it" must not read as "not
+ * expired".
+ */
+export function toMillis(value: unknown, fallback = 0): number {
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isFinite(t) ? t : fallback;
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? value : fallback;
+  if (typeof value === "string") {
+    const t = Date.parse(value);
+    return Number.isNaN(t) ? fallback : t;
+  }
+  return fallback;
+}

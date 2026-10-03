@@ -1,19 +1,32 @@
-import { describe, expect, it } from "vitest";
-import { Sha256, tarballKey, MAX_TARBALL_BYTES } from "../src/lib/storage";
+import { describe, expect, it, vi } from "vitest";
+import { Sha256, tarballKey, hashTarball, MAX_TARBALL_BYTES, TarballTooLarge } from "../src/lib/storage";
 
 /**
- * `crypto.subtle.digest` is one-shot, so hashing a 50 MB artifact with it means
- * buffering the whole thing and hashing a second copy. `Sha256` hashes
- * incrementally instead, which keeps peak memory at the artifact plus a 64-byte
- * block.
+ * Defect D91: the tarball digest used to be computed by this module's own
+ * streaming `Sha256`, inside the request handler. Measured, that costs ~13 ms of
+ * CPU per MB against a Worker limit of 10 ms for the whole invocation -- so the
+ * 50 MB ceiling was unreachable and every publish above roughly a megabyte
+ * returned Cloudflare error 1102. The digest now runs in the Durable Object,
+ * which has 30 s, and reaches `hashTarball` as an injected function.
  *
- * That only works if it is genuinely SHA-256. A subtly wrong implementation
- * would publish checksums that no `fpm` client or `sha256sum` could ever verify,
- * which is worse than publishing none — so it is checked against the NIST
- * vectors and against `crypto.subtle` for arbitrary chunkings.
+ * The consequence for this file is that the correctness of a published checksum
+ * now depends on the *injected* digest rather than on `Sha256`. So the tests
+ * below cover both halves: `Sha256` is still verified against NIST (it remains
+ * exported and is a reference implementation worth keeping honest), and
+ * `hashTarball` is verified to actually call the injected function, to reject a
+ * malformed digest, and to refuse an oversized artifact.
  */
 
 const encoder = new TextEncoder();
+
+function streamOf(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  });
+}
 
 function hashOf(data: Uint8Array, chunkSize = data.length): string {
   const hasher = new Sha256();
@@ -128,5 +141,69 @@ describe("tarballKey", () => {
 
   it("caps the upload at the documented ceiling", () => {
     expect(MAX_TARBALL_BYTES).toBe(50 * 1024 * 1024);
+  });
+});
+
+describe("hashTarball: the digest is the caller's, and must be usable (D91)", () => {
+  it("digests through the injected function rather than hashing inline", async () => {
+    const digest = vi.fn(async () => "a".repeat(64));
+    const result = await hashTarball(streamOf(encoder.encode("hello")), 5, digest);
+
+    expect(digest).toHaveBeenCalledTimes(1);
+    expect(result.sha256).toBe("a".repeat(64));
+    expect(new TextDecoder().decode(result.bytes)).toBe("hello");
+    expect(result.total).toBe(5);
+  });
+
+  it("rejects a malformed digest instead of storing it as the artifact's identity", async () => {
+    // The digest is written into the version document and echoed to every
+    // download as `x-checksum-sha256`. A truncated or non-hex value would be
+    // advertised as a checksum that verifies nothing, which is worse than none.
+    for (const bad of ["", "nothex", "a".repeat(63), "A".repeat(64), `${"a".repeat(64)}x`]) {
+      await expect(
+        hashTarball(streamOf(encoder.encode("x")), 1, async () => bad),
+      ).rejects.toThrow(/unusable/i);
+    }
+  });
+
+  it("refuses an artifact over the ceiling while streaming, and cancels the reader", async () => {
+    // D8: v0.0.1 inflated a whole attacker-controlled gzip in-request first.
+    // The cancel matters as much as the throw -- an unread body keeps the
+    // connection and its memory alive.
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(1024 * 1024));
+      },
+      cancel,
+    });
+
+    await expect(hashTarball(body, 0, async () => "b".repeat(64))).rejects.toBeInstanceOf(
+      TarballTooLarge,
+    );
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it("refuses an empty artifact", async () => {
+    await expect(
+      hashTarball(streamOf(new Uint8Array(0)), 0, async () => "c".repeat(64)),
+    ).rejects.toThrow(/empty/i);
+  });
+
+  it("refuses a body that disagrees with its declared length", async () => {
+    // Otherwise the stored checksum describes bytes the registry never held.
+    await expect(
+      hashTarball(streamOf(encoder.encode("12345")), 5000, async () => "d".repeat(64)),
+    ).rejects.toThrow(/declared length/i);
+  });
+
+  it("produces a digest that agrees with the platform, via the injected function", async () => {
+    // The end-to-end property, and the one that actually matters: whatever the
+    // caller injects must still yield a real SHA-256 of the exact bytes.
+    const data = crypto.getRandomValues(new Uint8Array(4096));
+    const result = await hashTarball(streamOf(data), data.byteLength, async (b) =>
+      subtleHex(b),
+    );
+    expect(result.sha256).toBe(await subtleHex(data));
   });
 });

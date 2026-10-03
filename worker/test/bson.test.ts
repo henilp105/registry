@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
-import { isIdLike, toBsonQueries, toRpcSafe } from "../src/db/bson";
+import { isIdLike, toBsonQueries, toRpcSafe, toMillis } from "../src/db/bson";
 
 /**
  * The BSON ↔ RPC round trip, pinned.
@@ -198,5 +198,43 @@ describe("isIdLike states the assumption in one place", () => {
         isIdLike(value),
       );
     }
+  });
+});
+
+describe("toMillis: reading a Date back out of MongoDB", () => {
+  /**
+   * Defect D90. `toRpcSafe` renders every Date as an ISO string, so a value read
+   * through the Durable Object is not a Date. `existing.expires_at.getTime()` was
+   * therefore a TypeError, and the upload path answered HTTP 500 for any expired
+   * or exhausted token instead of 401 -- on an unauthenticated public endpoint,
+   * from an input any caller can produce.
+   */
+  it("accepts the ISO string the RPC boundary actually produces", () => {
+    const when = new Date("2026-10-02T00:00:00.000Z");
+    const viaRpc = toRpcSafe<unknown>(when);
+    expect(typeof viaRpc).toBe("string");
+    expect(() => (viaRpc as Date).getTime()).toThrow();
+    expect(toMillis(viaRpc)).toBe(when.getTime());
+  });
+
+  it("still accepts a real Date, an epoch number and nullish", () => {
+    const when = new Date("2026-01-01T00:00:00.000Z");
+    expect(toMillis(when)).toBe(when.getTime());
+    expect(toMillis(when.getTime())).toBe(when.getTime());
+    expect(toMillis(null)).toBe(0);
+    expect(toMillis(undefined)).toBe(0);
+  });
+
+  it("does not read an unparseable value as 'not yet expired'", () => {
+    // The fallback direction matters: this is used in expiry checks, where an
+    // unreadable date must never be mistaken for a live token.
+    expect(toMillis("not a date")).toBe(0);
+    expect(toMillis({})).toBe(0);
+    expect(toMillis("not a date", Number.MAX_SAFE_INTEGER)).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("round-trips a Date through toRpcSafe without losing the instant", () => {
+    const when = new Date("2027-06-15T12:34:56.789Z");
+    expect(toMillis(toRpcSafe<unknown>(when))).toBe(when.getTime());
   });
 });

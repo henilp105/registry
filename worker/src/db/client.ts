@@ -64,6 +64,24 @@ export function dbAsync(env: Env, op: MongoOp): Promise<unknown> {
   return env.MONGO_POOL.get(id, { locationHint: "apac" }).execute({ op });
 }
 
+/**
+ * Lowercase hex SHA-256 of an artifact, computed in the pool.
+ *
+ * It lives here, next to `db`, rather than in lib/storage.ts, because
+ * `storage.ts` must stay importable from plain Node: it is the module the
+ * checksum tests exercise, and importing the Durable Object from it would pull
+ * `cloudflare:workers` into a Node test runner and fail the whole suite at
+ * import time rather than at the assertion. See the `sha256` op in
+ * mongo-pool.ts (defect D91) for why this cannot run in the request handler.
+ */
+export async function sha256InPool(env: Env, bytes: Uint8Array): Promise<string> {
+  const digest = await db<string>(env, { kind: "sha256", bytes });
+  if (typeof digest !== "string") {
+    throw new Error("digest op returned a non-string value");
+  }
+  return digest;
+}
+
 // ── collection names ─────────────────────────────────────────────────────────
 
 export const COLLECTIONS = {
