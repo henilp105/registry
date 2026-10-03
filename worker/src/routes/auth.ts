@@ -300,7 +300,7 @@ async function logout(env: Env, auth: AuthContext | null): Promise<Response> {
     kind: "updateOne",
     collection: "users",
     filter: { uuid: auth.uuid },
-    update: { $set: { lastLogout: new Date() } },
+    update: { $set: { lastLogout: new Date(), sessionsInvalidBefore: new Date() } },
   });
 
   return jsonOk({ message: "Logout successful" });
@@ -326,10 +326,20 @@ async function refresh(request: Request, env: Env): Promise<Response> {
     kind: "findOne",
     collection: "users",
     filter: { uuid: result.claims.sub },
-    projection: { uuid: 1, isVerified: 1 },
+    projection: { uuid: 1, isVerified: 1, sessionsInvalidBefore: 1 },
   })) as UserDoc | null;
   if (!user) return jsonError(401, "Invalid or expired refresh token");
   if (!user.isVerified) return jsonError(401, "Please verify your email");
+
+  // Defect: logout used to only record `lastLogout` while every refresh token
+  // minted before it stayed valid for its full 180-day TTL. Tokens issued
+  // before the most recent logout/password-change are now rejected.
+  const invalidBefore = user.sessionsInvalidBefore
+    ? Math.floor(new Date(user.sessionsInvalidBefore as string | Date).getTime() / 1000)
+    : 0;
+  if (result.claims.iat < invalidBefore) {
+    return jsonError(401, "Invalid or expired refresh token");
+  }
 
   const [accessToken, newRefresh] = await issueTokens(env, user.uuid);
   return jsonOk({
@@ -437,7 +447,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
       kind: "updateOne",
       collection: "users",
       filter: { uuid: user.uuid },
-      update: { $set: { password: await hashPasswordInPool(env, password) } },
+      update: { $set: { password: await hashPasswordInPool(env, password), sessionsInvalidBefore: new Date() } },
     });
     return jsonOk({ message: "Password reset successful" });
   }
@@ -452,7 +462,7 @@ async function resetPassword(request: Request, env: Env): Promise<Response> {
     kind: "updateOne",
     collection: "users",
     filter: { uuid: consumed.user_uuid },
-    update: { $set: { password: await hashPasswordInPool(env, password) } },
+    update: { $set: { password: await hashPasswordInPool(env, password), sessionsInvalidBefore: new Date() } },
   });
 
   return jsonOk({ message: "Password reset successful" });

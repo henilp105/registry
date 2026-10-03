@@ -1980,3 +1980,14 @@ missing-collection failure on the request path, runs the same idempotent
 `bootstrap` the cron runs, and retries the read once (GET only, one attempt per
 isolate). Verified live: dropped `packages_text`, reloaded, and the retry path
 recreated all 27 indexes and returned 200.
+
+## D128 — refresh tokens survived logout and password changes
+
+`POST /auth/logout` only recorded `lastLogout`; `POST /auth/reset-password` and
+the signed-in change-password shape did not touch any session field. A refresh
+token -- 180-day TTL -- minted before any of those events stayed fully usable,
+so a credential that should have been dead minted fresh access tokens for half
+a year. Now logout and both password-change paths set
+`sessionsInvalidBefore`, and `POST /auth/refresh` rejects any token whose `iat`
+precedes it. A token issued *after* a fresh login is unaffected (its `iat` is
+later).
