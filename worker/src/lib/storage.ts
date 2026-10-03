@@ -61,7 +61,21 @@ const SIZE_TOLERANCE_BYTES = 1024;
 export type StoredTarball = {
   key: string;
   size: number;
-  /** SHA-256 hex of the artifact. Verified on every download path. */
+  /**
+   * SHA-256 hex of the artifact as uploaded.
+   *
+   * Defect D96: this comment used to read "Verified on every download path",
+   * which was false. `getTarball` reads the digest out of R2's
+   * `customMetadata` and the route echoes it as `x-checksum-sha256`; nothing
+   * compares it to the bytes being served. So an object replaced or corrupted in
+   * place was served while advertising the *original* digest, and a client that
+   * trusted the header had no way to notice.
+   *
+   * The digest is therefore a recorded claim, not an enforced invariant. It is
+   * carried because `fpm` clients can verify against it; what they must not do
+   * is treat the header alone as proof, which is why the header is emitted
+   * alongside the bytes and never instead of a client-side digest.
+   */
   sha256: string;
 };
 

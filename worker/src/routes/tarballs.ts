@@ -159,6 +159,15 @@ async function serveTarball(
       });
 
       // Defect D24: the artifact checksum, which v2.0.1 never stored anywhere.
+      //
+      // Defect D96: this is the digest recorded at upload, read back out of R2's
+      // custom metadata. It is *not* recomputed over the bytes being served --
+      // that would mean buffering a 50 MB artifact and spending ~13 ms of CPU per
+      // MB to guard against corruption R2's own read path already surfaces. So it
+      // is a recorded claim about these bytes, and a client that wants proof must
+      // digest what it received and compare. Emitting it unchecked is still
+      // right: `fpm` verifies against it, and a mismatch is then detectable
+      // rather than invisible.
       if (result.sha256) headers.set("x-checksum-sha256", result.sha256);
       headers.set("content-length", String(result.size));
 

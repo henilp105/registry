@@ -1725,3 +1725,38 @@ The D13 fix closed this class of bug for current documents; legacy data kept a
 copy of it. That is the pattern worth watching on every join fix: the code that
 was repaired stops being wrong, and nothing marks the documents it stopped
 understanding.
+
+---
+
+## D90–D96 — lib/db audit round (2026-10-03)
+
+D85–D89 read `routes/*.ts`. This round read the surface that round did not:
+`lib/*.ts`, `db/*.ts`, `index.ts` and `router.ts`.
+
+| ID | Site | Defect | Consequence |
+|---|---|---|---|
+| D90 | `lib/upload-tokens.ts` | `existing.expires_at.getTime()` on a value that came back through `toRpcSafe`, which renders Dates as ISO **strings** | Any *expired* or *exhausted* upload token threw a `TypeError` → **HTTP 500** on an unauthenticated public endpoint, from input any caller can produce, instead of 401. Only `.getTime()` on a DB value in the tree. |
+| D91 | `lib/storage.ts` | SHA-256 computed by the module's own pure-JS `Sha256`, inside the request handler | Measured ~13 ms/MB against `limits.cpu_ms: 10`. The budget was gone before 1 MB, so **`MAX_TARBALL_BYTES` (50 MB) was unreachable** — every publish above ~1 MB returned error 1102. Native `crypto.subtle` is no answer either (~3.5 ms/MB, and one-shot). Moved to the Durable Object, which has 30 s — the same reason PBKDF2 is there. |
+| D92 | `lib/rate-limit.ts` | bucketed on `path.startsWith("/auth/")` while the router matches on **path segments** | `POST //auth/login` reaches the real login handler but counted at 100/min instead of 10/min; `//packages` published at 100/min instead of 5/hour. |
+| D93 | `db/mongo-pool.ts` | retried **every** op kind, while its own header claimed idempotent only | `isRetryable` matches ShutdownInProgress (91) and network errors raised while reading the reply to a write the server had committed — ambiguous outcomes. A replayed `insertOne` duplicated `auth_tokens`/`upload_tokens` rows; a replayed `transaction` re-ran its whole cascade. |
+| D94 | `lib/cache.ts` | `cacheKey` concatenated **decoded** query components raw | `?a=1&b=2` and `?a=1%26b%3D2` produced one key for two different requests. Latent — every cached route passes a query-less internal URL — but a trap for the first caller that keys on a real query. |
+| D95 | `db/bson.ts` | `toBsonQueries` rewrote **any** 24-hex string, including a `$search` operand | `GET /packages?query=<24 hex>` built `{$text: {$search: ObjectId(...)}}`; MongoDB rejected the pipeline and, since the aggregate and count share a `Promise.all`, a public **search 500'd** instead of returning nothing. |
+| D96 | `lib/storage.ts` | the doc comment claimed "Verified on every download path" | Nothing verified it. `getTarball` read the digest from R2 metadata and the route echoed it as `x-checksum-sha256`, so an object replaced in place was served advertising the *original* digest. |
+
+### The two worth generalising
+
+**D90 is the shape of this whole codebase's risk.** Every other defect here was a
+logic error a reader can catch. D90 was a *type* that changed shape at an RPC
+boundary three files away, and it survived typecheck, lint, 314 passing tests and
+five CI jobs. `toRpcSafe` documents its Date→string conversion, `bson.test.ts`
+pins it, and the one call site that assumed otherwise is invisible to all three.
+`toMillis` now exists for exactly this, and the type it accepts is the type the
+boundary actually produces.
+
+**D93 is the shape of any retry policy.** "Retry once on transient error" is a
+correct-sounding default that is only correct if you have classified every
+operation. Nothing here had been classified, so the retry was applied to
+inserts. The policy now lives in `db/retry-safety.ts` — its own module, because
+`mongo-pool.ts` imports `cloudflare:workers` and cannot be tested in Node — and it
+defaults to *not* retrying, so a future op kind has to be argued for rather than
+inherited.
