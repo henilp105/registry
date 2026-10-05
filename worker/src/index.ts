@@ -142,7 +142,7 @@ export default {
       return jsonError(404, "Page not found", {}, { ...cors, ...rateHeaders });
     } catch (err) {
       // Defect S20/D8: never echo an internal message or stack to the client.
-      console.error("unhandled", url.pathname, err instanceof Error ? err.message : err);
+      console.error("unhandled", url.pathname, err instanceof Error ? err.stack ?? err.message : err);
       return jsonError(500, "Internal server error", {}, cors);
     }
   },

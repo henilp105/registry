@@ -34,5 +34,15 @@
     "typescript-eslint": "^8.19.0",
     "vitest": "^3.0.0",
     "wrangler": "^4.147.0"
+  },
+  "allowScripts": {
+    "esbuild@0.25.4": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.28.1": true,
+    "workerd@1.20250906.0": true,
+    "workerd@1.20261001.1": true,
+    "fsevents@2.3.3": true,
+    "sharp@0.33.5": true,
+    "sharp@0.35.4": true
   }
 }

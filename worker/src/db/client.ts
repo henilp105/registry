@@ -53,9 +53,18 @@ export type Env = PoolEnv & {
  * cluster lives in the APAC group) so the round trip stays short.
  */
 export async function db<T = unknown>(env: Env, op: MongoOp): Promise<T> {
+  console.log("DB>>", op.kind, "collection" in op ? (op as { collection?: string }).collection : "");
+  try { console.log("MONGO-URI-HOST>>>", new URL(env.MONGO_URI.replace(/^mongodb\+srv:\/\//, "mongodb://")).host); } catch (e) { console.log("MONGO-URI-HOST>>> unparsable", String(e).slice(0,80)); }
   const id = env.MONGO_POOL.idFromName(POOL_NAME);
   const stub = env.MONGO_POOL.get(id, { locationHint: "apac" });
-  return (await stub.execute({ op })) as T;
+  try {
+    const r = (await stub.execute({ op })) as T;
+    console.log("DB<<<ok", op.kind);
+    return r;
+  } catch (e) {
+    console.log("DB<<<err", op.kind, e instanceof Error ? e.message : String(e));
+    throw e;
+  }
 }
 
 /** Fire-and-forget variant for writes that do not need the result. */

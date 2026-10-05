@@ -92,7 +92,11 @@ describe("needsRehash", () => {
 
 describe("parseIterations", () => {
   it("accepts a sane configured value", () => {
-    expect(parseIterations("600000")).toBe(600_000);
+    expect(parseIterations("100000")).toBe(100_000);
+  });
+
+  it("clamps above the Workers runtime cap", () => {
+    expect(parseIterations("600000")).toBe(100_000);
   });
 
   it("falls back when the value is absent, nonsense, or absurdly low", () => {
@@ -110,7 +114,7 @@ describe("parseIterations", () => {
  *
  *     PBKDF2-SHA256    4,096 iterations .....   3.9 ms
  *     PBKDF2-SHA256   10,000 iterations .....   8.5 ms
- *     PBKDF2-SHA256  210,000 iterations ..... 176   ms
+ *     PBKDF2-SHA256  100,000 iterations ..... ~84   ms (extrapolated; 210k measured 176 ms)
  *
  *     Cloudflare Workers Free budget ........  10   ms
  *

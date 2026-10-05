@@ -17,8 +17,9 @@
  * ── What we use instead ──────────────────────────────────────────────────────
  * PBKDF2-HMAC-SHA256 via WebCrypto, which is a native, constant-time-ish
  * primitive and therefore effectively free in CPU terms. OWASP's guidance is
- * 600,000 iterations for PBKDF2-HMAC-SHA256; we default to 210,000, which is
- * what WebCrypto can do inside the budget and is still a large multiple of the
+ * 600,000 iterations for PBKDF2-HMAC-SHA256; we default to 100,000, which is
+ * the hard cap enforced by the Workers runtime ("iteration counts above
+ * 100000 are not supported") and is still a large multiple of the
  * legacy zero iterations. The count is stored per hash, so it can be raised
  * later without invalidating existing credentials.
  *
@@ -49,7 +50,7 @@ export { sha256Hex };
 const PBKDF2_PREFIX = "pbkdf2$sha256$";
 const LEGACY_PREFIX = "legacy-sha256$";
 
-export const DEFAULT_PBKDF2_ITERATIONS = 210_000;
+export const DEFAULT_PBKDF2_ITERATIONS = 100_000;
 
 const encoder = new TextEncoder();
 
@@ -73,7 +74,7 @@ export async function verifyPassword(
   if (stored.startsWith(PBKDF2_PREFIX)) {
     const parsed = parseHash(stored);
     if (!parsed || parsed.algorithm !== "pbkdf2") return false;
-    const dk = await pbkdf2(password, b64uDecode(parsed.salt), parsed.iterations);
+    const dk = await pbkdf2(password, b64uDecode(parsed.salt), Math.min(parsed.iterations, 100_000));
     return timingSafeEqual(dk, b64uDecode(parsed.hash));
   }
 
@@ -119,7 +120,10 @@ export function needsRehash(stored: string, currentIterations = DEFAULT_PBKDF2_I
 
 export function parseIterations(raw: string | undefined, fallback = DEFAULT_PBKDF2_ITERATIONS): number {
   const n = Number(raw ?? fallback);
-  return Number.isFinite(n) && n >= 1_000 ? n : fallback;
+  const parsed = Number.isFinite(n) && n >= 1_000 ? n : fallback;
+  // Workers throws "iteration counts above 100000 are not supported" above
+  // 100k, so never hand the runtime a larger value even if misconfigured.
+  return Math.min(parsed, 100_000);
 }
 
 async function pbkdf2(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {

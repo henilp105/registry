@@ -16,6 +16,7 @@
 /backend/.env
 /backend/.venv
 /backend/vercel.json
+/backend/logs/
 /backend/static/*.tar.gz
 /backend/__pycache__/
 /backend/tests/__pycache__/
@@ -28,6 +29,7 @@
 /frontend/node_modules
 /frontend/.pnp
 /frontend/.pnp.js
+/frontend/wrangler.jsonc
 
 # testing
 .pytest_cache/
@@ -52,3 +54,7 @@ tests/__pycache__/
 /package.json
 /package-lock.json
 /backend/static/packages/
+
+# local deployment record (contains secrets)
+/deployment.sh
+.wrangler/
