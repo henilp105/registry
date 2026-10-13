@@ -30,7 +30,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-          cache: 'pip'
 
       # tomli is a TOML backstop for anything older than 3.11 (stdlib from 3.11).
       # numpy is required by the FNV-1a test: the reference implementation it

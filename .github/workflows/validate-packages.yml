@@ -73,7 +73,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-          cache: pip
 
       # The validator only needs a TOML parser, which is in the standard library
       # from 3.11. tomli is the backstop for anything older.
