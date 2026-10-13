@@ -12,11 +12,13 @@ discover, and manage Fortran libraries and applications.
 4. [Package Management](package-management.md) — Publishing and managing packages
 5. [Namespace Management](namespace-management.md) — Organizing packages with namespaces
 6. [Contributing](contributing.md) — Development setup and contribution guidelines
+7. [Manual Testing Runbook](MANUAL_TESTING.md) — Pre/post-deploy checklist for every feature, including fpm end-to-end
 
 ### Reference and design documents
 
 | Document | What it is |
 |----------|------------|
+| [Manual Testing Runbook](MANUAL_TESTING.md) | The pre/post-deploy checklist that keeps the registry up |
 | [API Contract](API_CONTRACT.md) | The frozen, machine-checked API surface |
 | [Serverless Migration Plan](SERVERLESS_MIGRATION_PLAN.md) | Why the edge architecture looks the way it does |
 | [Baseline Audit](BASELINE_AUDIT.md) | The defect register that drove the rewrite |

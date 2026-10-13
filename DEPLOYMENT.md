@@ -165,6 +165,10 @@ data deliberately rather than pointing a staging Worker at the production cluste
 ## 5. Validating a deployment
 
 ```bash
+# One command: the full read-only post-deploy smoke (docs/MANUAL_TESTING.md §2).
+# Exits non-zero on the first failure — roll back if it does.
+API="$API" ALLOWED_ORIGIN="<your frontend origin>" scripts/smoke.sh
+
 # The API is alive and MongoDB is reachable through the Durable Object
 curl -s $API/health | jq
 
@@ -181,6 +185,10 @@ curl -s -X POST $API/auth/login -F user_identifier=nobody -F password=wrong | jq
 # The edge cache is working
 curl -si $API/packages/stdlib/json-fortran | grep -i x-cache   # HIT on a repeat
 ```
+
+The full checklist — every route, the `fpm` publish/consume round-trip, the
+negative/security probes, and the rollback drill — is
+[`docs/MANUAL_TESTING.md`](docs/MANUAL_TESTING.md).
 
 ---
 

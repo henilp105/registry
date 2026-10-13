@@ -57,6 +57,7 @@ handler, because the Workers free tier allows only 10 ms of CPU per request. See
 | [Namespace Management](docs/namespace-management.md) | Organizing packages |
 | [Deployment](DEPLOYMENT.md) | Serverless deployment runbook |
 | [Contributing](docs/contributing.md) | Development setup and guidelines |
+| [Manual Testing Runbook](docs/MANUAL_TESTING.md) | Pre/post-deploy checklist for every feature, including fpm end-to-end |
 | [API Contract](docs/API_CONTRACT.md) | The frozen, machine-checked API surface |
 
 The live API serves its own generated OpenAPI document at `/apidocs` and
