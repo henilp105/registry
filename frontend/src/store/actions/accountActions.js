@@ -5,9 +5,16 @@ export const GET_USER_ACCOUNT_REQUEST = "GET_USER_ACCOUNT_REQUEST";
 export const GET_USER_ACCOUNT_SUCCESS = "GET_USER_ACCOUNT_SUCCESS";
 export const GET_USER_ACCOUNT_FAILURE = "GET_USER_ACCOUNT_FAILURE";
 
-export const RESET_PASSWORD_REQUEST = "RESET_PASSWORD_REQUEST";
-export const RESET_PASSWORD_SUCCESS = "RESET_PASSWORD_SUCCESS";
-export const RESET_PASSWORD_FAILURE = "RESET_PASSWORD_FAILURE";
+// The account settings "change password" form is a *different* flow from the
+// emailed reset-password flow. These used to share the literal strings
+// RESET_PASSWORD_*, which both `accountReducer` and `resetPasswordReducer`
+// handle -- so changing your password from /manage/account also wrote
+// `statuscode` into the resetpassword slice, and resetting from an emailed link
+// wrote a message into the account slice. Distinct constants keep the two
+// apart.
+export const CHANGE_PASSWORD_REQUEST = "CHANGE_PASSWORD_REQUEST";
+export const CHANGE_PASSWORD_SUCCESS = "CHANGE_PASSWORD_SUCCESS";
+export const CHANGE_PASSWORD_FAILURE = "CHANGE_PASSWORD_FAILURE";
 
 export const CHANGE_EMAIL_REQUEST = "CHANGE_EMAIL_REQUEST";
 export const CHANGE_EMAIL_SUCCESS = "CHANGE_EMAIL_SUCCESS";
@@ -17,8 +24,8 @@ export const RESET_MESSAGES = "RESET_MESSAGES";
 
 // Legacy aliases for backward compatibility
 export const GET_USER_ACCOUNT = GET_USER_ACCOUNT_SUCCESS;
-export const RESET_PASSWORD = RESET_PASSWORD_REQUEST;
-export const RESET_PASSWORD_ERROR = RESET_PASSWORD_FAILURE;
+export const RESET_PASSWORD = CHANGE_PASSWORD_REQUEST;
+export const RESET_PASSWORD_ERROR = CHANGE_PASSWORD_FAILURE;
 export const CHANGE_EMAIL = CHANGE_EMAIL_REQUEST;
 
 /**
@@ -53,7 +60,7 @@ export const getUserAccount = (accessToken) => async (dispatch) => {
  * @param {string} accessToken - JWT access token
  */
 export const reset = (oldPassword, newPassword, accessToken) => async (dispatch) => {
-  dispatch({ type: RESET_PASSWORD_REQUEST });
+  dispatch({ type: CHANGE_PASSWORD_REQUEST });
 
   try {
     const result = await authenticatedPost(
@@ -63,12 +70,12 @@ export const reset = (oldPassword, newPassword, accessToken) => async (dispatch)
     );
     
     dispatch({
-      type: RESET_PASSWORD_SUCCESS,
+      type: CHANGE_PASSWORD_SUCCESS,
       payload: { message: result.data.message },
     });
   } catch (error) {
     dispatch({
-      type: RESET_PASSWORD_FAILURE,
+      type: CHANGE_PASSWORD_FAILURE,
       payload: { message: getErrorMessage(error) },
     });
   }

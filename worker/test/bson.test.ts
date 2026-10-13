@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ObjectId } from "mongodb";
-import { isIdLike, toBsonQueries, toRpcSafe, toMillis, rawBson, memberOf, notMemberOf, pullBothForms } from "../src/db/bson";
+import { isIdLike, toBsonQueries, toRpcSafe, toMillis, rawBson, memberOf, notMemberOf, pullBothForms, idsBothForms } from "../src/db/bson";
 
 /**
  * The BSON ↔ RPC round trip, pinned.
@@ -327,6 +327,52 @@ describe("rawBson: the escape hatch (legacy maintainers)", () => {
       $pull: { maintainers: pullBothForms(HEX_QUERY) },
     });
     const forms = converted.$pull.maintainers.$in;
+    expect(forms.some((v) => v instanceof ObjectId)).toBe(true);
+    expect(forms.some((v) => v === HEX_QUERY)).toBe(true);
+  });
+});
+
+describe("dual-form helpers are RPC-serialisable before conversion", () => {
+  /**
+   * Defect: the helpers used to build their fragments out of a symbol-keyed
+   * wrapper around a live `ObjectId`. Both are fatal at the Durable Object RPC
+   * boundary that every op crosses before `toBsonQueries` runs:
+   *
+   *   - workerd drops symbol-keyed properties, so `{[RAW]: v}` arrives as `{}`.
+   *   - workerd rejects class instances, so an `ObjectId` member throws
+   *     "DataCloneError: Could not serialize object of type ObjectId".
+   *
+   * The unit tests above call `toBsonQueries` directly, so they never crossed
+   * that boundary and could not catch it. These assert the property that
+   * actually matters: the fragment is plain data until the pool expands it.
+   */
+  const HEX_QUERY = "0123456789abcdef01234567";
+
+  /** True if a value still carries an ObjectId or a symbol key, i.e. would fail RPC. */
+  const confrontsRpc = (value: unknown): boolean => {
+    if (value instanceof ObjectId) return true;
+    if (Array.isArray(value)) return value.some(confrontsRpc);
+    if (value && typeof value === "object") {
+      if (Object.getOwnPropertySymbols(value).length > 0) return true;
+      return Object.values(value).some(confrontsRpc);
+    }
+    return false;
+  };
+
+  it.each([
+    ["memberOf", () => memberOf(HEX_QUERY)],
+    ["notMemberOf", () => notMemberOf(HEX_QUERY)],
+    ["pullBothForms", () => pullBothForms(HEX_QUERY)],
+    ["idsBothForms", () => idsBothForms([HEX_QUERY])],
+  ])("%s emits only RPC-safe data", (_name, build) => {
+    const fragment = build();
+    expect(confrontsRpc(fragment), "helper output still contains an ObjectId or symbol").toBe(false);
+    // Every member must survive a real serialisation round trip unchanged.
+    expect(JSON.parse(JSON.stringify(fragment))).toEqual(fragment);
+  });
+
+  it("still expands to both stored forms inside the pool", () => {
+    const forms = toBsonQueries<unknown[]>(idsBothForms([HEX_QUERY]));
     expect(forms.some((v) => v instanceof ObjectId)).toBe(true);
     expect(forms.some((v) => v === HEX_QUERY)).toBe(true);
   });

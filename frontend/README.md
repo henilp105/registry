@@ -1,70 +1,62 @@
-# Getting Started with Create React App
+# fpm Registry — Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+The React single-page app for the Fortran Package Manager registry. It is a
+static build served from Cloudflare Pages; all data comes from the serverless
+API in [`../worker`](../worker).
 
-## Available Scripts
+## Stack
 
-In the project directory, you can run:
+- **React 18** (Create React App / `react-scripts` 5)
+- **Redux Toolkit** + `redux-persist` for state and session rehydration
+- **React Router 6** for routing
+- **React-Bootstrap 5** for accessible dialogs, forms, and dropdowns
+- **recharts** for the package rating graph
 
-### `npm start`
+## Local development
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Start the API first (see [`../worker`](../worker)), then:
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```bash
+npm ci
+REACT_APP_REGISTRY_API_URL=http://localhost:8787 npm start
+```
 
-### `npm test`
+The app opens at <http://localhost:3000>. `REACT_APP_REGISTRY_API_URL` is
+inlined at **build** time, so changing it requires a restart.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Scripts
 
-### `npm run build`
+| Command | What it does |
+|---------|--------------|
+| `npm start` | Dev server with hot reload |
+| `npm test` | Interactive test runner |
+| `npm run build` | Production bundle in `build/` |
+| `npm run deploy` | Build and deploy to Cloudflare Pages |
+| `npm run preview` | Build and serve locally with `wrangler pages dev` |
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Design system
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Colour, type, space, radius, elevation and motion are defined once as CSS
+custom properties in [`src/theme/tokens.css`](src/theme/tokens.css). Components
+must reference a token rather than a literal value.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- [`THEME.md`](THEME.md) explains the palette and the token layer.
+- `src/theme/tokens.css` is **generated** — edit `tools/palette.py` and run
+  `python3 tools/build_tokens.py`, then commit both files.
+- [`frontend/docs/theme-contrast.md`](docs/theme-contrast.md) records the
+  measured WCAG contrast ratios.
 
-### `npm run eject`
+## Accessibility checks
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Small dependency-free probes live in `tools/` and are run in CI:
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+python3 tools/build_tokens.py --check   # tokens match the generator
+node tools/route-smoke.cjs              # every route renders
+node tools/modal-a11y.cjs               # dialogs are labelled and focus-trapped
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Deployment
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+The frontend is deployed to Cloudflare Pages. See the canonical
+[deployment runbook](../DEPLOYMENT.md) for the full free-tier setup.

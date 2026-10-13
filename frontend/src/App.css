@@ -49,12 +49,6 @@
   max-width: var(--content-width);
 }
 
-/* The brand mark is an <img> wrapped in a clickable Navbar.Brand, so the hit
-   target needs an explicit cursor: an anchor wrapper alone would not. */
-.navbar-brand-clickable {
-  cursor: pointer;
-}
-
 /* Register is the one filled call-to-action in the top-level nav; everything
    else is a plain link. */
 .nav-cta {
@@ -122,37 +116,6 @@
   background-color: var(--color-brand-solid);
 }
 
-/* Underline that grows from the centre on hover/focus. */
-.nav-link-hover {
-  position: relative;
-  transition: color var(--duration-fast) var(--ease-standard);
-}
-
-/* The theme owns its own navigation colour.
- *
- * Bootstrap's `.nav-link { color: var(--bs-nav-link-color) }` has specificity
- * (0,1,0) and beats the theme's `a { color: var(--color-link) }` at (0,0,1), so
- * every top-level link took Bootstrap's colour instead of the palette's. In dark
- * mode that was Bootstrap's *light* default, black at 1.11:1 on the dark
- * background -- invisible, and failing WCAG AA for large text and UI components
- * as well as for body text.
- *
- * Two things fix it, and both are wanted:
- *
- *   1. `applyTheme` now mirrors `data-theme` onto `data-bs-theme`, which is what
- *      activates Bootstrap's own dark palette. That corrects every Bootstrap
- *      component at once rather than one rule at a time.
- *   2. This block restates the nav colour at matching specificity, so the theme
- *      stays authoritative for its own navigation even if that mirror is ever
- *      dropped. One mechanism fixing a whole framework is worth having; relying
- *      on it alone is not.
- *
- * Selector note: `react-bootstrap`'s `<Nav>` renders `<div class="navbar-nav">`,
- * not the `<ul class="nav">` of Bootstrap 4. Scoping to `.nav` matches nothing,
- * which is why the first attempt at this rule silently did nothing.
- *
- * `!important` is deliberately not used: it would also beat a user's override.
- */
 .navbar-nav .nav-link-hover,
 .navbar-nav .nav-link-hover:hover,
 .navbar-nav .nav-link-hover:focus-visible {
@@ -269,16 +232,13 @@
    Dashboard
    -------------------------------------------------------------------------- */
 
-#dashboard-card {
+.dashboard-card {
   margin-bottom: var(--space-4);
   font-size: var(--font-size-sm);
-  transition:
-    transform var(--duration-base) var(--ease-standard),
-    box-shadow var(--duration-base) var(--ease-standard);
+  transition: box-shadow var(--duration-base) var(--ease-standard);
 }
 
-#dashboard-card:hover {
-  transform: translateY(-2px);
+.dashboard-card:hover {
   box-shadow: var(--shadow-md);
 }
 
@@ -302,7 +262,7 @@
    Misc
    -------------------------------------------------------------------------- */
 
-#card-text {
+.dashboard-card__text {
   text-align: justify;
   line-height: var(--line-height-relaxed);
 }

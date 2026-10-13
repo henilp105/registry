@@ -84,10 +84,10 @@ export type MongoOp =
    *     Worker Free CPU budget .................  10 ms
    *
    * So even the iteration count MongoDB itself uses for SCRAM costs ~40% of
-   * the whole budget, and the largest count the Workers runtime allows for
-   * password storage (100k; above it throws "iteration counts above 100000
-   * are not supported") is ~8x over it. Hashing in a Worker handler would
-   * return Cloudflare error 1102 on every login and every signup.
+   * the whole budget, and the configured password-storage cost (10k by default;
+   * the runtime caps it at 100k) already fills most of the rest. Hashing in a
+   * Worker handler would return Cloudflare error 1102 on every login and every
+   * signup.
    *
    * The Durable Object has 30 s of CPU per request on the Free plan, which is
    * the same trick that makes the MongoDB connection viable: move the
@@ -151,16 +151,6 @@ export type DeleteResult = { deletedCount: number };
  * request in a region converges on the same Durable Object instance.
  */
 export const POOL_NAME = "fpm-registry-mongo-pool";
-
-// TEMP DEBUG: count DO subrequests per invocation.
-const _ofetch = globalThis.fetch;
-if (!(globalThis as any).__fetchWrapped) {
-  (globalThis as any).__fetchWrapped = true;
-  globalThis.fetch = ((...args: any[]) => {
-    try { console.log("FETCH>>>", typeof args[0] === "string" ? args[0] : (args[0]?.url ?? "?")); } catch {}
-    return (_ofetch as any)(...args);
-  }) as any;
-}
 
 export class MongoPool extends DurableObject<PoolEnv> {
   /** The live client. Survives for the DO isolate's lifetime — this is what
@@ -315,13 +305,11 @@ export class MongoPool extends DurableObject<PoolEnv> {
     }
     try {
       this.#client = await this.#connecting;
-      console.log("MONGO-CONNECT-OK");
       this.#connecting = null;
       this.#pendingClient = null;
       this.#lastError = null;
       return this.#client;
     } catch (err) {
-      console.log("MONGO-CONNECT-FAIL", err instanceof Error ? err.name + ":" + err.message : String(err));
       this.#connecting = null;
       this.#lastError = err instanceof Error ? err.message : String(err);
       const pending = this.#pendingClient;
@@ -383,7 +371,6 @@ export class MongoPool extends DurableObject<PoolEnv> {
         // idempotent by construction: they are filtered on a field the write
         // itself changes (`revoked_at: null`, `used_at: null`,
         // `versions.version: { $ne }`), so a second application matches nothing.
-        console.log("EXEC-ERR attempt", attempt, request.op.kind, err instanceof Error ? err.name + ":" + err.message : String(err));
         if (attempt >= 1 || !isRetryable(err) || !isReplaySafe(request.op)) throw err;
         // The socket may have died under us; drop it so the retry reconnects.
         await this.#reset();

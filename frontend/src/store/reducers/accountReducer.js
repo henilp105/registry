@@ -2,9 +2,9 @@ import {
   GET_USER_ACCOUNT_REQUEST,
   GET_USER_ACCOUNT_SUCCESS,
   GET_USER_ACCOUNT_FAILURE,
-  RESET_PASSWORD_REQUEST,
-  RESET_PASSWORD_SUCCESS,
-  RESET_PASSWORD_FAILURE,
+  CHANGE_PASSWORD_REQUEST,
+  CHANGE_PASSWORD_SUCCESS,
+  CHANGE_PASSWORD_FAILURE,
   CHANGE_EMAIL_REQUEST,
   CHANGE_EMAIL_SUCCESS,
   CHANGE_EMAIL_FAILURE,
@@ -47,8 +47,8 @@ const accountReducer = (state = initialState, action) => {
         error: action.payload.message,
       };
 
-    // Reset password
-    case RESET_PASSWORD_REQUEST:
+    // Change password
+    case CHANGE_PASSWORD_REQUEST:
       return {
         ...state,
         isLoadingPassword: true,
@@ -56,7 +56,7 @@ const accountReducer = (state = initialState, action) => {
         message: null,
       };
 
-    case RESET_PASSWORD_SUCCESS:
+    case CHANGE_PASSWORD_SUCCESS:
       return {
         ...state,
         isLoadingPassword: false,
@@ -64,7 +64,7 @@ const accountReducer = (state = initialState, action) => {
         error: null,
       };
 
-    case RESET_PASSWORD_FAILURE:
+    case CHANGE_PASSWORD_FAILURE:
       return {
         ...state,
         isLoadingPassword: false,

@@ -91,11 +91,12 @@ export default {
       // first one forgotten is the one an attacker finds. This chokepoint cannot
       // be forgotten that way.
       //
-      // `authenticate` is called here as well as inside the handlers. That is one
-      // extra HMAC verification: no database round trip and no KDF, so a fraction
-      // of a millisecond, in exchange for counting per account rather than per
-      // address. Counting per address would let one user behind a shared NAT deny
-      // service to everyone else on it.
+      // `authenticate` is called here as well as in the router and handlers, but
+      // it is memoised per request (see lib/auth.ts), so identity is resolved
+      // once: a single HMAC verify plus one indexed `users` read. That buys
+      // counting per account rather than per address, which matters because
+      // counting per address would let one user behind a shared NAT deny service
+      // to everyone else on it.
       let rateHeaders: Record<string, string> = {};
       if (!isExempt(url.pathname)) {
         const identity = await authenticate(request, env);
@@ -142,7 +143,10 @@ export default {
       return jsonError(404, "Page not found", {}, { ...cors, ...rateHeaders });
     } catch (err) {
       // Defect S20/D8: never echo an internal message or stack to the client.
-      console.error("unhandled", url.pathname, err instanceof Error ? err.stack ?? err.message : err);
+      // Log only the message: `err.stack ?? err.message` loses a thrown
+      // non-Error value entirely, and a full stack in the logs adds nothing a
+      // path + message does not already give.
+      console.error("unhandled", url.pathname, err instanceof Error ? err.message : err);
       return jsonError(500, "Internal server error", {}, cors);
     }
   },
@@ -183,7 +187,11 @@ async function healthResponse(env: Env, cors: Record<string, string>): Promise<R
     body.mongo = { connected: false, checked: true, error: "unreachable" };
   }
 
-  return json(200, body, cors);
+  // The frozen contract's success rule is "HTTP 2xx AND body `code: 200`"
+  // (docs/API_CONTRACT.md §1), and docs/api-reference.md documents that shape
+  // for /health too. Omit it and a client branching on `body.code` sees an
+  // unshaped response.
+  return json(200, { code: 200, ...body }, cors);
 }
 
 /** Dispatch the four free Cron Triggers. Phases 7-8 fill in the real work. */

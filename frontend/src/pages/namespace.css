@@ -129,15 +129,12 @@
   padding: 0.875rem var(--space-4);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard);
+  transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
 .namespace-info-clickable:hover,
 .namespace-info-clickable:focus-within {
   background-color: var(--primary-50);
-  transform: translateX(4px);
 }
 
 .namespace-info-clickable:hover .namespace-info-icon,
@@ -157,13 +154,6 @@
 .namespace-info-clickable:hover .chevron-icon,
 .namespace-info-clickable:focus-within .chevron-icon {
   opacity: 1;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .namespace-info-clickable:hover,
-  .namespace-info-clickable:focus-within {
-    transform: none;
-  }
 }
 
 /* --------------------------------------------------------------------------
@@ -203,25 +193,16 @@
   width: 4px;
   height: 24px;
   border-radius: 2px;
-  background: linear-gradient(
-    180deg,
-    var(--color-brand-solid),
-    var(--color-brand-solid-hover)
-  );
+  background-color: var(--color-brand-solid);
 }
 
 .packages-count {
   padding: var(--space-2) var(--space-5);
   border-radius: var(--radius-full);
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-solid),
-    var(--color-brand-solid-hover)
-  );
+  background-color: var(--color-brand-solid);
   color: var(--color-on-brand-solid);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  box-shadow: var(--shadow-sm);
 }
 
 .packages-list {

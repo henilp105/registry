@@ -48,10 +48,11 @@ function iterations(env: Env): number {
 /**
  * Hash a password *inside the Durable Object*.
  *
- * PBKDF2-SHA256 costs tens of ms of CPU even at the runtime-enforced cap of
- * 100k iterations, roughly 10x the Worker's entire 10 ms CPU budget, so
- * running it in the handler would return error 1102 on every signup and
- * login. The DO has 30 s of CPU per request on the Free plan.
+ * PBKDF2-SHA256 costs milliseconds of CPU even at the configured 10,000
+ * iterations (~8.5 ms, most of the Worker's entire 10 ms CPU budget), and far
+ * more at the runtime cap of 100,000, so running it in the handler would return
+ * error 1102 on every signup and login. The DO has 30 s of CPU per request on
+ * the Free plan.
  * See the `hashPassword` op in mongo-pool.ts.
  */
 async function hashPasswordInPool(env: Env, password: string): Promise<string> {

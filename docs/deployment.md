@@ -1,11 +1,13 @@
 # Deployment Guide
 
-**This guide has moved.** The Docker Compose / nginx deployment described here is the *legacy* stack.
-It is no longer how the registry is deployed.
+The registry is deployed **serverless** — there is no VM, Docker Compose, or nginx to run.
 
-Current deployment runbook: **[`DEPLOYMENT.md`](../DEPLOYMENT.md)** at the repository root.
+👉 **Current runbook: [`DEPLOYMENT.md`](../DEPLOYMENT.md) at the repository root.**
 
-## What changed
+## What changed from the self-hosted stack
+
+The last self-hosted release (`v2.0.1`) ran Flask behind nginx in Docker Compose. That
+stack has been removed from this repository as part of the serverless migration.
 
 | | Legacy (`v2.0.1`) | Current |
 |---|---|---|
@@ -15,23 +17,11 @@ Current deployment runbook: **[`DEPLOYMENT.md`](../DEPLOYMENT.md)** at the repos
 | Scaling | Vertical, manual | Automatic at the edge |
 | Cost | Whatever the VM costs | **$0.00/month**, all free tiers |
 | Secrets | `.env` on the server | `wrangler secret put`, never on disk |
-| MongoDB | Self-hosted, 512 MB VPS | MongoDB Atlas M0, free tier |
+| MongoDB | Self-hosted | MongoDB Atlas M0, free tier |
 | Artifacts | Container filesystem, lost on redeploy | R2, versioned and durable |
 
-The migration rationale, the measured constraints that forced each decision, and the rejected
-alternatives are in [`docs/SERVERLESS_MIGRATION_PLAN.md`](./SERVERLESS_MIGRATION_PLAN.md). The API
-surface is unchanged; [`docs/API_CONTRACT.md`](./API_CONTRACT.md) is the frozen contract, and
+The migration rationale, the measured constraints that forced each decision, and the
+rejected alternatives are in
+[`SERVERLESS_MIGRATION_PLAN.md`](./SERVERLESS_MIGRATION_PLAN.md). The API surface is
+unchanged; [`API_CONTRACT.md`](./API_CONTRACT.md) is the frozen contract, and
 `/apidocs/openapi.json` serves it generated from the code so the two cannot drift.
-
-## Why the legacy guide is kept
-
-The legacy stack is still the rollback target for the first 7 days after cutover, so the procedure for
-restarting it is not worthless yet:
-
-```bash
-cd /opt/registry/backend
-git pull
-docker compose -f compose.yaml -f compose.override.yaml up -d --build backend
-```
-
-After cutover is complete and the legacy stack is decommissioned, delete this file.

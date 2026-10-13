@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cacheKey, TTL, ENTITY } from "../src/lib/cache";
-import { escapeRegex, clampInt, SORT_MAP, MAX_PAGE_SIZE, planSearch, buildMatchFilter, sortDirection } from "../src/lib/search";
+import { escapeRegex, clampInt, SORT_MAP, MAX_PAGE_SIZE, planSearch, buildMatchFilter, sortDirection, sortDirectionFor } from "../src/lib/search";
 
 describe("cacheKey", () => {
   it("is stable for the same URL", () => {
@@ -205,5 +205,32 @@ describe("sortDirection", () => {
   it("honours desc, case-insensitively", () => {
     expect(sortDirection("desc")).toBe(-1);
     expect(sortDirection("DESC")).toBe(-1);
+  });
+});
+
+describe("sortDirectionFor", () => {
+  /**
+   * `docs/API_CONTRACT.md` §7.5 annotates `updated_at`, `created_at` and
+   * `download_count` as DESC, and the shipped UI never sends `sort=`. With an
+   * unconditional ASC default, "Date last updated" listed the oldest edits first
+   * and "downloads" the least-downloaded package first.
+   */
+  it("defaults date and download fields to DESC", () => {
+    expect(sortDirectionFor("updated_at", null)).toBe(-1);
+    expect(sortDirectionFor("created_at", null)).toBe(-1);
+    expect(sortDirectionFor("download_count", null)).toBe(-1);
+    expect(sortDirectionFor("updated_at", "")).toBe(-1);
+  });
+
+  it("defaults name and author to ASC", () => {
+    expect(sortDirectionFor("name", null)).toBe(1);
+    expect(sortDirectionFor("author", null)).toBe(1);
+  });
+
+  it("lets an explicit sort override the field default", () => {
+    expect(sortDirectionFor("download_count", "asc")).toBe(1);
+    expect(sortDirectionFor("updated_at", "asc")).toBe(1);
+    expect(sortDirectionFor("name", "desc")).toBe(-1);
+    expect(sortDirectionFor("name", "nonsense")).toBe(1);
   });
 });

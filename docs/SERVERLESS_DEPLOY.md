@@ -44,10 +44,12 @@ wrangler r2 bucket create fpm-registry-tarballs
 ```bash
 cd worker
 wrangler secret put MONGO_URI
-# paste: mongodb+srv://henilp105_db_user:FsPIM1HkOairYjZj@cluster0.kdreahb.mongodb.net/?appName=Cluster0
+# paste your own Atlas connection string from the cluster's "Connect" dialog:
+#   mongodb+srv://<db-user>:<db-password>@<cluster-host>/?appName=Cluster0
 
 wrangler secret put JWT_SECRET_KEY        # generate: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
-wrangler secret put VALIDATION_SECRET     # different random string, same command
+wrangler secret put SALT                  # different random string; required for password hashing
+wrangler secret put VALIDATION_SECRET     # another random string (mail verification tokens)
 wrangler secret put BREVO_API_KEY         # free-tier Brevo key, or leave unset to disable mail
 ```
 
@@ -79,7 +81,7 @@ npx wrangler pages deploy build --project-name fpm-registry
 
 ```bash
 curl https://fpm-registry-api.<your-subdomain>.workers.dev/health
-curl "https://fpm-registry-api.<your-subdomain>.workers.dev/search?query=test"
+curl "https://fpm-registry-api.<your-subdomain>.workers.dev/packages?query=test"
 node ../scripts/check_api_compat.py --base-url https://fpm-registry-api.<your-subdomain>.workers.dev
 ```
 

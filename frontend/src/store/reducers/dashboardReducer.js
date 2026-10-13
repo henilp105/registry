@@ -26,7 +26,11 @@ const dashboardReducer = (state = initialState, action) => {
         ...state,
         isLoading: false,
         packages: asList(action.payload.packages),
-        namespaces: action.payload.namespaces,
+        // Same D63 hardening as `packages` above: dashboard.js guards with
+        // `!namespaces || namespaces.length === 0` and then calls
+        // `namespaces.map`. A truthy non-array (proxy error page, truncated
+        // body) slips past the guard and throws, blanking the dashboard.
+        namespaces: asList(action.payload.namespaces),
         error: null,
       };
 

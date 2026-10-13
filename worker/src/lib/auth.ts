@@ -30,6 +30,19 @@ export type UserDoc = {
 export { signToken, verifyToken } from "./jwt";
 
 /**
+ * Per-request memo of the resolved identity.
+ *
+ * The rate-limit chokepoint (`index.ts`), the router, and at least one handler
+ * all call `authenticate` with the same `Request`. Identity resolution reads
+ * the user document to enforce `sessionsInvalidBefore` / `isVerified`, so
+ * without a memo one authenticated request costs up to three identical `users`
+ * reads — real money against the Atlas M0 ceiling of 100 ops/second and against
+ * the free-tier read budget. Keyed on the `Request` object, which is unique per
+ * fetch and shared by every caller within it.
+ */
+const identityByRequest = new WeakMap<Request, Promise<AuthContext | null>>();
+
+/**
  * Resolve the caller from the `Authorization: Bearer` header.
  *
  * Returns `null` rather than throwing so anonymous routes stay reachable and
@@ -37,7 +50,15 @@ export { signToken, verifyToken } from "./jwt";
  * legitimately public read routes, and the routes that do need identity check
  * `auth === null` themselves.
  */
-export async function authenticate(request: Request, env: Env): Promise<AuthContext | null> {
+export function authenticate(request: Request, env: Env): Promise<AuthContext | null> {
+  const cached = identityByRequest.get(request);
+  if (cached) return cached;
+  const resolved = resolveIdentity(request, env);
+  identityByRequest.set(request, resolved);
+  return resolved;
+}
+
+async function resolveIdentity(request: Request, env: Env): Promise<AuthContext | null> {
   const header = request.headers.get("Authorization");
   if (!header || !header.startsWith("Bearer ")) return null;
   const token = header.slice(7).trim();

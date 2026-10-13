@@ -27,6 +27,7 @@ import type { Env } from "../db/client";
 import { jsonError, jsonOk } from "../lib/responses";
 import { ENTITY, invalidate } from "../lib/cache";
 import { logger } from "../lib/logger";
+import { strId } from "../lib/permissions";
 import { validateLicense } from "../lib/validators";
 
 /** Constant-time string comparison for the shared secret. */
@@ -136,9 +137,26 @@ async function pendingWork(env: Env, url: URL): Promise<Response> {
     ],
   })) as Record<string, unknown>[];
 
+  // Legacy package documents predate the denormalised `namespace_name` field.
+  // `applyResult` locates them by resolving the namespace, but it needs the
+  // *name* to build that filter — so a job that offers `namespace: ""` can never
+  // be applied and the package stays pending forever. Recover the name here.
+  const idNamespaces = docs.filter((d) => !d.namespace_name && d.namespace).map((d) => d.namespace);
+  const nameByNamespaceId = new Map<string, string>();
+  if (idNamespaces.length > 0) {
+    const namespaces = (await db<{ _id: unknown; namespace: string }[]>(env, {
+      kind: "find",
+      collection: "namespaces",
+      filter: { _id: { $in: idNamespaces } },
+      projection: { _id: 1, namespace: 1 },
+    })) as { _id: unknown; namespace: string }[];
+    for (const ns of namespaces) nameByNamespaceId.set(strId(ns._id), ns.namespace);
+  }
+
   const jobs = [];
   for (const doc of docs) {
-    const namespaceName = String(doc.namespace_name ?? "");
+    const namespaceName =
+      String(doc.namespace_name ?? "") || nameByNamespaceId.get(strId(doc.namespace)) || "";
     for (const version of (doc.versions ?? []) as Record<string, unknown>[]) {
       if (version.unable_to_verify === false) continue;
       // A version that already failed validation stays visible but must not be

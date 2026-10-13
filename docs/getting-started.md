@@ -147,47 +147,34 @@ source-dir = "src"
 
 ---
 
-## Quick Start with Docker
+## Running Your Own Instance
 
-For local development or self-hosting:
+The registry is serverless: the API is a Cloudflare Worker and the frontend is a static
+React build. There is nothing to install locally to host it.
 
-```bash
-# Clone the repository
-git clone https://github.com/fortran-lang/fpm-registry
-cd fpm-registry/registry
-
-# Start all services
-docker compose up -d
-
-# Access the registry
-open http://localhost
-
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
-```
-
-### Environment Configuration
-
-Create a `.env` file for custom configuration:
+For local development:
 
 ```bash
-# MongoDB
-MONGO_DB_NAME=fpmregistry
+# API (in worker/)
+cd worker
+npm ci
+cp .dev.vars.example .dev.vars   # fill in MONGO_URI, JWT_SECRET_KEY, SALT
+npm run dev                      # http://localhost:8787
 
-# Security (CHANGE IN PRODUCTION!)
-SALT=your-unique-salt-value
-JWT_SECRET_KEY=your-jwt-secret-key
-
-# Email (optional, for password reset)
-RESET_EMAIL=your-email@gmail.com
-RESET_PASSWORD=your-app-password
-
-# Admin password
-SUDO_PASSWORD=your-admin-password
+# Frontend (in frontend/)
+cd frontend
+npm ci
+REACT_APP_REGISTRY_API_URL=http://localhost:8787 npm start
 ```
+
+For a real deployment, follow the [deployment runbook](../DEPLOYMENT.md).
+
+### Configuration
+
+The Worker reads its settings from `worker/wrangler.jsonc` and from secrets set with
+`wrangler secret put`. The required secrets are `MONGO_URI`, `SALT`, and
+`JWT_SECRET_KEY`; `VALIDATION_SECRET` is needed for package validation and
+`BREVO_API_KEY` is optional (email). Never commit secret values.
 
 ---
 
@@ -196,7 +183,7 @@ SUDO_PASSWORD=your-admin-password
 - [API Reference](api-reference.md) - Complete API documentation
 - [Authentication](authentication.md) - Deep dive into auth flows
 - [Package Management](package-management.md) - Advanced publishing options
-- [Deployment Guide](deployment.md) - Production deployment
+- [Deployment Guide](../DEPLOYMENT.md) - Production deployment
 
 ---
 
@@ -218,6 +205,5 @@ A: New packages undergo verification. Check the package status via API.
 
 ### Getting Help
 
-- Check the [FAQ](faq.md) for common questions
-- Search existing [GitHub Issues](https://github.com/fortran-lang/fpm-registry/issues)
+- Search existing [GitHub Issues](https://github.com/fortran-lang/registry/issues)
 - Ask on [Fortran Discourse](https://fortran-lang.discourse.group/)

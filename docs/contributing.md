@@ -1,10 +1,12 @@
 # Contributing Guide
 
-Thank you for your interest in contributing to the FPM Registry! This guide will help you get started with development, understand our standards, and submit quality contributions.
+Thank you for your interest in contributing to the FPM Registry! This guide will help you
+get started with development, understand our standards, and submit quality contributions.
 
 ## Code of Conduct
 
-We are committed to providing a welcoming and inclusive environment. All contributors are expected to:
+We are committed to providing a welcoming and inclusive environment. All contributors are
+expected to:
 
 - Be respectful and considerate
 - Welcome newcomers and help them get started
@@ -32,10 +34,11 @@ Report unacceptable behavior to: fpm@fortran-lang.org
 ### Good First Issues
 
 Look for issues labeled:
-- `good first issue` - Suitable for newcomers
-- `help wanted` - Community help needed
-- `documentation` - Docs improvements
-- `beginner-friendly` - Low complexity
+
+- `good first issue` — suitable for newcomers
+- `help wanted` — community help needed
+- `documentation` — docs improvements
+- `beginner-friendly` — low complexity
 
 ---
 
@@ -43,68 +46,50 @@ Look for issues labeled:
 
 ### Prerequisites
 
-- **Python 3.10+** - Backend development
-- **Node.js 18+** - Frontend development
-- **Docker & Docker Compose** - Container development
-- **Git** - Version control
-- **MongoDB** - Database (or use Docker)
+- **Node.js ≥ 22** — the API runs on Cloudflare Workers and the frontend is React
+- **npm** (bundled with Node)
+- **Git**
+- A **MongoDB** instance — a free [Atlas M0 cluster](https://www.mongodb.com/atlas) or a
+  local `mongod` for offline work
 
-### Backend Setup
+No Docker, no Python, and no web server are required.
+
+### API setup (`worker/`)
+
+The API is a Cloudflare Worker written in TypeScript, with a Durable Object owning the
+MongoDB connection and the password KDF.
 
 ```bash
-# Clone repository
-git clone https://github.com/fortran-lang/registry.git
-cd registry/backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# venv\Scripts\activate    # Windows
+cd worker
 
 # Install dependencies
-pip install -r requirements.txt
-pip install -r requirements-dev.txt  # Development dependencies
+npm ci
 
-# Set environment variables
-cp .env.example .env
-# Edit .env with your settings
+# Configure local development. `.dev.vars` is gitignored — never commit it.
+cp .dev.vars.example .dev.vars
+#   MONGO_URI=...            your Atlas or local connection string
+#   JWT_SECRET_KEY=...       node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+#   SALT=...                 only read by the legacy hash verifier
 
-# Start MongoDB (using Docker)
-docker run -d -p 27017:27017 --name mongo mongo:6.0
-
-# Run development server
-python app.py
-# or
-flask run --debug
+# Run the development server (wrangler dev)
+npm run dev
+# → http://localhost:8787
 ```
 
-### Frontend Setup
+### Frontend setup (`frontend/`)
 
 ```bash
-cd registry/frontend
+cd frontend
 
-# Install dependencies
-npm install
+npm ci
 
-# Start development server
-npm start
-# Runs on http://localhost:3000
+# Point the app at the local Worker
+REACT_APP_REGISTRY_API_URL=http://localhost:8787 npm start
+# → http://localhost:3000
 ```
 
-### Full Stack with Docker
-
-```bash
-cd registry/backend
-
-# Start all services
-docker compose -f compose.yaml up -d
-
-# View logs
-docker compose logs -f
-
-# Stop services
-docker compose down
-```
+`REACT_APP_REGISTRY_API_URL` is inlined at **build** time, so changing it requires a
+rebuild, not a restart.
 
 ---
 
@@ -112,34 +97,21 @@ docker compose down
 
 ```
 registry/
-├── backend/
-│   ├── app.py              # Flask application entry
-│   ├── auth.py             # Authentication logic
-│   ├── packages.py         # Package endpoints
-│   ├── namespaces.py       # Namespace endpoints
-│   ├── user.py             # User endpoints
-│   ├── mongo.py            # Database client
-│   ├── mail.py             # Email functionality
-│   ├── validate.py         # Input validation
-│   ├── models/
-│   │   ├── package.py      # Package data model
-│   │   ├── namespace.py    # Namespace data model
-│   │   └── user.py         # User data model
-│   ├── tests/
-│   │   ├── base_case.py    # Test base class
-│   │   ├── test_login.py   # Auth tests
-│   │   ├── test_packages.py
-│   │   └── test_signup.py
-│   └── docker/
-│       └── backend.Dockerfile
-├── frontend/
+├── worker/                 # Cloudflare Worker API (TypeScript)
 │   ├── src/
-│   │   ├── App.js          # Main component
-│   │   ├── index.js        # Entry point
-│   │   ├── pages/          # Page components
-│   │   ├── components/     # Reusable components
-│   │   └── store/          # State management
-│   └── public/
+│   │   ├── index.ts        # Worker entry: CORS, rate limiting, health, crons
+│   │   ├── router.ts       # Route table
+│   │   ├── routes/         # One module per resource (auth, users, packages, …)
+│   │   ├── lib/            # JWT, password hashing, cache, validators, storage
+│   │   └── db/             # Durable Object pool, BSON/RPC conversion, indexes
+│   ├── test/               # Vitest suites (hermetic + live-Atlas)
+│   └── wrangler.jsonc      # Bindings and per-environment vars
+├── frontend/               # React single-page app (CRA)
+│   └── src/
+│       ├── pages/          # Route-level components
+│       ├── components/     # Reusable components
+│       └── store/          # Redux state
+├── scripts/                # Audit harnesses and CI gates
 └── docs/                   # Documentation
 ```
 
@@ -147,182 +119,77 @@ registry/
 
 ## Coding Standards
 
-### Python Style Guide
+### TypeScript (API)
 
-We follow [PEP 8](https://peps.python.org/pep-0008/) with some additions:
+- Strict TypeScript; `npm run typecheck` must pass for both `tsconfig.json` and
+  `tsconfig.test.json`.
+- Prefer small, dependency-free modules. The Worker's 10 ms CPU budget is a hard
+  constraint — keep heavy work (KDF, Mongo connection, hashing) inside the Durable Object.
+- Use the structured `logger` (`src/lib/logger.ts`) rather than bare `console.log`.
+- Successful responses are HTTP 2xx with a body `code: 200`; failures are non-2xx with
+  `{ code, message }`. This is enforced by the tests in `worker/test/`.
 
-```python
-# Good: Clear, descriptive names
-def get_package_by_namespace(namespace: str, package_name: str) -> dict:
-    """Retrieve a package from the specified namespace.
-    
-    Args:
-        namespace: The namespace containing the package.
-        package_name: The name of the package to retrieve.
-        
-    Returns:
-        Dictionary containing package information.
-        
-    Raises:
-        PackageNotFoundError: If the package doesn't exist.
-    """
-    pass
-
-# Bad: Unclear, no documentation
-def get_pkg(ns, n):
-    pass
-```
-
-### Python Formatting
-
-```bash
-# Format code
-black .
-
-# Sort imports
-isort .
-
-# Lint code
-flake8 .
-pylint backend/
-
-# Type checking
-mypy backend/
-```
-
-### JavaScript/React Style Guide
-
-We use ESLint with Airbnb configuration:
-
-```javascript
-// Good: Functional components with hooks
-const PackageCard = ({ package, onSelect }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  
-  return (
-    <Card 
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <CardTitle>{package.name}</CardTitle>
-      <CardDescription>{package.description}</CardDescription>
-    </Card>
-  );
-};
-
-// Bad: Class component for simple UI
-class PackageCard extends React.Component {
-  // ...
+```ts
+// Good: explicit types, documented intent, no hidden work in a handler
+export function clampPage(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, MAX_PAGE_SIZE) : 1;
 }
 ```
 
-### JavaScript Formatting
+### JavaScript / React (frontend)
+
+- Functional components with hooks.
+- Keep the theme writers (`frontend/src/theme/theme.js` and the inline script in
+  `frontend/public/index.html`) in sync — CI checks that both set `data-bs-theme`.
+
+### Formatting
 
 ```bash
-# Format code
+# API
+cd worker
+npm run format       # prettier --write src test
+npm run lint         # eslint src test
+
+# Frontend
+cd frontend
 npx prettier --write src/
-
-# Lint code
-npm run lint
-
-# Fix lint issues
-npm run lint:fix
 ```
 
 ---
 
 ## Testing
 
-### Running Backend Tests
+### API tests
 
 ```bash
-cd backend
+cd worker
 
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=. --cov-report=html
-
-# Run specific test file
-pytest tests/test_packages.py
-
-# Run specific test
-pytest tests/test_packages.py::test_upload_package
-
-# Verbose output
-pytest -v
-
-# Stop on first failure
-pytest -x
+npm test                      # all suites
+npm test -- password          # only files matching "password"
+npm run typecheck             # tsc, both projects
+npm run lint                  # eslint
 ```
 
-### Writing Tests
+The suite is split into **hermetic** tests (pure modules: JWT, PBKDF2, validators, BSON
+conversion, retry policy) and **live-Atlas** tests that need `MONGO_URI` in
+`worker/.dev.vars`. Live tests skip when no cluster is configured.
 
-```python
-# tests/test_packages.py
-import pytest
-from tests.base_case import BaseCase
+When you fix a bug, add a regression test that **fails against the bug**. A test that
+passes both before and after is not coverage.
 
-class TestPackageUpload(BaseCase):
-    """Tests for package upload functionality."""
-    
-    def test_upload_valid_package(self):
-        """Valid package should upload successfully."""
-        # Arrange
-        token = self.get_upload_token()
-        tarball = self.create_test_tarball()
-        
-        # Act
-        response = self.client.post(
-            '/packages',
-            headers={'Authorization': f'Bearer {token}'},
-            data={'tarball': tarball}
-        )
-        
-        # Assert
-        assert response.status_code == 200
-        assert response.json['message'] == 'Package uploaded successfully'
-    
-    def test_upload_without_token_fails(self):
-        """Upload without auth token should return 401."""
-        tarball = self.create_test_tarball()
-        
-        response = self.client.post(
-            '/packages',
-            data={'tarball': tarball}
-        )
-        
-        assert response.status_code == 401
-    
-    def test_upload_invalid_manifest_fails(self):
-        """Package with invalid fpm.toml should fail validation."""
-        token = self.get_upload_token()
-        tarball = self.create_invalid_tarball()
-        
-        response = self.client.post(
-            '/packages',
-            headers={'Authorization': f'Bearer {token}'},
-            data={'tarball': tarball}
-        )
-        
-        assert response.status_code == 400
-        assert 'invalid' in response.json['message'].lower()
+### Validator tests
+
+```bash
+python -m pytest scripts/test_validate_packages.py -v
 ```
 
-### Running Frontend Tests
+### Frontend
 
 ```bash
 cd frontend
-
-# Run tests
 npm test
-
-# Run with coverage
-npm test -- --coverage
-
-# Update snapshots
-npm test -- -u
+npm run build       # must succeed; CI runs it as an invariant check
 ```
 
 ---
@@ -352,6 +219,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 ```
 
 **Types:**
+
 | Type | Description |
 |------|-------------|
 | `feat` | New feature |
@@ -364,16 +232,13 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 | `perf` | Performance improvement |
 
 **Examples:**
+
 ```
 feat(packages): add package search by keywords
 
 fix(auth): resolve JWT token expiration issue
 
 docs(api): update authentication examples
-
-refactor(models): simplify package validation logic
-
-test(namespaces): add tests for admin management
 ```
 
 ### Commit Best Practices
@@ -454,22 +319,18 @@ A clear description of what the bug is.
 
 **To Reproduce**
 1. Go to '...'
-2. Click on '...'
+2. Send request '...'
 3. See error
 
 **Expected behavior**
 What you expected to happen.
 
-**Screenshots**
-If applicable, add screenshots.
-
 **Environment**
-- OS: [e.g., Ubuntu 22.04]
-- Browser: [e.g., Firefox 120]
-- Version: [e.g., 2.0.0]
+- Endpoint / route: [e.g. POST /packages]
+- Environment: [e.g. development / staging / production]
 
 **Additional context**
-Any other relevant information.
+Any other relevant information. **Redact secrets, tokens, and connection strings.**
 ```
 
 ### Feature Requests
@@ -485,7 +346,7 @@ What you want to happen.
 Other solutions you've considered.
 
 **Additional context**
-Any other context or screenshots.
+Any other context.
 ```
 
 ---
@@ -502,7 +363,7 @@ Any other context or screenshots.
 
 ### Documentation Structure
 
-```markdown
+````markdown
 # Page Title
 
 Brief introduction paragraph.
@@ -517,28 +378,14 @@ More detailed content.
 
 #### Code Example
 
-```python
-# Example code
+```ts
+// Example code
 ```
 
 ## Next Steps
 
-- [Related Doc](related-doc.md)
-```
-
-### Building Documentation
-
-```bash
-# Install mkdocs
-pip install mkdocs mkdocs-material
-
-# Serve locally
-mkdocs serve
-# View at http://localhost:8000
-
-# Build static site
-mkdocs build
-```
+- Related Doc (related-doc.md)
+````
 
 ---
 
@@ -547,6 +394,7 @@ mkdocs build
 ### Version Numbering
 
 We follow [Semantic Versioning](https://semver.org/):
+
 - **Major** (X.0.0): Breaking changes
 - **Minor** (0.X.0): New features
 - **Patch** (0.0.X): Bug fixes
@@ -554,13 +402,12 @@ We follow [Semantic Versioning](https://semver.org/):
 ### Release Checklist
 
 1. [ ] All tests pass on `main`
-2. [ ] CHANGELOG.md updated
-3. [ ] Version bumped in code
-4. [ ] Documentation updated
-5. [ ] Release notes drafted
-6. [ ] Tag created and pushed
-7. [ ] GitHub release published
-8. [ ] Docker images published
+2. [ ] Version bumped in `worker/package.json` and `worker/src/index.ts`
+3. [ ] Documentation updated
+4. [ ] Release notes drafted
+5. [ ] Tag created and pushed
+6. [ ] GitHub release published
+7. [ ] Worker deployed (`npm run deploy:production`)
 
 ---
 
@@ -568,7 +415,7 @@ We follow [Semantic Versioning](https://semver.org/):
 
 ### Resources
 
-- **Documentation**: [docs/](./README.md)
+- **Documentation**: [Documentation index](./README.md)
 - **Issue Tracker**: [GitHub Issues](https://github.com/fortran-lang/registry/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/fortran-lang/registry/discussions)
 
@@ -580,6 +427,7 @@ We follow [Semantic Versioning](https://semver.org/):
 ### Maintainers
 
 For urgent issues or security concerns:
+
 - Email: fpm@fortran-lang.org
 
 ---
@@ -587,6 +435,7 @@ For urgent issues or security concerns:
 ## Recognition
 
 Contributors are recognized in:
+
 - CONTRIBUTORS.md file
 - Release notes
 - GitHub contributor graph

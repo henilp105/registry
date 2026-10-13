@@ -12,7 +12,7 @@ JWT_SECRET_KEY=
 # use PBKDF2-SHA256 with a per-user salt.
 SALT=
 
-# Password reset + email verification via Brevo HTTPS API (see backend/mail.py).
+# Password reset + email verification via the Brevo HTTPS API (src/lib/mail.ts).
 # Free tier: 300 emails/day. Leave blank to disable sending.
 BREVO_API_KEY=
 BREVO_SENDER_EMAIL=

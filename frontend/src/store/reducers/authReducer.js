@@ -42,6 +42,9 @@ const authReducer = (state = initialState, action) => {
         username: action.payload.username,
         isLoading: false,
         error: null,
+        // Clear any message left by a previous signup success; without this it
+        // survives the next login and would render on any page reading it.
+        message: null,
       };
 
     // Silent renewal of the access/refresh pair — same identity, new tokens.

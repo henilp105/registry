@@ -1,3 +1,0 @@
-# SSL certificates directory
-# Run scripts/generate-ssl.sh to generate self-signed certificates
-# Or use Let's Encrypt for production

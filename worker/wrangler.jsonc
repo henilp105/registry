@@ -21,9 +21,9 @@
 
   // Explicit CPU ceiling. Cloudflare recommends setting this to prevent
   // runaway bills on the paid plan; on free it bounds error 1102 blast radius.
-  // "limits": {
-  //   "cpu_ms": 2
-  // },
+  "limits": {
+    "cpu_ms": 10
+  },
 
   "observability": {
     "enabled": true,
@@ -36,7 +36,7 @@
   "vars": {
     "ENVIRONMENT": "development",
     "MONGO_DB_NAME": "fpmregistry",
-    "PBKDF2_ITERATIONS": "100000",
+    "PBKDF2_ITERATIONS": "10000",
     "HOST": "http://localhost:5173",
     // Both loopback spellings. `localhost` and `127.0.0.1` are different
     // origins to a browser, and which one a developer uses depends on their
@@ -89,20 +89,18 @@
   "kv_namespaces": [
     {
       "binding": "CACHE",
-      "id": "47853de056914784807c95e00e3660af"
+      "id": "REPLACE_WITH_KV_NAMESPACE_ID"
     }
   ],
 
-  // Cron triggers disabled for now: the Free plan caps an account at 5 cron
-  // triggers total, and this account is already at the cap. Re-enable when a
-  // slot frees up or on the paid plan.
-  // "triggers": {
-  //   "crons": [
-  //     "17 * * * *",   // hourly   — ensure MongoDB indexes exist (bootstrap)
-  //     "0 3 * * *",    // 03:00 UTC— sweep expired upload/auth tokens
-  //     "0 4 * * SUN"   // 04:00 Sun— prune orphaned tarballs from R2
-  //   ]
-  // },
+  "triggers": {
+    // 5 cron triggers are available on the free plan; we use 3.
+    "crons": [
+      "17 * * * *",   // hourly   — ensure MongoDB indexes exist (bootstrap)
+      "0 3 * * *",    // 03:00 UTC— sweep expired upload/auth tokens
+      "0 4 * * 0"     // 04:00 Sun— prune orphaned tarballs from R2
+    ]
+  },
 
   // ── Environment inheritance, which is the trap here ─────────────────────
   // `vars`, `durable_objects` and `kv_namespaces` are NOT inherited by an
@@ -119,15 +117,15 @@
       "vars": {
         "ENVIRONMENT": "staging",
         "MONGO_DB_NAME": "fpmregistry_staging",
-        "PBKDF2_ITERATIONS": "100000",
+        "PBKDF2_ITERATIONS": "10000",
         "HOST": "https://staging.registry.fortran-lang.org",
-        "ALLOWED_ORIGINS": "https://staging.registry.fortran-lang.org,https://fpm-registry.henilp105.workers.dev"
+        "ALLOWED_ORIGINS": "https://staging.registry.fortran-lang.org"
       },
       "durable_objects": {
         "bindings": [{ "name": "MONGO_POOL", "class_name": "MongoPool" }]
       },
       "kv_namespaces": [
-        { "binding": "CACHE", "id": "ced43e444c764dc0ab0b2e375cca22b2" }
+        { "binding": "CACHE", "id": "REPLACE_WITH_STAGING_KV_NAMESPACE_ID" }
       ],
       "exports": {
         "MongoPool": { "type": "durable-object", "storage": "sqlite" }
@@ -144,15 +142,15 @@
       "vars": {
         "ENVIRONMENT": "production",
         "MONGO_DB_NAME": "fpmregistry",
-        "PBKDF2_ITERATIONS": "100000",
+        "PBKDF2_ITERATIONS": "10000",
         "HOST": "https://registry.fortran-lang.org",
-        "ALLOWED_ORIGINS": "https://registry.fortran-lang.org,https://fpm-registry.henilp105.workers.dev"
+        "ALLOWED_ORIGINS": "https://registry.fortran-lang.org"
       },
       "durable_objects": {
         "bindings": [{ "name": "MONGO_POOL", "class_name": "MongoPool" }]
       },
       "kv_namespaces": [
-        { "binding": "CACHE", "id": "3c7487a9a7764287a96f3047f34914e2" }
+        { "binding": "CACHE", "id": "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID" }
       ],
       "exports": {
         "MongoPool": { "type": "durable-object", "storage": "sqlite" }

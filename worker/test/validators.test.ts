@@ -137,6 +137,14 @@ describe("validateLicense", () => {
     expect(validateLicense("(MIT OR BSD-3-Clause) AND Apache-2.0").ok).toBe(true);
   });
 
+  it("accepts parenthesised terms on both sides of an operator", () => {
+    // Both parenthesised *terms* (not one parenthesised sub-expression): the
+    // string starts with `(` and ends with `)`, which the wrapper-peeler used to
+    // mistake for one pair around the whole expression and reject.
+    expect(validateLicense("(MIT) AND (Apache-2.0)").ok).toBe(true);
+    expect(validateLicense("(Apache-2.0) OR (MIT)").ok).toBe(true);
+  });
+
   it("accepts an exception, and rejects an unknown one", () => {
     expect(validateLicense("GPL-2.0-only WITH Classpath-exception-2.0").ok).toBe(true);
     expect(validateLicense("GPL-2.0-only WITH Not-A-Real-Exception").ok).toBe(false);

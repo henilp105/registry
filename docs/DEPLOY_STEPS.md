@@ -12,7 +12,7 @@ Atlas M0 cluster. The PAT for this repo is configured in the git remote.
 ## 0. Clone / update
 
 ```bash
-git clone https://github.com/henilp105/registry.git
+git clone https://github.com/fortran-lang/registry.git
 cd registry
 git checkout main
 git pull origin main
@@ -38,10 +38,14 @@ Edit `worker/wrangler.jsonc`:
 
 ```bash
 npx wrangler secret put MONGO_URI
-# paste: mongodb+srv://henilp105_db_user:FsPIM1HkOairYjZj@cluster0.kdreahb.mongodb.net/?appName=Cluster0
+# paste your own Atlas connection string from the cluster's "Connect" dialog:
+#   mongodb+srv://<db-user>:<db-password>@<cluster-host>/?appName=Cluster0
 
 npx wrangler secret put JWT_SECRET_KEY
 # paste a random string: node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+
+npx wrangler secret put SALT
+# another random string; required for password hashing/verification
 
 npx wrangler secret put VALIDATION_SECRET
 # another random string (mail verification tokens)
@@ -108,10 +112,9 @@ npx wrangler deploy
 ## 8. Verify end-to-end
 
 ```bash
-curl -sS -X POST https://fpm-registry-api.<account>.workers.dev/auth/register \
-  -H 'Content-Type: application/json' \
-  -d '{"username":"smoke","email":"you@example.com","password":"..."}'
-curl -sS "https://fpm-registry-api.<account>.workers.dev/search?query=fpm"
+curl -sS -X POST https://fpm-registry-api.<account>.workers.dev/auth/signup \
+  -d 'username=smoke&email=you@example.com&password=...'
+curl -sS "https://fpm-registry-api.<account>.workers.dev/packages?query=fpm"
 ```
 
 Open `https://fpm-registry.pages.dev`, register, publish a package, and

@@ -185,7 +185,7 @@ const Dashboard = () => {
       <Row>
         {packages.map((element, index) => (
           <Col key={element.id} xs={12} md={4}>
-            <Card id="dashboard-card">
+            <Card className="dashboard-card">
               <Card.Body>
                 <Card.Title>
                   <div className="d-flex justify-content-between">
@@ -213,7 +213,9 @@ const Dashboard = () => {
                 <Card.Subtitle className="mb-2 text-muted">
                   {element.namespace}
                 </Card.Subtitle>
-                <Card.Text id="card-text">{element.description}</Card.Text>
+                <Card.Text className="dashboard-card__text">
+                  {element.description}
+                </Card.Text>
                 {/*
                   These were <div onClick>, which are not focusable and have
                   no keyboard activation at all - the package card's three
@@ -310,7 +312,7 @@ const Dashboard = () => {
       <Row>
         {namespaces.map((element) => (
           <Col key={element.name} xs={12} md={4} className="mb-3">
-            <Card id="dashboard-card" className="h-100">
+            <Card className="dashboard-card h-100">
               <Card.Body className="d-flex flex-column">
                 <div className="d-flex justify-content-between align-items-start mb-2">
                   <Card.Title className="mb-0">
@@ -328,7 +330,7 @@ const Dashboard = () => {
                     <span className="chip dashboard__role">Maintainer</span>
                   ) : null}
                 </div>
-                <Card.Text id="card-text" className="text-muted small flex-grow-1">
+                <Card.Text className="dashboard-card__text text-muted small flex-grow-1">
                   {element.description || "No description"}
                 </Card.Text>
                 <div className="chip-container mt-auto pt-2">

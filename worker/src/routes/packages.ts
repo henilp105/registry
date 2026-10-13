@@ -56,7 +56,7 @@ import {
   clampInt,
   escapeRegex,
   planSearch,
-  sortDirection,
+  sortDirectionFor,
 } from "../lib/search";
 import { consumeUploadToken, inspectUploadToken, tokenAllows } from "../lib/upload-tokens";
 import {
@@ -165,7 +165,7 @@ async function searchPackages(env: Env, url: URL): Promise<Response> {
   // Shaping happens in a final $project stage rather than in the initial
   // projection, so the sort still sees `updated_at` / `download_count` while the
   // response only carries the five documented fields.
-  const direction = sortDirection(url.searchParams.get("sort"));
+  const direction = sortDirectionFor(sortField, url.searchParams.get("sort"));
 
   // A pathological or injection-shaped query must not reach the matcher.
   const plan = planSearch(rawQuery);
@@ -305,7 +305,7 @@ async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
   const skip = Math.min(page * limit, MAX_SKIP);
   const sortedBy = (url.searchParams.get("sorted_by") ?? "name").toLowerCase();
   const sortField = SORT_MAP[sortedBy] ?? "name";
-  const direction = sortDirection(url.searchParams.get("sort"));
+  const direction = sortDirectionFor(sortField, url.searchParams.get("sort"));
 
   // `*` is the CLI's "any" sentinel, not a literal to match against.
   const wildcard = (key: string): string | null => {
@@ -844,6 +844,40 @@ async function deprecatePackage(
 
 // ── POST /packages (upload) ──────────────────────────────────────────────────
 
+/** The namespace fields the consume-time publish re-check reads. */
+type NamespaceAuthDoc = {
+  _id: unknown;
+  namespace: string;
+  author?: unknown;
+  admins?: unknown[];
+  maintainers?: unknown[];
+};
+
+/**
+ * Does the upload-token creator still hold publish rights?
+ *
+ * Uses the *same* predicate the mint route uses (`canPublishPackage`: site
+ * admin ∪ namespace admin ∪ namespace maintainer ∪ package maintainer). A
+ * namespace-membership check alone rejected package maintainers and site
+ * admins — neither need appear in the namespace document — so the mint route
+ * handed out tokens the publish route then refused with "Invalid upload token",
+ * and a package maintainer's `dry_run` disagreed with their real publish.
+ */
+async function creatorMayPublish(
+  env: Env,
+  createdBy: string,
+  namespace: NamespaceAuthDoc,
+  packageName: string,
+  existing: { _id: unknown; maintainers?: unknown } | null,
+): Promise<boolean> {
+  const creator = await findUser(env, createdBy);
+  if (!creator) return false;
+  const pkg = existing
+    ? { _id: existing._id, name: packageName, maintainers: (existing.maintainers ?? []) as unknown[] }
+    : { name: packageName, maintainers: [] as unknown[] };
+  return canPublishPackage(creator, namespace, pkg);
+}
+
 /**
  * Upload.
  *
@@ -908,29 +942,32 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
       logger.warn("rejected upload token", { reason: inspected.reason });
       return jsonError(401, "Invalid upload token");
     }
-    // The real path applies tokenAllows; the dry run must apply it too, or a
-    // package-scoped token passes a dry run for the wrong namespace/package
-    // and fails at publish time — the exact opposite of a dry run's job.
-    const ns = (await db<{ _id: unknown } | null>(env, {
+    // The real path applies both `tokenAllows` and a consume-time role
+    // re-check; the dry run must apply both too, or it reports "Successful"
+    // for a token the real publish path will reject — the exact opposite of a
+    // dry run's job.
+    const ns = (await db<NamespaceAuthDoc | null>(env, {
       kind: "findOne",
       collection: "namespaces",
       filter: { _id: toHexOrId(inspected.namespaceId) },
-      projection: { _id: 1 },
-    })) as { _id: unknown } | null;
+      projection: { _id: 1, namespace: 1, author: 1, admins: 1, maintainers: 1 },
+    })) as NamespaceAuthDoc | null;
     if (!ns) return jsonError(404, "Namespace not found");
-    let packageId: string | null = null;
-    if (inspected.packageId) {
-      packageId = inspected.packageId;
-    } else {
-      const existing = (await db<{ _id: unknown } | null>(env, {
-        kind: "findOne",
-        collection: "packages",
-        filter: { name: packageName, namespace: ns._id },
-        projection: { _id: 1 },
-      })) as { _id: unknown } | null;
-      packageId = existing ? strId(existing._id) : null;
-    }
+
+    const pkgProbe = (await db<{ _id: unknown; maintainers?: unknown[] } | null>(env, {
+      kind: "findOne",
+      collection: "packages",
+      filter: inspected.packageId
+        ? { _id: toHexOrId(inspected.packageId) }
+        : { name: packageName, namespace: ns._id },
+      projection: { _id: 1, maintainers: 1 },
+    })) as { _id: unknown; maintainers?: unknown[] } | null;
+    const packageId = inspected.packageId ?? (pkgProbe ? strId(pkgProbe._id) : null);
+
     if (!tokenAllows(inspected, inspected.namespaceId, packageId)) {
+      return jsonError(401, "Invalid upload token");
+    }
+    if (!(await creatorMayPublish(env, inspected.createdBy, ns, packageName, pkgProbe))) {
       return jsonError(401, "Invalid upload token");
     }
     return jsonOk({ message: "Dry run Successful." });
@@ -947,48 +984,34 @@ async function upload(request: Request, env: Env, ctx: ExecutionContext): Promis
   }
   const verdict = { valid: true as const, namespaceId: inspected.namespaceId, packageId: inspected.packageId, createdBy: inspected.createdBy };
 
-  const namespace = (await db<{ _id: unknown; namespace: string; author?: unknown; admins?: unknown[]; maintainers?: unknown[] } | null>(env, {
+  const namespace = (await db<NamespaceAuthDoc | null>(env, {
     kind: "findOne",
     collection: "namespaces",
     filter: { _id: toHexOrId(verdict.namespaceId) },
     projection: { namespace: 1, author: 1, admins: 1, maintainers: 1 },
-  })) as { _id: unknown; namespace: string; author?: unknown; admins?: unknown[]; maintainers?: unknown[] } | null;
+  })) as NamespaceAuthDoc | null;
 
   if (!namespace) return jsonError(404, "Namespace not found");
-
-  // A token minted while the creator was author/admin/maintainer keeps full
-  // publish rights until expiry even if that role is later removed. Re-check
-  // the role at consume time, not just at mint time, so revocation means
-  // revocation today rather than "revoke after the fact".
-  {
-    const creator = (await db<{ _id: unknown } | null>(env, {
-      kind: "findOne",
-      collection: "users",
-      filter: { uuid: verdict.createdBy },
-      projection: { _id: 1 },
-    })) as { _id: unknown } | null;
-    const id = creator ? String(creator._id) : "";
-    const stillMember =
-      id &&
-      [namespace.author, ...(namespace.admins ?? []), ...(namespace.maintainers ?? [])]
-        .filter(Boolean)
-        .some((m) => String((m as { toString(): string }).toString()) === id || String(m) === id);
-    if (!stillMember) {
-      logger.warn("upload token creator lost namespace role", { namespace: namespace.namespace });
-      return jsonError(401, "Invalid upload token");
-    }
-  }
 
   const existing = (await db<(Record<string, unknown> & { _id: unknown }) | null>(env, {
     kind: "findOne",
     collection: "packages",
     filter: { name: packageName, namespace: namespace._id },
-    projection: { versions: 1 },
+    projection: { versions: 1, maintainers: 1 },
   })) as (Record<string, unknown> & { _id: unknown }) | null;
 
   if (!tokenAllows(verdict, verdict.namespaceId, existing ? strId(existing._id) : null)) {
     // A package-scoped token cannot create a new package: there is no package
     // id to match against.
+    return jsonError(401, "Invalid upload token");
+  }
+
+  // A token minted while the creator held publish rights keeps them until
+  // expiry even if the role is later removed. Re-check at consume time, not
+  // just at mint time, so revocation means revocation today rather than
+  // "revoke after the fact".
+  if (!(await creatorMayPublish(env, verdict.createdBy, namespace, packageName, existing))) {
+    logger.warn("upload token creator lost publish rights", { namespace: namespace.namespace });
     return jsonError(401, "Invalid upload token");
   }
 

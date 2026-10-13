@@ -30,13 +30,9 @@
 .namespace-card__header {
   padding: var(--space-10) var(--space-8);
   /* D84: --primary-400 renders #9797ff in light mode; white text on it is
-     2.06:1, so the title washed out. Span to --primary-600/--color-brand-solid,
-     which clears 4.5:1 in both themes. */
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-solid),
-    var(--primary-600)
-  );
+     2.06:1, so the title washed out. --color-brand-solid clears 4.5:1 in both
+     themes. Flat fill rather than a gradient: same colour, one less decoration. */
+  background-color: var(--color-brand-solid);
   color: var(--color-text-inverse);
   text-align: center;
 }
@@ -191,39 +187,28 @@
   padding: var(--space-4) var(--space-6);
   border: 0;
   border-radius: var(--radius-lg);
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-solid),
-    var(--color-brand-solid-hover)
-  );
+  background-color: var(--color-brand-solid);
   color: var(--color-on-brand-solid);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition:
-    transform var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
 }
 
-/* Was onMouseOver/onMouseOut mutating e.currentTarget.style directly, so the
-   lift never happened for keyboard users. A CSS :hover/:focus-visible pair
-   covers both. */
+/* Hover and focus-visible both shift to the darker brand step. Was a JS
+   onMouseOver/onMouseOut pair mutating style directly, which never fired for
+   keyboard users; a CSS pair covers both input modes. */
 .namespace-submit:hover:not(:disabled),
-.namespace-submit:focus-visible:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-lg);
+.namespace-submit:focus-visible:not(:disabled),
+.namespace-submit:active:not(:disabled) {
+  background-color: var(--color-brand-solid-hover);
 }
 
 .namespace-submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .namespace-submit:hover:not(:disabled),
-  .namespace-submit:focus-visible:not(:disabled) {
-    transform: none;
-  }
 }
 
 /* --------------------------------------------------------------------------

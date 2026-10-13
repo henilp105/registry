@@ -1,38 +1,48 @@
 # FPM Registry
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-green.svg)](https://www.python.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6.svg)](https://www.typescriptlang.org/)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020.svg)](https://workers.cloudflare.com/)
 [![React](https://img.shields.io/badge/React-18-61dafb.svg)](https://reactjs.org/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-6.0+-47A248.svg)](https://www.mongodb.com/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-8.0-47A248.svg)](https://www.mongodb.com/)
 
-The official package registry for the **Fortran Package Manager (fpm)**. A modern, full-stack web application for publishing, discovering, and managing Fortran packages.
+The official package registry for the **Fortran Package Manager (fpm)**. A serverless,
+full-stack application for publishing, discovering, and managing Fortran packages — no
+servers to run, and **$0.00/month** on free tiers.
 
-> **Note**: This registry is currently in testing phase. The database may be reset during development. Production use is not recommended yet.
+> **Note**: This registry is currently in testing phase. The database may be reset during
+> development. Production use is not recommended yet.
 
 ---
 
 ## ✨ Features
 
-- 📦 **Package Management** - Upload, version, and distribute Fortran packages
-- 🔍 **Package Discovery** - Search and browse packages with filtering
-- 👥 **Namespace Organization** - Group packages under organizational namespaces
-- 🔐 **Access Control** - Role-based permissions (admins, maintainers, users)
-- 🔑 **Secure Authentication** - JWT-based auth with upload tokens for CI/CD
-- 📊 **Package Ratings** - Community ratings and feedback
-- 🚀 **CLI Integration** - Direct publishing via `fpm publish`
-- 📖 **API Documentation** - Interactive Swagger/OpenAPI docs
-- 🐳 **Docker Ready** - One-command deployment with Docker Compose
+- 📦 **Package Management** — Upload, version, and distribute Fortran packages
+- 🔍 **Package Discovery** — Search and browse packages with filtering
+- 👥 **Namespace Organization** — Group packages under organizational namespaces
+- 🔐 **Access Control** — Role-based permissions (admins, maintainers, users)
+- 🔑 **Secure Authentication** — JWT auth with revocable, scoped upload tokens for CI/CD
+- 📊 **Package Ratings** — Community ratings and feedback
+- 🚀 **CLI Integration** — Direct publishing via `fpm publish`
+- 📖 **API Documentation** — Generated OpenAPI, served at `/apidocs`
+- ⚡ **Edge-native** — Cloudflare Workers + Durable Objects, MongoDB Atlas, R2, KV
 
 ---
 
-## 🌐 Live Instances
+## 🏗️ Architecture
 
-| Service | URL |
-|---------|-----|
-| **Backend API** | https://64.226.81.128/ |
-| **Frontend** | https://registry-phi.vercel.app/ |
-| **API Docs** | https://64.226.81.128/apidocs/ |
+| Piece | Technology | Role |
+|-------|-----------|------|
+| API | Cloudflare Workers + Durable Objects | Routing, auth, business logic |
+| Database | MongoDB Atlas (free M0) | Metadata only — never tarballs |
+| Artifacts | Cloudflare R2 | Package tarballs, free egress |
+| Cache | Cloudflare KV + Cache API | Hot metadata and search results |
+| Frontend | React (CRA) on Cloudflare Pages | Web UI |
+| Validation | GitHub Actions | Unpacks and verifies uploaded packages |
+
+The MongoDB connection and the password KDF live in a **Durable Object**, not the Worker
+handler, because the Workers free tier allows only 10 ms of CPU per request. See
+[`DEPLOYMENT.md`](DEPLOYMENT.md) for the full rationale and runbook.
 
 ---
 
@@ -40,190 +50,104 @@ The official package registry for the **Fortran Package Manager (fpm)**. A moder
 
 | Document | Description |
 |----------|-------------|
-| [Getting Started](docs/getting-started.md) | Installation and first steps |
+| [Getting Started](docs/getting-started.md) | Install fpm and publish your first package |
 | [API Reference](docs/api-reference.md) | Complete REST API documentation |
 | [Authentication](docs/authentication.md) | Auth flows, JWT, and RBAC |
 | [Package Management](docs/package-management.md) | Publishing and managing packages |
 | [Namespace Management](docs/namespace-management.md) | Organizing packages |
-| [Deployment Guide](docs/deployment.md) | Production deployment |
+| [Deployment](DEPLOYMENT.md) | Serverless deployment runbook |
 | [Contributing](docs/contributing.md) | Development setup and guidelines |
+| [API Contract](docs/API_CONTRACT.md) | The frozen, machine-checked API surface |
+
+The live API serves its own generated OpenAPI document at `/apidocs` and
+`/apidocs/openapi.json`.
 
 ---
 
 ## 🚀 Quick Start
 
-### Publishing Packages with fpm
+### Publishing a package with fpm
 
-The fpm CLI (v0.8.2+) supports direct publishing to the registry:
+The fpm CLI (v0.8.2+) can publish directly to the registry:
 
 ```bash
-# Publish your package
-fpm publish --token <upload-token>
+fpm publish --token <upload-token> --registry <api-url>
 ```
 
-See [fpm documentation](https://fpm.fortran-lang.org/registry/index.html) for details.
+See the [fpm documentation](https://fpm.fortran-lang.org/registry/index.html) for details.
 
-### Running with Docker
+### Local development
 
-The easiest way to run the full stack locally:
-
-```bash
-# Clone the repository
-git clone https://github.com/fortran-lang/registry.git
-cd registry
-
-# Start all services (frontend + backend + MongoDB)
-docker compose up -d
-```
-
-**Access Points:**
-- 🌐 **Frontend**: http://localhost
-- 🔌 **API**: http://localhost/
-- 📖 **API Docs**: http://localhost/apidocs/
+Prerequisites: **Node.js ≥ 22** and a free MongoDB Atlas cluster (or a local MongoDB).
 
 ```bash
-# View logs
-docker compose logs -f
+# ── API ───────────────────────────────────────────────────────────────────────
+cd worker
+npm ci
+cp .dev.vars.example .dev.vars    # fill in MONGO_URI, JWT_SECRET_KEY, SALT
+npm run dev                       # wrangler dev → http://localhost:8787
 
-# Stop services
-docker compose down
+# ── Frontend (in a second terminal) ───────────────────────────────────────────
+cd frontend
+npm ci
+REACT_APP_REGISTRY_API_URL=http://localhost:8787 npm start
+# → http://localhost:3000
 ```
 
 ---
 
-## 🛠️ Development Setup
+## 🛠️ Development
 
-### Prerequisites
-
-| Requirement | Version | Purpose |
-|-------------|---------|---------|
-| Python | 3.13+ | Backend API |
-| Node.js | 24+ | Frontend build |
-| MongoDB | 6.0+ | Database |
-| Docker | 20.10+ | Containerization |
-
-### Backend Development
+### API (`worker/`)
 
 ```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/macOS
-# venv\Scripts\activate   # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your MongoDB URI and secrets
-
-# Run development server
-python server.py
-# API available at http://localhost:9090
+cd worker
+npm run typecheck   # tsc, both projects
+npm run lint        # eslint
+npm test            # vitest (hermetic + live-Atlas suites)
+npm run format      # prettier
 ```
 
-### Frontend Development
+### Frontend (`frontend/`)
 
 ```bash
 cd frontend
-
-# Install dependencies
-npm install
-
-# Start development server
-REACT_APP_REGISTRY_API_URL="http://localhost:9090" npm start
-# Frontend available at http://localhost:3000
-```
-
-### Running Tests
-
-```bash
-cd backend
-
-# Run tests with Docker
-docker compose -f compose.test.yaml up --build
-
-# Or run directly with pytest
-pytest tests/ -v
+npm ci
+npm start           # development server on :3000
+npm run build       # production build into build/
+npm test            # react-scripts test
 ```
 
 ---
 
 ## ⚙️ Configuration
 
-### Environment Variables
+The Worker reads configuration from `worker/wrangler.jsonc` (`vars`) and from secrets.
 
-Copy the example environment file and customize:
+| Secret | Purpose | Required |
+|--------|---------|----------|
+| `MONGO_URI` | MongoDB Atlas connection string | yes |
+| `SALT` | Salt for legacy `sha256(password + SALT)` verification | yes |
+| `JWT_SECRET_KEY` | HS256 signing key for access/refresh tokens | yes |
+| `VALIDATION_SECRET` | Shared secret for the GitHub Actions validation callback | yes |
+| `BREVO_API_KEY` | Brevo HTTP API key for verification/reset email | optional |
 
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your values:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `FRONTEND_PORT` | Port to expose frontend | `80` |
-| `MONGO_DB_NAME` | MongoDB database name | `fpmregistry` |
-| `SALT` | Password hashing salt | ⚠️ Change this! |
-| `JWT_SECRET_KEY` | JWT signing secret | ⚠️ Change this! |
-| `SUDO_PASSWORD` | Admin password | `admin` |
-| `RESET_EMAIL` | SMTP email for password reset | (optional) |
-| `RESET_PASSWORD` | SMTP password | (optional) |
-
-### Production Deployment
-
-For production, make sure to:
-
-1. Change `SALT`, `JWT_SECRET_KEY`, and `SUDO_PASSWORD` to secure random values
-2. Configure `RESET_EMAIL` and `RESET_PASSWORD` for password reset functionality
-3. Consider using an external MongoDB instance for better data management
+Set secrets with `wrangler secret put <NAME>` — never commit them. Generate random
+values with:
 
 ```bash
-# Generate secure random values
-openssl rand -hex 32  # Use for SALT and JWT_SECRET_KEY
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 ```
 
----
-
-##  MongoDB Tools Setup
-
-For the registry archives functionality (weekly database dumps), install MongoDB tools:
-
-<details>
-<summary><strong>Ubuntu/Debian Installation</strong></summary>
-
-```bash
-# Import MongoDB public key
-wget -qO - https://www.mongodb.org/static/pgp/server-6.0.asc | sudo apt-key add -
-
-# Add repository
-echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/6.0 multiverse" | \
-  sudo tee /etc/apt/sources.list.d/mongodb-org-6.0.list
-
-# Install tools
-sudo apt-get update
-sudo apt install mongodb-org-tools
-```
-
-</details>
-
-See [MongoDB Tools Installation](https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-ubuntu/) for other platforms.
+> ⚠️ Changing `SALT` after accounts exist locks every existing user out. It is not a
+> free rotation.
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guide](docs/contributing.md) for:
-
-- Development environment setup
-- Coding standards and style guide
-- Testing requirements
-- Pull request process
-
-### Quick Contribution Steps
+We welcome contributions! See the [Contributing Guide](docs/contributing.md) for
+development setup, coding standards, and the pull request process.
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -235,8 +159,6 @@ We welcome contributions! Please see our [Contributing Guide](docs/contributing.
 
 ## 🐛 Reporting Issues
 
-Found a bug or have a feature request?
-
 1. Check [existing issues](https://github.com/fortran-lang/registry/issues)
 2. Open a [new issue](https://github.com/fortran-lang/registry/issues/new)
 3. Include steps to reproduce and environment details
@@ -245,14 +167,14 @@ Found a bug or have a feature request?
 
 ## 📜 License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- [Fortran-lang community](https://fortran-lang.org/) - For building the modern Fortran ecosystem
-- [fpm](https://github.com/fortran-lang/fpm) - The Fortran Package Manager
+- [Fortran-lang community](https://fortran-lang.org/) — for building the modern Fortran ecosystem
+- [fpm](https://github.com/fortran-lang/fpm) — the Fortran Package Manager
 - All [contributors](https://github.com/fortran-lang/registry/graphs/contributors) who helped build this registry
 
 <p align="center">

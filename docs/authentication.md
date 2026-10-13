@@ -58,7 +58,7 @@ sequenceDiagram
     DB-->>API: Email available
     API->>DB: Create user (unverified)
     API->>Email: Send verification email
-    API-->>User: 201 Created + JWT Token
+    API-->>User: 200 OK (no token yet)
     User->>API: POST /auth/verify-email
     API->>DB: Mark email verified
     API-->>User: 200 Email verified
@@ -68,24 +68,20 @@ sequenceDiagram
 
 ```bash
 curl -X POST "https://registry.fortran-lang.org/auth/signup" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "fortran_dev",
-    "email": "developer@example.com",
-    "password": "SecureP@ssw0rd!"
-  }'
+  -d "username=fortran_dev&email=developer@example.com&password=SecureP@ssw0rd!"
 ```
 
 **Password Requirements:**
 - Minimum 8 characters
-- At least one uppercase letter
-- At least one lowercase letter  
-- At least one number
-- At least one special character
+- Maximum 512 characters
+
+(The registry does not require particular character classes; the sign-up
+form's strength meter is advisory only.)
 
 **Response:** `200 OK` — no tokens are issued until the email is verified:
 ```json
 {
+  "code": 200,
   "message": "Signup successful. Please verify your email."
 }
 ```
@@ -113,11 +109,7 @@ On success the response also issues a fresh token pair:
 
 ```bash
 curl -X POST "https://registry.fortran-lang.org/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "developer@example.com",
-    "password": "SecureP@ssw0rd!"
-  }'
+  -d "email=developer@example.com&password=SecureP@ssw0rd!"
 ```
 
 **Response:**
@@ -149,10 +141,7 @@ Request a password reset email:
 
 ```bash
 curl -X POST "https://registry.fortran-lang.org/auth/forgot-password" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "developer@example.com"
-  }'
+  -d "email=developer@example.com"
 ```
 
 **Response:**
@@ -169,7 +158,6 @@ curl -X POST "https://registry.fortran-lang.org/auth/forgot-password" \
 
 Use the token from the reset email:
 
-```bash
 ```bash
 curl -X POST "https://registry.fortran-lang.org/auth/reset-password" \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -217,26 +205,33 @@ Super Admin (sudo)
 
 | Action | User | Pkg Maintainer | NS Maintainer | NS Admin | Sudo |
 |--------|:----:|:--------------:|:-------------:|:--------:|:----:|
-| View packages | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Upload to package | ✗ | ✓ | ✓ | ✓ | ✓ |
-| Upload to namespace | ✗ | ✗ | ✓ | ✓ | ✓ |
-| Add pkg maintainers | ✗ | ✓ | ✓ | ✓ | ✓ |
-| Add ns maintainers | ✗ | ✗ | ✗ | ✓ | ✓ |
-| Delete namespace | ✗ | ✗ | ✗ | ✓ | ✓ |
-| View reports | ✗ | ✗ | ✗ | ✗ | ✓ |
-| Delete any package | ✗ | ✗ | ✗ | ✗ | ✓ |
+| View packages | Yes | Yes | Yes | Yes | Yes |
+| Upload to package | No | Yes | Yes | Yes | Yes |
+| Upload to namespace | No | No | Yes | Yes | Yes |
+| Add pkg maintainers | No | Yes | Yes | Yes | Yes |
+| Add ns maintainers | No | No | No | Yes | Yes |
+| Delete namespace | No | No | No | Yes | Yes |
+| View reports | No | No | No | No | Yes |
+| Delete any package | No | No | No | No | Yes |
 
 ### Admin Verification
 
-Some operations require sudo/admin verification:
+Check whether the caller is a site admin. The route needs only the bearer
+token; there is no password. `isAdmin` is the **string** `"true"`, not a
+boolean (preserved from the original API):
 
 ```bash
 curl -X POST "https://registry.fortran-lang.org/users/admin" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "password": "SUDO_PASSWORD"
-  }'
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+**Response:**
+```json
+{
+  "code": 200,
+  "message": "User is admin",
+  "isAdmin": "true"
+}
 ```
 
 ---
@@ -273,12 +268,16 @@ curl -X POST "https://registry.fortran-lang.org/packages/my-namespace/my-package
 fpm publish --token "fpm_upload_ns_abc123xyz..."
 ```
 
-Or via API:
+Or via API. The publish route takes the token and the metadata as form fields;
+there is no `Authorization` header on this route:
+
 ```bash
 curl -X POST "https://registry.fortran-lang.org/packages" \
-  -H "Authorization: Bearer fpm_upload_ns_abc123xyz..." \
-  -F "tarball=@my-package-1.0.0.tar.gz" \
-  -F "namespace=my-namespace"
+  -F "upload_token=fpm_upload_ns_abc123xyz..." \
+  -F "package_name=my-package" \
+  -F "package_version=1.0.0" \
+  -F "package_license=MIT" \
+  -F "tarball=@my-package-1.0.0.tar.gz"
 ```
 
 ---

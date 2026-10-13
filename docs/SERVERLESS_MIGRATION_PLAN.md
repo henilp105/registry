@@ -307,7 +307,7 @@ runbook in [`DEPLOYMENT.md`](../DEPLOYMENT.md).
 ### What is honestly not verified
 
 - **No browser-based visual verification.** No browser runs in the migration environment. The frontend
-  dark mode is verified arithmetically (53 measured contrast pairs in `docs/theme-contrast.md`), not
+  dark mode is verified arithmetically (53 measured contrast pairs in `frontend/docs/theme-contrast.md`), not
   by eye. This is the one gap a reviewer should close first.
 - **Cutover traffic steps are documented, not executed.** Phases 10% → 50% → 100% are a Cloudflare
   console operation. The runbook is written to be followed; it has not been rehearsed end to end.

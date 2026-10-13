@@ -39,30 +39,10 @@
   gap: var(--space-4);
 }
 
-/* Staggered entrance. The delay is driven by a custom property set inline
-   from the item index, so the stagger stays in one place rather than being
-   recomputed as a whole animation string per row. */
+/* Results list. Each item is a full-width block; no entrance animation, so the
+   list renders in place on every page change rather than re-staggering. */
 .search-results__item {
   width: 100%;
-  animation: search-item-in var(--duration-base) var(--ease-decelerate) both;
-  animation-delay: calc(var(--index, 0) * 40ms);
-}
-
-@keyframes search-item-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .search-results__item {
-    animation: none;
-  }
 }
 
 .search-pagination {

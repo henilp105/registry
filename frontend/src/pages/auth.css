@@ -221,39 +221,25 @@
   padding: 0.875rem var(--space-6);
   border: 0;
   border-radius: var(--radius-lg);
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-solid),
-    var(--color-brand-solid-hover)
-  );
+  background-color: var(--color-brand-solid);
   color: var(--color-on-brand-solid);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
   box-shadow: var(--shadow-sm);
   transition:
-    transform var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
 }
 
-.auth-submit-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
-}
-
+.auth-submit-btn:hover:not(:disabled),
 .auth-submit-btn:active:not(:disabled) {
-  transform: translateY(0);
+  background-color: var(--color-brand-solid-hover);
 }
 
 .auth-submit-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .auth-submit-btn:hover:not(:disabled) {
-    transform: none;
-  }
 }
 
 /* --------------------------------------------------------------------------
@@ -478,17 +464,19 @@
   }
 }
 
+/* The retry action is secondary: a flat surface fill rather than the brand
+   gradient, so "Try again" never competes with the page's primary action. */
 .verify-retry-btn {
-  background: linear-gradient(
-    135deg,
-    var(--color-text-muted),
-    var(--color-text-subtle)
-  );
-  box-shadow: var(--shadow-sm);
+  background-color: var(--color-surface-inset);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
 }
 
-.verify-retry-btn:hover:not(:disabled) {
-  box-shadow: var(--shadow-md);
+.verify-retry-btn:hover:not(:disabled),
+.verify-retry-btn:active:not(:disabled) {
+  background-color: var(--color-border);
+  color: var(--color-text);
 }
 
 /* A single centred column for the short standalone auth pages (reset

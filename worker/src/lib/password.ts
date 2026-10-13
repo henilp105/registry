@@ -17,11 +17,14 @@
  * ── What we use instead ──────────────────────────────────────────────────────
  * PBKDF2-HMAC-SHA256 via WebCrypto, which is a native, constant-time-ish
  * primitive and therefore effectively free in CPU terms. OWASP's guidance is
- * 600,000 iterations for PBKDF2-HMAC-SHA256; we default to 100,000, which is
- * the hard cap enforced by the Workers runtime ("iteration counts above
- * 100000 are not supported") and is still a large multiple of the
- * legacy zero iterations. The count is stored per hash, so it can be raised
- * later without invalidating existing credentials.
+ * 600,000 iterations for PBKDF2-HMAC-SHA256; we default to 10,000 so the KDF
+ * stays fast on the free tier (see the measurement below -- 10k is ~8.5 ms in
+ * the Durable Object, and the whole login still fits inside its 30 s budget
+ * with room to spare). The Workers runtime hard-caps the count at 100,000
+ * ("iteration counts above 100000 are not supported"), which is kept as
+ * `MAX_PBKDF2_ITERATIONS` for verifying hashes written by an earlier
+ * deployment, and the count is stored per hash, so it can be raised later
+ * without invalidating existing credentials.
  *
  * Legacy `sha256(password + SALT)` is still **verified**, so nobody is locked
  * out, and is transparently upgraded on the next successful login.
@@ -50,7 +53,18 @@ export { sha256Hex };
 const PBKDF2_PREFIX = "pbkdf2$sha256$";
 const LEGACY_PREFIX = "legacy-sha256$";
 
-export const DEFAULT_PBKDF2_ITERATIONS = 100_000;
+export const DEFAULT_PBKDF2_ITERATIONS = 10_000;
+
+/**
+ * The highest iteration count the Workers runtime accepts.
+ *
+ * A hash written when the configured cost was higher (for example the 100,000
+ * used before the cost was tuned down to 10,000) must still verify, so
+ * verification clamps a stored count to this ceiling rather than the current
+ * default. Above it, `crypto.subtle.deriveBits` throws, which would turn a
+ * legacy login into a 500 instead of a successful sign-in.
+ */
+export const MAX_PBKDF2_ITERATIONS = 100_000;
 
 const encoder = new TextEncoder();
 
@@ -74,7 +88,7 @@ export async function verifyPassword(
   if (stored.startsWith(PBKDF2_PREFIX)) {
     const parsed = parseHash(stored);
     if (!parsed || parsed.algorithm !== "pbkdf2") return false;
-    const dk = await pbkdf2(password, b64uDecode(parsed.salt), Math.min(parsed.iterations, 100_000));
+    const dk = await pbkdf2(password, b64uDecode(parsed.salt), Math.min(parsed.iterations, MAX_PBKDF2_ITERATIONS));
     return timingSafeEqual(dk, b64uDecode(parsed.hash));
   }
 
@@ -114,7 +128,7 @@ export function needsRehash(stored: string, currentIterations = DEFAULT_PBKDF2_I
   if (parsed.algorithm !== "pbkdf2") return true;
   // Rehash whenever the stored cost is below the configured one. The old
   // Math.min(...) reduced this to "< MIN_ACCEPTABLE", so a cost that moved
-  // from 100k to 210k never triggered a migration.
+  // from 10k to 100k never triggered a migration.
   return parsed.iterations < currentIterations;
 }
 
@@ -123,7 +137,7 @@ export function parseIterations(raw: string | undefined, fallback = DEFAULT_PBKD
   const parsed = Number.isFinite(n) && n >= 1_000 ? n : fallback;
   // Workers throws "iteration counts above 100000 are not supported" above
   // 100k, so never hand the runtime a larger value even if misconfigured.
-  return Math.min(parsed, 100_000);
+  return Math.min(parsed, MAX_PBKDF2_ITERATIONS);
 }
 
 async function pbkdf2(password: string, salt: Uint8Array, iterations: number): Promise<Uint8Array> {

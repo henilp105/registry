@@ -1,85 +1,49 @@
-name: Run Tests for Backend
+name: Run Tests for Validator
+
+# The Flask backend this workflow used to exercise has been removed as part of the
+# serverless migration; the API now lives in `worker/` and is covered by
+# `.github/workflows/worker.yml`. What remains here is the test suite for the
+# package validator (`scripts/validate_packages.py`), which still runs on GitHub
+# Actions runners and is the code that unpacks a publisher-controlled tarball --
+# exactly the surface where a silent regression is most costly.
 
 on:
   # `"**"`, not `"*"`. GitHub's glob `*` does not cross a `/`, so `"*"` silently
-  # matched no branch containing a slash -- `integration/serverless-and-frontend`
-  # ran zero backend tests when this migration merged both halves. The same
-  # pattern in worker.yml skipped every integration branch for the same reason.
-  # A filter that quietly matches nothing looks exactly like a filter that
-  # matches everything, which is why this went unnoticed.
+  # matched no branch containing a slash.
   push:
     branches: ["**"]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
 
-env:
-    MONGO_DB_NAME: testregistry
-    MONGO_URI: mongodb://localhost:27017/
-    MONGO_USER_NAME: Admin
-    MONGO_PASSWORD: Admin
-    SALT: MYSALT
-    HOST: localhost
-    RESET_EMAIL: reset@localhost.com
-    # Both must be at least 8 characters: backend/utils/validators.py rejects
-    # anything shorter, and test_sudo_user_signup signs up with SUDO_PASSWORD.
-    # v2.0.1 shipped `reset` and `fortran` here while enforcing len >= 8, so
-    # this workflow has failed on every run since at least 2026-02-07.
-    RESET_PASSWORD: resetpass
-    SUDO_PASSWORD: fortranpass
-    IS_CI: true
-    # Defect D113: GET /latency now fails closed without this, so the suite needs
-    # a value. The latency tests themselves assert on a live endpoint rather than
-    # on auth, so any non-empty string satisfies them.
-    LATENCY_ADMIN_TOKEN: ci-latency-token-not-a-secret
-    # 40 bytes: PyJWT warns below the 32-byte minimum for HS256 (RFC 7518 3.2).
-    JWT_SECRET_KEY: fpm-registry-test-secret-key-v2-0123456789ab
-
 jobs:
-  test:
+  validator:
+    name: Package validator
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
-      - name: Checkout page source
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: MongoDB in GitHub Actions
-        uses: supercharge/mongodb-github-action@1.10.0
-        with:
-          mongodb-port: 27017  
-          
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: 'pip'
-  
-      - name: Install python libraries
-        run: pip3 install --user -r backend/requirements.txt
 
-      - name: Run unit tests
-        run: |
-          cd backend
-          python -m pytest tests/ -v --tb=short --color=yes
+      # tomli is a TOML backstop for anything older than 3.11 (stdlib from 3.11).
+      # numpy is required by the FNV-1a test: the reference implementation it
+      # cross-checks reproduces the legacy numpy int64 overflow, so a numpy-free
+      # run errors instead of asserting the digest still matches fpm.
+      - name: Install test dependencies
+        run: pip install --quiet pytest tomli numpy
 
       # Defect D125: scripts/test_validate_packages.py is the only test for
       # scripts/validate_packages.py -- the validator that replaced the
       # shell-injectable backend/validate.py -- and nothing in the repository ran
-      # it. No workflow step, no npm script, no Makefile target. Its 60-odd
-      # assertions about traversal, symlink/hardlink escapes and the FNV-1a
-      # compatibility digest were correct and never executed, so a regression in
-      # the validator that reintroduced any of those defences would have merged
-      # green.
-      #
-      # It is also the wrong file to be the only defence of: this is the code
-      # that unpacks a publisher-controlled tarball.
+      # it. Its 60-odd assertions about traversal, symlink/hardlink escapes and the
+      # FNV-1a compatibility digest were correct and never executed, so a
+      # regression that reintroduced any of those defences would have merged green.
       - name: Validate the validator
-        run: python -m pytest scripts/test_validate_packages.py -v --tb=short
-
-      - name: Run tests with coverage
-        if: github.event_name == 'pull_request'
-        run: |
-          cd backend
-          pip install pytest-cov
-          python -m pytest tests/ -v --cov=. --cov-report=term-missing
+        run: python -m pytest scripts/test_validate_packages.py -v --tb=short --color=yes

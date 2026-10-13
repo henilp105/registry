@@ -1,60 +1,43 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# Root environment file (keep .env.example)
+# Environment files (keep the examples)
 .env
 !.env.example
-!.env.production
 
+# Editors / OS
 /.vscode/
 /.vercel/
-/.docker/
-/backend/_*
-*_pycache_*
-/backend/static/*.tar.gz
+.DS_Store
 
-# backend
-/backend/.env
-/backend/.venv
-/backend/vercel.json
-/backend/logs/
-/backend/static/*.tar.gz
-/backend/__pycache__/
-/backend/tests/__pycache__/
-/backend/.vercel
-/backend/app.log
-/.DS_Store
-/backend/.DS_Store
+# Agent / tooling scratch
+/opencode/
 
-# dependencies
+# Dependencies
+/node_modules
 /frontend/node_modules
 /frontend/.pnp
 /frontend/.pnp.js
-/frontend/wrangler.jsonc
 
-# testing
-.pytest_cache/
-/frontend/coverage
-tests/__pycache__/
-
-# production
+# Build output
 /frontend/build
+/frontend/coverage
 
-# misc
-/frontend/.DS_Store
-/frontend/.env.local
-/frontend/.env.development.local
-/frontend/.env.test.local
-/frontend/.env.production.local
+# Local Wrangler state. The Worker has its own .gitignore, but these are the
+# paths that trip people up when they run wrangler from the repo root.
+/worker/node_modules
+/worker/dist
+/worker/.wrangler
+/worker/.dev.vars
+/worker/worker-configuration.d.ts
 
+# Logs
+*.log
 /frontend/npm-debug.log*
 /frontend/yarn-debug.log*
 /frontend/yarn-error.log*
-# root-level audit harness (playwright etc.)
-/node_modules
-/package.json
-/package-lock.json
-/backend/static/packages/
 
-# local deployment record (contains secrets)
+# Python tooling for the validator scripts
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local deployment record (contains secrets)
 /deployment.sh
-.wrangler/

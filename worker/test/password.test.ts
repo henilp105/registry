@@ -119,11 +119,12 @@ describe("parseIterations", () => {
  *     Cloudflare Workers Free budget ........  10   ms
  *
  * So the iteration count MongoDB itself uses for SCRAM already costs ~40% of
- * the whole Worker budget, and the count we want for password storage is ~18x
- * over it. Hashing inside a request handler would return Cloudflare error 1102
- * on every signup and every login. The Durable Object gets 30 s of CPU per
- * request on the Free plan, which is where the KDF now runs — see the
- * `hashPassword` / `verifyPassword` ops in src/db/mongo-pool.ts.
+ * the whole Worker budget, and the configured password-storage cost (10,000 by
+ * default) fills most of the rest. Hashing inside a request handler would
+ * return Cloudflare error 1102 on every signup and every login. The Durable
+ * Object gets 30 s of CPU per request on the Free plan, which is where the KDF
+ * now runs — see the `hashPassword` / `verifyPassword` ops in
+ * src/db/mongo-pool.ts.
  *
  * There is deliberately **no** wall-clock assertion here. The number above
  * swings by an order of magnitude with machine load (measured 176 ms idle

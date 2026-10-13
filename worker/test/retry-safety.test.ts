@@ -191,6 +191,15 @@ describe("isReplaySafe: writes only where the filter guards the update", () => {
       }),
     ).toBe(true);
   });
+
+  it("does not treat Object.prototype members as a guard", () => {
+    // `field in filter` matched inherited keys, so a `$set` on `constructor` /
+    // `toString` looked guarded in any filter and the write was retried after an
+    // ambiguous error — a duplicated write.
+    expect(isGuardedWrite({ $set: { constructor: 1 } }, { name: "json-fortran" })).toBe(false);
+    expect(isGuardedWrite({ $set: { toString: 1 } }, {})).toBe(false);
+    expect(isGuardedWrite({ $set: { valueOf: 1 } }, { name: "x" })).toBe(false);
+  });
 });
 
 describe("allStepsReplaySafe: why transaction is refused even when its steps look safe", () => {

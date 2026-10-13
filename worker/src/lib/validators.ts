@@ -206,8 +206,12 @@ function peelWrapper(expr: string): string | null {
     if (ch === "(") depth++;
     else if (ch === ")") {
       depth--;
-      // A close before the end means the outer paren closed early.
-      if (depth === 0 && i !== expr.length - 1) return null;
+      // More closes than opens: genuinely unbalanced.
+      if (depth < 0) return null;
+      // The leading `(` closed before the end, so the string is not one wrapper
+      // around the whole expression — e.g. `(MIT) AND (Apache-2.0)`. Leave it
+      // intact for `splitTopLevel` rather than rejecting a valid expression.
+      if (depth === 0 && i !== expr.length - 1) return expr;
     }
   }
   return depth === 0 ? expr.slice(1, -1).trim() : null;

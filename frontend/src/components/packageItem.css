@@ -6,26 +6,17 @@
   border-radius: var(--radius-lg);
   background-color: var(--color-surface);
   transition:
-    transform var(--duration-base) var(--ease-standard),
     box-shadow var(--duration-base) var(--ease-standard),
     border-color var(--duration-base) var(--ease-standard);
 }
 
-/* Hover lifts the card. Driven by :hover rather than a React isHovered state
-   so it also fires for keyboard users tabbing onto the card's links, which a
-   mouse-only handler never did. */
+/* Hover deepens the border and shadow; driven by :hover rather than a React
+   isHovered state so keyboard users tabbing onto the card's links get the same
+   cue. No translate: the row should not move under the pointer. */
 .package-item:hover,
 .package-item:focus-within {
-  transform: translateY(-2px);
   border-color: var(--primary-300);
   box-shadow: var(--shadow-md);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .package-item:hover,
-  .package-item:focus-within {
-    transform: none;
-  }
 }
 
 .package-item__mark {

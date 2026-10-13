@@ -20,15 +20,18 @@
  * stale version list for up to 60 seconds after a publish is a user-visible
  * bug ("I just published 1.2.0 and it is not there").
  *
- * KV is kept for the two things that genuinely want global replication and a
- * slow TTL: the search index mirror and the long-lived archive listing.
+ * KV is used for exactly one thing: the `ver:<entity>` invalidation tokens.
+ * Those genuinely want global replication and a slow TTL, because a token
+ * written in one PoP has to be visible while a request routed to another PoP
+ * computes its cache key. KV does **not** hold response bodies, a search index
+ * mirror, or an archive listing — those are either the Cache API or MongoDB.
  *
  * ── Invalidation ────────────────────────────────────────────────────────────
  * Because the Cache API has no `delete-by-prefix`, invalidation is by TTL plus
- * a versioned cache key. Every mutating route bumps a monotonic counter for the
- * entity in KV; read keys embed that counter. A publish therefore retires every
- * stale entry immediately rather than waiting out a TTL, without needing an
- * index of what to purge.
+ * a versioned cache key. Every mutating route writes a fresh unique token
+ * (`<timestamp>:<uuid>`) for the entity in KV; read keys embed that token. A
+ * publish therefore retires every stale entry immediately rather than waiting
+ * out a TTL, without needing an index of what to purge.
  */
 
 export type CacheEnv = {

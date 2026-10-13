@@ -37,6 +37,23 @@ export function sortDirection(sort: string | null): 1 | -1 {
 }
 
 /**
+ * Effective direction for a sort field, honouring the field's natural default.
+ *
+ * The frozen contract (`docs/API_CONTRACT.md` §7.5) annotates `updated_at`,
+ * `created_at` and `download_count` as **DESC**: "Date last updated" must show
+ * the newest first and "downloads" the most-downloaded first. The shipped UI
+ * never sends `sort=`, so an unconditional ASC default silently inverted both
+ * — the two options the contract calls out were the only ones observably wrong.
+ *
+ * An explicit `sort=asc|desc` still wins; this only changes the implicit default.
+ */
+export function sortDirectionFor(field: string, sort: string | null): 1 | -1 {
+  const explicit = (sort ?? "").trim();
+  if (explicit !== "") return sortDirection(explicit);
+  return field === "updated_at" || field === "created_at" || field === "download_count" ? -1 : 1;
+}
+
+/**
  * Coerce a query parameter to a bounded integer.
  *
  * Defect D19: `v2.0.1` did

@@ -234,8 +234,12 @@ async function postReport(
  * flag, so every call returned the same queue forever and the flag was never
  * cleared anywhere in the codebase.
  *
- * Reading now marks the returned reports as viewed, in one transaction, so two
- * admins cannot both claim the same report.
+ * Reading marks the returned reports as viewed. Each report is claimed
+ * individually with a conditional update whose filter still requires
+ * `is_viewed: false`, so only one admin can match any given report: a concurrent
+ * admin's update matches zero documents and the report does not appear in both
+ * responses. (A `find` followed by an unconditional `updateMany` did not have
+ * that property, despite the comment that used to claim a transaction.)
  */
 async function viewReports(env: Env, auth: AuthContext | null): Promise<Response> {
   if (!auth) return jsonError(401, "Unauthorized");
@@ -256,17 +260,26 @@ async function viewReports(env: Env, auth: AuthContext | null): Promise<Response
     return jsonOk({ message: "Malicious Reports fetched Successfully", reports: [] });
   }
 
-  const ids = pending.map((r) => r._id);
-  await db(env, {
-    kind: "updateMany",
-    collection: "malicious_reports",
-    filter: { _id: { $in: ids }, is_viewed: false },
-    update: { $set: { is_viewed: true, viewed_at: new Date(), viewed_by: strId(viewer._id) } },
-  });
+  // Claim each report atomically. `updateOne` returns `matchedCount: 0` when
+  // another admin got there first, so the winner is decided by MongoDB, not by
+  // the order this process read the queue.
+  const claimed = (
+    await Promise.all(
+      pending.map(async (r) => {
+        const result = await db<{ matchedCount: number }>(env, {
+          kind: "updateOne",
+          collection: "malicious_reports",
+          filter: { _id: r._id, is_viewed: false },
+          update: { $set: { is_viewed: true, viewed_at: new Date(), viewed_by: strId(viewer._id) } },
+        });
+        return result.matchedCount > 0 ? r : null;
+      }),
+    )
+  ).filter((r): r is Record<string, unknown> => r !== null);
 
   return jsonOk({
     message: "Malicious Reports fetched Successfully",
-    reports: pending.map((r) => ({
+    reports: claimed.map((r) => ({
       reason: r.reason,
       // v2.0.1 returned the reporter's username as `name`, not `username`.
       // Both are emitted: additive, and neither consumer can break.

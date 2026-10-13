@@ -41,21 +41,7 @@ const ALLOWED = new Set([
   "DEPLOYMENT.md",
   "docs/deployment.md",
   "docs/BASELINE_AUDIT.md",
-  "backend/scripts/load_db.sh",
-  "backend/scripts/migrate_db.py",
   "worker/.dev.vars.example",
-  // Synthetic fixtures for the legacy Flask suite that this migration replaces.
-  // Listed individually rather than allowing the whole `backend/tests/` tree,
-  // because "allow all of tests/" is how real credentials end up committed -- and
-  // each of these is a constant that can be read and judged on its own.
-  //
-  // TEST_JWT_SECRET is a 28-character fixture signing the suite's own tokens;
-  // TEST_PASSWORD is the account the suite registers. Neither reaches anything.
-  "backend/tests/base_case.py",
-  "backend/tests/test_login.py",
-  "backend/tests/test_namespaces.py",
-  "backend/tests/test_packages.py",
-  "backend/tests/test_signup.py",
 ]);
 
 const SKIP_DIRS = new Set(["node_modules", ".git", "build", "dist", "coverage", ".wrangler"]);

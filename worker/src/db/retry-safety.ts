@@ -111,7 +111,14 @@ export function isGuardedWrite(
   const $set = (update as { $set?: unknown }).$set;
   if (!$set || typeof $set !== "object" || Array.isArray($set)) return false;
 
-  return Object.keys($set as Record<string, unknown>).some((field) => field in filter);
+  // Own property only. `field in filter` also consults the prototype chain, so a
+  // `$set` field named `constructor`, `toString`, `valueOf`, `hasOwnProperty`,
+  // … would be "found" in *every* filter and the write misclassified as
+  // replay-safe — then retried after an ambiguous error and applied twice, the
+  // exact failure mode this module exists to prevent.
+  return Object.keys($set as Record<string, unknown>).some((field) =>
+    Object.prototype.hasOwnProperty.call(filter, field),
+  );
 }
 
 /**

@@ -43,30 +43,27 @@ fortran-lang/                  # Namespace
 ```bash
 curl -X POST "https://registry.fortran-lang.org/namespaces" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "namespace": "my-namespace",
-    "namespace_description": "A collection of scientific computing libraries"
-  }'
+  -d "namespace=my-namespace&namespace_description=A collection of scientific computing libraries"
 ```
 
-**Response (201 Created):**
+**Response:**
 ```json
 {
-  "code": 201,
+  "code": 200,
   "message": "Namespace created successfully."
 }
 ```
 
 ### Naming Rules
 
+A namespace name matches `^[a-zA-Z0-9_-]{1,64}$`:
+
 | Rule | Valid | Invalid |
 |------|-------|---------|
-| Lowercase letters | `mypackage` | `MyPackage` |
+| Letters (any case) | `mypackage`, `MyPackage` | `my package` |
 | Numbers | `lib2024` | - |
-| Hyphens | `my-lib` | `my_lib` |
-| Length (3-50 chars) | `fpm` | `ab` |
-| Start with letter | `json-lib` | `123lib` |
+| Hyphens and underscores | `my-lib`, `my_lib` | `my.lib` |
+| Length (1-64 chars) | `fpm` | a 65-character name |
 
 ### Reserved Namespaces
 
@@ -107,15 +104,15 @@ Some namespaces are reserved:
 
 | Action | User | Maintainer | Admin |
 |--------|:----:|:----------:|:-----:|
-| Download packages | ✅ | ✅ | ✅ |
-| View namespace info | ✅ | ✅ | ✅ |
-| Upload packages | ❌ | ✅ | ✅ |
-| Delete package versions | ❌ | ✅ | ✅ |
-| Add package maintainers | ❌ | ✅ | ✅ |
-| Generate upload tokens | ❌ | ❌ | ✅ |
-| Add namespace maintainers | ❌ | ❌ | ✅ |
-| Add namespace admins | ❌ | ❌ | ✅ |
-| Delete namespace | ❌ | ❌ | ✅ |
+| Download packages | Yes | Yes | Yes |
+| View namespace info | Yes | Yes | Yes |
+| Upload packages | No | Yes | Yes |
+| Delete package versions | No | Yes | Yes |
+| Add package maintainers | No | Yes | Yes |
+| Generate upload tokens | No | No | Yes |
+| Add namespace maintainers | No | No | Yes |
+| Add namespace admins | No | No | Yes |
+| Delete namespace | No | No | Yes |
 
 ---
 
@@ -126,13 +123,9 @@ Some namespaces are reserved:
 Only existing admins can add new admins:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/your-username/admin" \
+curl -X POST "https://registry.fortran-lang.org/your-username/namespace/admin" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "namespace": "my-namespace",
-    "new_admin": "trusted-user"
-  }'
+  -d "username=trusted-user&namespace=my-namespace"
 ```
 
 **Response:**
@@ -146,19 +139,18 @@ curl -X POST "https://registry.fortran-lang.org/your-username/admin" \
 ### Removing an Admin
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/your-username/admin/remove" \
+curl -X POST "https://registry.fortran-lang.org/your-username/namespace/admin/remove" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "namespace": "my-namespace",
-    "admin": "former-admin"
-  }'
+  -d "username=former-admin&namespace=my-namespace"
 ```
 
 ### Viewing Admins
 
+Listing members is a `POST` (the original API's choice, preserved). The
+response key is `users`:
+
 ```bash
-curl "https://registry.fortran-lang.org/namespaces/my-namespace/admins" \
+curl -X POST "https://registry.fortran-lang.org/namespaces/my-namespace/admins" \
   -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
@@ -166,7 +158,7 @@ curl "https://registry.fortran-lang.org/namespaces/my-namespace/admins" \
 ```json
 {
   "code": 200,
-  "admins": ["owner-user", "trusted-user"]
+  "users": ["owner-user", "trusted-user"]
 }
 ```
 
@@ -181,11 +173,7 @@ Admins can add maintainers to the namespace:
 ```bash
 curl -X POST "https://registry.fortran-lang.org/your-username/namespace/maintainer" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "namespace": "my-namespace",
-    "new_maintainer": "contributor-user"
-  }'
+  -d "username=contributor-user&namespace=my-namespace"
 ```
 
 ### Removing a Maintainer
@@ -193,11 +181,7 @@ curl -X POST "https://registry.fortran-lang.org/your-username/namespace/maintain
 ```bash
 curl -X POST "https://registry.fortran-lang.org/your-username/namespace/maintainer/remove" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "namespace": "my-namespace",
-    "maintainer": "contributor-user"
-  }'
+  -d "username=contributor-user&namespace=my-namespace"
 ```
 
 ### Viewing Maintainers
@@ -275,46 +259,31 @@ curl -X POST "https://registry.fortran-lang.org/packages/my-namespace/my-package
 ### Viewing Namespace Details
 
 ```bash
-curl "https://registry.fortran-lang.org/namespaces/my-namespace"
+curl "https://registry.fortran-lang.org/namespace/my-namespace"
 ```
 
-**Response:**
+Note the **singular** `namespace` segment; the plural `namespaces` is used only
+for writes. The response carries the description, creation date, and the
+namespace's packages:
+
 ```json
 {
-  "namespace": "my-namespace",
-  "namespace_description": "A collection of scientific computing libraries",
-  "created_at": "2024-01-15T10:30:00Z",
-  "packages": ["stdlib", "json-fortran", "test-drive"],
-  "package_count": 3
+  "code": 200,
+  "description": "A collection of scientific computing libraries",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "packages": [
+    "stdlib",
+    "json-fortran",
+    "test-drive"
+  ]
 }
 ```
 
 ### Listing Namespace Packages
 
-```bash
-curl "https://registry.fortran-lang.org/namespaces/my-namespace/packages"
-```
-
-**Response:**
-```json
-{
-  "code": 200,
-  "packages": [
-    {
-      "name": "stdlib",
-      "description": "Fortran Standard Library",
-      "latest_version": "0.3.0",
-      "downloads": 15420
-    },
-    {
-      "name": "json-fortran",
-      "description": "JSON parsing library",
-      "latest_version": "8.3.0",
-      "downloads": 8932
-    }
-  ]
-}
-```
+There is no separate packages route; the package list is the `packages` field
+of the response above. To read a single package, use
+`GET /packages/{namespace}/{package}`.
 
 ---
 
@@ -331,15 +300,12 @@ curl "https://registry.fortran-lang.org/namespaces/my-namespace/packages"
 
 ### Deletion Process
 
-Only namespace admins can delete namespaces:
+Only site admins can delete namespaces. The route is `POST` to the singular
+`/namespace/{name}/delete` and needs only the bearer token:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/namespaces/my-namespace/delete" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "password": "your-account-password"
-  }'
+curl -X POST "https://registry.fortran-lang.org/namespace/my-namespace/delete" \
+  -H "Authorization: Bearer YOUR_TOKEN"
 ```
 
 ### Pre-Deletion Checklist
@@ -371,12 +337,12 @@ acme-corp/                           # Organization namespace
 # 1. Add as namespace maintainer (admin action)
 curl -X POST "https://registry.fortran-lang.org/cto/namespace/maintainer" \
   -H "Authorization: Bearer ADMIN_TOKEN" \
-  -d '{"namespace": "acme-corp", "new_maintainer": "new-hire"}'
+  -d "username=new-hire&namespace=acme-corp"
 
 # 2. Add to specific packages (maintainer action)
 curl -X POST "https://registry.fortran-lang.org/lead-dev/maintainer" \
   -H "Authorization: Bearer MAINTAINER_TOKEN" \
-  -d '{"namespace": "acme-corp", "package": "acme-core", "new_maintainer": "new-hire"}'
+  -d "username=new-hire&namespace=acme-corp&package=acme-core"
 ```
 
 ### Offboarding Team Members
@@ -385,12 +351,12 @@ curl -X POST "https://registry.fortran-lang.org/lead-dev/maintainer" \
 # 1. Remove from all packages
 curl -X POST "https://registry.fortran-lang.org/lead-dev/maintainer/remove" \
   -H "Authorization: Bearer ADMIN_TOKEN" \
-  -d '{"namespace": "acme-corp", "package": "acme-core", "maintainer": "former-employee"}'
+  -d "username=former-employee&namespace=acme-corp&package=acme-core"
 
 # 2. Remove from namespace
 curl -X POST "https://registry.fortran-lang.org/cto/namespace/maintainer/remove" \
   -H "Authorization: Bearer ADMIN_TOKEN" \
-  -d '{"namespace": "acme-corp", "maintainer": "former-employee"}'
+  -d "username=former-employee&namespace=acme-corp"
 
 # 3. Regenerate upload tokens (security measure)
 curl -X POST "https://registry.fortran-lang.org/namespaces/acme-corp/uploadToken" \
@@ -452,10 +418,8 @@ You're not an admin of the namespace:
 ### "Invalid namespace name"
 
 Check naming rules:
-- Lowercase only
-- Letters, numbers, hyphens
-- 3-50 characters
-- Starts with letter
+- Letters (any case), numbers, hyphens and underscores only
+- 1-64 characters
 
 ### "Cannot delete namespace"
 

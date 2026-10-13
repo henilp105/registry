@@ -19,8 +19,10 @@ export const RESET_ERROR_MESSAGE = RESET_RATE_PACKAGE_MESSAGES;
  * @returns {Function} Redux thunk action
  */
 export const ratePackage = (data, accessToken) => async (dispatch) => {
-  // Exit early if no access token
-  if (accessToken === null) {
+  // Exit early if no access token. Falsy, not `=== null`: an `undefined`
+  // token would otherwise slip through and be sent as `Bearer undefined`,
+  // which 401s and triggers a spurious session sign-out via the interceptor.
+  if (!accessToken) {
     dispatch({
       type: RATE_PACKAGE_FAILURE,
       payload: {

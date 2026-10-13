@@ -298,17 +298,13 @@ curl "https://registry.fortran-lang.org/packages?page=2&limit=20"
 
 ### Adding Maintainers
 
-Package owners can add other users as maintainers:
+Package owners can add other users as maintainers. The route is
+`POST /{your-username}/maintainer` and takes form fields:
 
 ```bash
 curl -X POST "https://registry.fortran-lang.org/your-username/maintainer" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "namespace": "my-namespace",
-    "package": "my-package",
-    "new_maintainer": "contributor-username"
-  }'
+  -d "username=contributor-username&namespace=my-namespace&package=my-package"
 ```
 
 ### Removing Maintainers
@@ -316,12 +312,7 @@ curl -X POST "https://registry.fortran-lang.org/your-username/maintainer" \
 ```bash
 curl -X POST "https://registry.fortran-lang.org/your-username/maintainer/remove" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "namespace": "my-namespace",
-    "package": "my-package",
-    "maintainer": "contributor-username"
-  }'
+  -d "username=contributor-username&namespace=my-namespace&package=my-package"
 ```
 
 ### Viewing Maintainers
@@ -336,16 +327,13 @@ curl "https://registry.fortran-lang.org/packages/my-namespace/my-package/maintai
 
 ### Deprecating a Package
 
-Mark a package as deprecated (still visible but discouraged):
+Mark a package as deprecated (still visible but discouraged). There is no
+`/deprecate` path; deprecation is a `PUT` to `/packages`:
 
 ```bash
-curl -X POST "https://registry.fortran-lang.org/packages/my-namespace/my-package/deprecate" \
+curl -X PUT "https://registry.fortran-lang.org/packages" \
   -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "deprecated": true,
-    "message": "This package is no longer maintained. Use new-package instead."
-  }'
+  -d "name=my-package&namespace=my-namespace&isDeprecated=true"
 ```
 
 ### Deleting a Version

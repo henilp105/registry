@@ -87,41 +87,65 @@ const OPERAND_KEYS = new Set(["$search", "$regex", "$options", "$comment"]);
  * field at once (a legacy package's `maintainers` array holds hex strings
  * while every new document holds ObjectIds). Wrapping the fragment in
  * `rawBson` passes it through toBsonQueries untouched.
+ *
+ * ── Why every marker is a string key ────────────────────────────────────────
+ * These fragments are built in a route and then cross the Durable Object RPC
+ * boundary via `stub.execute({ op })` *before* `toBsonQueries` ever runs.
+ * workerd's RPC layer drops symbol-keyed properties entirely (a `{[sym]: v}`
+ * arrives as `{}`) and rejects bson `ObjectId` instances outright
+ * ("DataCloneError: Could not serialize object of type ObjectId"). A
+ * symbol-keyed marker or a live ObjectId therefore either vanishes or throws
+ * 500 at the boundary -- the escape hatch has to be plain, JSON-shaped data.
+ *
+ * `$fpmOid` / `$fpmStr` let a fragment quote both stored forms of one id while
+ * keeping the payload serialisable: the ObjectId is reconstructed here, inside
+ * the pool, where it is safe to build.
  */
-const RAW = Symbol.for("fpm.bson.raw");
+const RAW_KEY = "$fpmRaw";
+const OID_KEY = "$fpmOid";
+const STR_KEY = "$fpmStr";
 
 export function rawBson<T>(value: T): T {
-  return { [RAW]: value } as unknown as T;
+  return { [RAW_KEY]: value } as unknown as T;
 }
 
-/** Both stored forms of a user id: ObjectId (worker-written) and the legacy hex string. */
-function idPair(id: unknown): { oid: ObjectId; hex: string } | null {
+/** A plain, RPC-serialisable placeholder for `new ObjectId(hex)`. */
+function oidMarker(hex: string): unknown {
+  return { [OID_KEY]: hex };
+}
+
+/** A plain placeholder pinning a 24-hex operand as a literal string. */
+function strMarker(hex: string): unknown {
+  return { [STR_KEY]: hex };
+}
+
+/** The 24-hex form of an id, whether it arrives as a string or an ObjectId. */
+function idHex(id: unknown): string | null {
   const hex =
     typeof id === "string"
       ? id
       : typeof (id as { toHexString?: unknown })?.toHexString === "function"
         ? (id as { toHexString(): string }).toHexString()
         : null;
-  if (!hex || !HEX24.test(hex)) return null;
-  return { oid: new ObjectId(hex), hex };
+  return hex && HEX24.test(hex) ? hex : null;
 }
 
 /** Array-contains either form of the id (member of legacy or modern docs). */
 export function memberOf(id: unknown): unknown {
-  const pair = idPair(id);
-  return pair ? rawBson({ $in: [pair.oid, pair.hex] }) : id;
+  const hex = idHex(id);
+  return hex ? { $in: [oidMarker(hex), strMarker(hex)] } : id;
 }
 
 /** Array does NOT contain either form of the id. */
 export function notMemberOf(id: unknown): unknown {
-  const pair = idPair(id);
-  return pair ? rawBson({ $nin: [pair.oid, pair.hex] }) : id;
+  const hex = idHex(id);
+  return hex ? { $nin: [oidMarker(hex), strMarker(hex)] } : id;
 }
 
 /** `$pull` condition matching either form of the id, for update documents. */
 export function pullBothForms(id: unknown): unknown {
-  const pair = idPair(id);
-  return pair ? rawBson({ $in: [pair.oid, pair.hex] }) : id;
+  const hex = idHex(id);
+  return hex ? { $in: [oidMarker(hex), strMarker(hex)] } : id;
 }
 
 /**
@@ -132,8 +156,8 @@ export function pullBothForms(id: unknown): unknown {
 export function idsBothForms(ids: unknown[]): unknown[] {
   const out: unknown[] = [];
   for (const id of ids) {
-    const pair = idPair(id);
-    if (pair) out.push(pair.oid, pair.hex);
+    const hex = idHex(id);
+    if (hex) out.push(oidMarker(hex), strMarker(hex));
     else out.push(id);
   }
   return out;
@@ -153,9 +177,19 @@ export function toBsonQueries<T = unknown>(value: unknown): T {
   // Already the right type; leave alone so a Date does not become a plain object.
   if (value instanceof Date || value instanceof ObjectId) return value as T;
 
+  // RPC-safe markers emitted by rawBson / memberOf / notMemberOf /
+  // pullBothForms / idsBothForms. The ObjectId is built here, inside the pool,
+  // because it cannot survive the RPC boundary (see the marker comment above).
+  if (OID_KEY in (value as Record<PropertyKey, unknown>)) {
+    return new ObjectId((value as Record<string, string>)[OID_KEY]) as T;
+  }
+  if (STR_KEY in (value as Record<PropertyKey, unknown>)) {
+    return (value as Record<string, string>)[STR_KEY] as T;
+  }
+
   // Explicit raw fragment: never rewritten.
-  if (RAW in (value as Record<PropertyKey, unknown>)) {
-    return (value as Record<PropertyKey, unknown>)[RAW] as T;
+  if (RAW_KEY in (value as Record<PropertyKey, unknown>)) {
+    return (value as Record<PropertyKey, unknown>)[RAW_KEY] as T;
   }
 
   const out: Record<string, unknown> = {};

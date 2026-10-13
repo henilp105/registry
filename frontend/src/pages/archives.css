@@ -52,27 +52,18 @@
   background-color: var(--color-surface);
   box-shadow: var(--shadow-xs);
   transition:
-    transform var(--duration-base) var(--ease-standard),
     box-shadow var(--duration-base) var(--ease-standard),
     border-color var(--duration-base) var(--ease-standard);
 }
 
-/* :focus-within so the card lifts for keyboard users tabbing to its link,
+/* :focus-within so the card reacts for keyboard users tabbing to its link,
    not only on mouse hover. The old style object tried to do this with a
    nested "&:hover" key, which is styled-components syntax and did nothing at
    all in a React style prop. */
 .archives__card:hover,
 .archives__card:focus-within {
-  transform: translateY(-3px);
   border-color: var(--color-border);
   box-shadow: var(--shadow-md);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .archives__card:hover,
-  .archives__card:focus-within {
-    transform: none;
-  }
 }
 
 .archives__link {

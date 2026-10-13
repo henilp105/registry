@@ -66,20 +66,6 @@
   border-radius: var(--radius-full);
   object-fit: cover;
   box-shadow: var(--shadow-sm);
-  transition:
-    transform var(--duration-slow) var(--ease-standard),
-    box-shadow var(--duration-slow) var(--ease-standard);
-}
-
-.account-avatar:hover {
-  transform: scale(1.05);
-  box-shadow: var(--shadow-md);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .account-avatar:hover {
-    transform: none;
-  }
 }
 
 .account-username {
@@ -137,22 +123,14 @@
   transition:
     background-color var(--duration-fast) var(--ease-standard),
     border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard),
-    transform var(--duration-fast) var(--ease-standard);
+    color var(--duration-fast) var(--ease-standard);
 }
 
 .account-action-btn:hover {
   border-color: var(--primary-300);
   background-color: var(--primary-100);
   color: var(--primary-800);
-  transform: translateY(-2px);
   box-shadow: var(--shadow-sm);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .account-action-btn:hover {
-    transform: none;
-  }
 }
 
 .account-action-btn .action-icon {
@@ -196,11 +174,7 @@
   width: 4px;
   height: 24px;
   border-radius: 2px;
-  background: linear-gradient(
-    180deg,
-    var(--color-brand-solid),
-    var(--color-brand-solid-hover)
-  );
+  background-color: var(--color-brand-solid);
 }
 
 /* Verified badge. Success ramp, which inverts correctly in dark mode. */
@@ -211,7 +185,7 @@
   padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-full);
   background-color: var(--color-success-solid);
-  color: var(--color-on-brand-solid);
+  color: var(--color-on-success-solid);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   box-shadow: var(--shadow-xs);
@@ -256,11 +230,7 @@
   width: 48px;
   height: 48px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-solid),
-    var(--color-brand-solid-hover)
-  );
+  background-color: var(--color-brand-solid);
   color: var(--color-on-brand-solid);
   box-shadow: var(--shadow-sm);
 }
@@ -417,33 +387,24 @@
   padding: var(--space-3) var(--space-6);
   border: 0;
   border-radius: var(--radius-md);
-  background: linear-gradient(
-    135deg,
-    var(--color-brand-solid),
-    var(--color-brand-solid-hover)
-  );
+  background-color: var(--color-brand-solid);
   color: var(--color-on-brand-solid);
   font-weight: var(--font-weight-semibold);
   box-shadow: var(--shadow-sm);
   transition:
-    transform var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard),
     box-shadow var(--duration-fast) var(--ease-standard);
 }
 
-.account-submit-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
+.account-submit-btn:hover:not(:disabled),
+.account-submit-btn:active:not(:disabled) {
+  background-color: var(--color-brand-solid-hover);
   box-shadow: var(--shadow-md);
 }
 
 .account-submit-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .account-submit-btn:hover:not(:disabled) {
-    transform: none;
-  }
 }
 
 .account-alert {

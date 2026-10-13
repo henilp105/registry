@@ -1,6 +1,6 @@
 # API Reference
 
-Complete REST API documentation for the FPM Registry. All endpoints use JSON for request and response bodies unless otherwise specified.
+Complete REST API documentation for the FPM Registry. Responses are JSON. Write endpoints (`POST`/`PUT`) accept form-encoded bodies (`multipart/form-data` or `application/x-www-form-urlencoded`); the request bodies below are shown as field objects for readability but are sent as form fields. See [API_CONTRACT.md](API_CONTRACT.md) for the exact fields each route reads.
 
 ## Base URL
 
@@ -58,7 +58,7 @@ Get API information and health status.
   "code": 200,
   "message": "FPM Registry API",
   "status": "healthy",
-  "version": "2.0.1"
+  "version": "3.0.0"
 }
 ```
 
@@ -72,53 +72,16 @@ Detailed health check including database connectivity.
   "code": 200,
   "status": "healthy",
   "database": "connected",
-  "version": "2.0.1"
+  "version": "3.0.0"
 }
 ```
 
-### GET /latency (legacy Flask only — not routed by the Worker)
+### GET /latency
 
-> This endpoint does not exist on the serverless runtime; it belonged to the
-> retired Flask deployment. The Worker answers 404 for it.
-
-Performance testing endpoint. Measures response times across all API endpoints.
-
-> **Requires `X-Admin-Token`** matching the `LATENCY_ADMIN_TOKEN` environment
-> variable; without it the endpoint answers `401` and runs nothing. Defect D113:
-> it was unauthenticated, and each call ran ~10 in-process sub-requests plus six
-> direct queries — roughly 15+ database round-trips per unauthenticated request,
-> answered with per-endpoint timings and collection sizes. It now fails closed
-> when the variable is unset, because an unset token must not mean "no token
-> required".
-
-**Query Parameters:**
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| category | string | Filter by category: `health`, `packages`, `namespaces`, `users`, `database` |
-
-**Response:**
-```json
-{
-  "code": 200,
-  "message": "Latency test completed",
-  "total_endpoints": 10,
-  "successful": 10,
-  "failed": 0,
-  "avg_latency_ms": 2.5,
-  "min_latency_ms": 0.5,
-  "max_latency_ms": 5.0,
-  "results": [
-    {
-      "endpoint": "/packages",
-      "method": "GET",
-      "status_code": 200,
-      "latency_ms": 2.5,
-      "success": true,
-      "category": "packages"
-    }
-  ]
-}
-```
+Retired. This endpoint belonged to the old Flask deployment and measured
+per-endpoint response times; the Worker does not route it and answers `404`.
+Its defunct `LATENCY_ADMIN_TOKEN` guard is recorded in
+[BASELINE_AUDIT.md](BASELINE_AUDIT.md) (defect D113).
 
 ---
 
@@ -146,6 +109,7 @@ Create a new user account.
 **Response (200):**
 ```json
 {
+  "code": 200,
   "message": "Signup successful. Please verify your email."
 }
 ```
@@ -547,16 +511,21 @@ Delete the authenticated user's account.
 
 ### POST /users/admin
 
-Verify admin privileges.
+Check whether the caller is a site admin.
 
 **Headers:** `Authorization: Bearer <token>`
 
-**Request Body:**
+**Response (200):**
 ```json
 {
-  "password": "sudo-password"
+  "code": 200,
+  "message": "User is admin",
+  "isAdmin": "true"
 }
 ```
+
+Note `isAdmin` is the string `"true"`, not a boolean — preserved for the
+frontend's string comparison.
 
 ---
 
@@ -728,6 +697,6 @@ now implemented and verified by `scripts/rate_limit_probe.cjs`.
 
 ## Interactive Documentation
 
-For interactive API exploration, visit the Swagger UI at:
-- **Production:** https://registry.fortran-lang.orgdocs
-- **Development:** http://localhost/apidocs
+For interactive API exploration, visit the OpenAPI documentation:
+- **Production:** https://registry.fortran-lang.org/apidocs
+- **Development:** http://localhost:8787/apidocs

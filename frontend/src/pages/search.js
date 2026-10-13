@@ -135,14 +135,13 @@ const EmptySearchState = ({ query }) => (
   </div>
 );
 
-// Package list with a short staggered entrance
+// Package list; each result is a full-width row.
 const ListView = ({ packages, currentPage, totalPages }) => (
   <div className="search-results">
-    {packages.map((packageEntity, index) => (
+    {packages.map((packageEntity) => (
       <div
         key={`${packageEntity.namespace}/${packageEntity.name}`}
         className="search-results__item"
-        style={{ "--index": index }}
       >
         <PackageItem packageEntity={packageEntity} />
       </div>

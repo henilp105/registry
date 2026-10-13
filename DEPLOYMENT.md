@@ -131,36 +131,34 @@ Every deploy is an immutable version, so rollback never involves rebuilding anyt
 stateless — all durable state lives in MongoDB and R2, neither of which a Worker rollback touches.
 
 If the Worker is broken badly enough that it is not serving at all, the fastest fix is to stop
-routing to it: point the hostname back at the legacy deployment in the Cloudflare DNS record, which
-takes effect in seconds.
+routing to it: point the hostname at a previous Worker version, or remove the route, in the
+Cloudflare dashboard. That takes effect in seconds and touches no data.
 
 ---
 
-## 4. Cutover from the legacy deployment
+## 4. First deployment
 
-The legacy stack is Docker Compose behind nginx. Cutover is a traffic change, not a data migration,
-because **the target database has never held registry data** — verified: `cluster0.kdreahb` contains
-only `admin`, `local` and the `sample_mflix` sample. So there is no dual-write, no backfill, and no
-reconciliation window.
+There is no legacy stack to cut over from: the Docker Compose + nginx deployment was removed when the
+registry moved to the serverless architecture, and this Worker is now the only deployment. A first
+deploy is a staging → production rollout, not a dual-write.
 
 | Step | Action | Gate to proceed |
 |---|---|---|
-| 0 | Deploy the Worker to staging. Point a staging hostname at it. | `/health` returns 200 with `mongo.connected: true` |
-| 1 | Load data into the target cluster. Small enough to do by hand for a soft launch. | `/packages?query=fortran` returns results |
-| 2 | Canary at 10% at Cloudflare, with the legacy origin as fallback. | Error rate and p95 within SLO for 24 h |
+| 0 | Deploy to staging (`npm run deploy:staging`) and point a staging hostname at it. | `/health` returns 200 with `mongo.connected: true` |
+| 1 | Seed the target cluster. Small enough to do by hand for a soft launch. | `/packages?query=fortran` returns results |
+| 2 | Route 10% of production traffic to the version. | Error rate and p95 within SLO for 24 h |
 | 3 | 50%. | 24 h clean. Confirm ratings and uploads work end to end. |
-| 4 | 100%. | Keep the legacy stack up, untouched, for 7 days. |
-| 5 | Decommission the legacy stack. | — |
+| 4 | 100%. | — |
 
-**Rollback at any step: `npx wrangler rollback`, or repoint DNS.** The legacy stack is still running
-and unmodified throughout, because it is never mutated — the Worker reads the *new* cluster.
+**Rollback at any step: `npx wrangler rollback`, or repoint DNS.** The Worker holds no durable
+state of its own — everything lives in MongoDB and R2 — so a rollback touches neither.
 
 ### What cannot be rolled back
 
 One thing, stated plainly: **MongoDB writes are not transactional with respect to a Worker
 rollback.** A package published while version *N* is live stays published if you roll back to
-*N-1*. This is inherent to moving the write path to a new datastore, and it is why step 1 loads data
-by hand rather than pointing the Worker at the production cluster.
+*N-1*. This is inherent to any code rollback against a shared datastore, and it is why step 1 seeds
+data deliberately rather than pointing a staging Worker at the production cluster.
 
 ---
 
@@ -247,15 +245,16 @@ cheap to poll from GitHub Actions on a cron, which is free.
 | R2 | 10 GB-month, free egress | ~10,000 typical fpm tarballs |
 | MongoDB M0 | 100 ops/sec, 512 MB, 10 GB/7-day egress | Metadata only; tarballs never touch it |
 | GitHub Actions | free on public repositories | Validation every 30 min |
-| Cron Triggers | 5 / account | 4 in use |
+| Cron Triggers | 5 / account | 3 in use |
 
 ---
 
 ## 10. Things that will surprise you
 
 - **Password hashing and the MongoDB connection both live in a Durable Object**, not the Worker.
-  PBKDF2 at 210,000 iterations measures 176 ms — roughly 18× the Worker's entire CPU budget. This is
-  not premature optimisation; without it, every login returns error 1102.
+  A database connection alone costs a single ~4.5 ms SCRAM step against a 10 ms budget, and the
+  PBKDF2 password KDF fills most of the rest even at 10,000 iterations. This is not premature
+  optimisation; without it, every login returns error 1102.
 - **`/packages` uses the `$text` index.** `v2.0.1` created that index and then never used it,
   searching with unescaped `$regex` over full README files instead.
 - **`ver.isDeprecated` and `ver.is_deprecated` are both emitted.** The frontend compares the former
