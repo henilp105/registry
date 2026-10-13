@@ -34,7 +34,7 @@ jobs:
           cache-dependency-path: worker/package-lock.json
 
       - name: Install
-        run: npm ci
+        run: npm install && npm ci
 
       - name: Typecheck
         run: npm run typecheck

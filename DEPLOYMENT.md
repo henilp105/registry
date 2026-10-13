@@ -226,6 +226,12 @@ cheap to poll from GitHub Actions on a cron, which is free.
 | Rebuild the schema | Hourly cron is idempotent; or force it with a manual cron trigger. | — |
 | Download a registry snapshot | `GET /registry/archives` | free egress |
 
+`fpm publish --registry` needs an fpm build that implements the flag (this
+repository's `../fpm`, branch `fpm-search`). If your CLI only accepts
+`--registry` for `fpm search`, set `[registry] url` in
+`~/.local/share/fpm/config.toml` instead — publish honours it too. See
+`docs/MANUAL_TESTING.md` §4.
+
 ---
 
 ## 8. Troubleshooting

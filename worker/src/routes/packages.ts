@@ -54,6 +54,7 @@ import {
   SORT_MAP,
   buildMatchFilter,
   clampInt,
+  cliSearchOptions,
   escapeRegex,
   planSearch,
   sortDirectionFor,
@@ -303,28 +304,27 @@ async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
   const limit = clampInt(url.searchParams.get("limit"), DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
   // See searchPackages: MAX_SKIP bounds the skip, not the page number.
   const skip = Math.min(page * limit, MAX_SKIP);
-  const sortedBy = (url.searchParams.get("sorted_by") ?? "name").toLowerCase();
-  const sortField = SORT_MAP[sortedBy] ?? "name";
-  const direction = sortDirectionFor(sortField, url.searchParams.get("sort"));
-
-  // `*` is the CLI's "any" sentinel, not a literal to match against.
-  const wildcard = (key: string): string | null => {
-    const value = url.searchParams.get(key);
-    if (value === null) return null;
-    const trimmed = value.trim();
-    return trimmed === "" || trimmed === "*" ? null : trimmed;
-  };
-  const namespace = wildcard("namespace");
-  const packageName = wildcard("package");
-  const license = wildcard("license");
-
-  const extra: Record<string, unknown> = {};
-  if (namespace) extra.namespace_name = { $regex: `^${escapeRegex(namespace)}`, $options: "i" };
-  if (packageName) extra.name = { $regex: `^${escapeRegex(packageName)}`, $options: "i" };
-  if (license) extra.license = { $regex: escapeRegex(license), $options: "i" };
+  // `fpm search` sends `sort_by` and `version`, and uses `*` as "any". The
+  // mapping lives in `cliSearchOptions` so the CLI contract is unit tested
+  // rather than only exercised through a live database (defect D200).
+  const { sortField, direction, filters: extra, version } = cliSearchOptions(url);
 
   const plan = planSearch(rawQuery);
   const filter = buildMatchFilter(plan, { is_deprecated: false, ...extra });
+
+  // Filtering by version keeps only packages that have a matching version, and
+  // narrows the projected list so the reported `version` is the matched one
+  // rather than the package's overall latest.
+  const projection: Record<string, unknown> = { name: 1, namespace_name: 1, description: 1, versions: 1 };
+  if (version) {
+    projection.versions = {
+      $filter: {
+        input: "$versions",
+        as: "v",
+        cond: { $regexMatch: { input: "$$v.version", regex: `^${escapeRegex(version)}`, options: "i" } },
+      },
+    };
+  }
 
   const [rows, total] = await Promise.all([
     db<Record<string, unknown>[]>(env, {
@@ -346,7 +346,7 @@ async function searchPackagesCli(env: Env, url: URL): Promise<Response> {
         },
         { $skip: skip },
         { $limit: limit },
-        { $project: { name: 1, namespace_name: 1, description: 1, versions: 1 } },
+        { $project: projection },
       ],
     }),
     db<number>(env, {

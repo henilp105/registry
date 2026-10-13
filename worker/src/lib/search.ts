@@ -146,4 +146,46 @@ export function mustResolveNamespaceFirst(namespaceFieldType: "objectid" | "stri
   return true;
 }
 
+/**
+ * Map `/packages_cli` query parameters onto search primitives.
+ *
+ * The fpm CLI sends `sort_by` (not `/packages`' `sorted_by`), a `version` filter
+ * and `*` as its "any" sentinel. Reading only `sorted_by` silently dropped the
+ * CLI's sort, and ignoring `version` made `fpm search --package_version` a no-op
+ * (defect D200). Extracted here so both are covered by a unit test.
+ */
+export function cliSearchOptions(url: URL): {
+  sortField: string;
+  direction: 1 | -1;
+  filters: Record<string, unknown>;
+  version: string | null;
+} {
+  const wildcard = (key: string): string | null => {
+    const value = url.searchParams.get(key);
+    if (value === null) return null;
+    const trimmed = value.trim();
+    return trimmed === "" || trimmed === "*" ? null : trimmed;
+  };
+
+  const sortedBy = (
+    url.searchParams.get("sort_by") ??
+    url.searchParams.get("sorted_by") ??
+    "name"
+  ).toLowerCase();
+  const sortField = SORT_MAP[sortedBy] ?? "name";
+  const direction = sortDirectionFor(sortField, url.searchParams.get("sort"));
+
+  const filters: Record<string, unknown> = {};
+  const namespace = wildcard("namespace");
+  const packageName = wildcard("package");
+  const license = wildcard("license");
+  const version = wildcard("version");
+  if (namespace) filters.namespace_name = { $regex: `^${escapeRegex(namespace)}`, $options: "i" };
+  if (packageName) filters.name = { $regex: `^${escapeRegex(packageName)}`, $options: "i" };
+  if (license) filters.license = { $regex: escapeRegex(license), $options: "i" };
+  if (version) filters["versions.version"] = { $regex: `^${escapeRegex(version)}`, $options: "i" };
+
+  return { sortField, direction, filters, version };
+}
+
 export { validatePackageName };

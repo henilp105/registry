@@ -237,9 +237,15 @@ Package search optimized for CLI tools.
 | query | string | Search term (default: "fortran") |
 | namespace | string | Filter by namespace |
 | package | string | Filter by package name |
+| version | string | Filter by version; `*` means any |
 | license | string | Filter by license |
-| page | integer | Page number |
-| limit | integer | Results per page |
+| sort_by | string | Sort field: `name`, `createdat`, `updatedat`, `downloads` (`sorted_by` accepted as an alias) |
+| sort | string | `asc` or `desc` |
+| page | integer | Page number (1-based) |
+| limit | integer | Results per page (capped at 50) |
+
+An empty result is a **404** with `{"status":"error"}` (the `fpm` CLI reads this
+as "no matches"); `/packages` returns `200` with an empty array instead.
 
 ### POST /packages
 

@@ -413,8 +413,8 @@ curl -sS "$API/namespace/$NS" \
   | jq -e --arg ns "$NS" '.code==200 and (.packages|type=="array")'
 
 # mint a NAMESPACE-scoped publish token (required for the first publish)
-UPTOKEN="$(curl -sS -X POST "$API/namespaces/$NS/uploadToken" \
-  -H "Authorization: Bearer $ACCESS" | jq -r '.uploadToken // .upload_token')"
+UPTOKEN=$(curl -sS -X POST "$API/namespaces/$NS/uploadToken" \
+  -H "Authorization: Bearer $ACCESS" | jq -r '.uploadToken // .upload_token')
 export UPTOKEN
 test -n "$UPTOKEN" && test "$UPTOKEN" != null && echo "got upload token"
 ```
@@ -433,7 +433,7 @@ curl -sS -X POST "$API/namespaces/$NS/uploadToken" -H "Authorization: Bearer $AC
 | Method | Path | Form / query | Auth | Expected |
 |---|---|---|---|---|
 | GET | `/packages` | `query`,`page` (0-based),`limit`,`sorted_by` | — | `{code:200,packages[],total_pages}` |
-| GET | `/packages_cli` | `query`,`namespace`,`package`,`license`,`page` (1-based) | — | `{code:200,packages[]}`; **404** when empty |
+| GET | `/packages_cli` | `query`,`namespace`,`package`,`version`,`license`,`sort_by`,`sort`,`page` (1-based),`limit` | — | `{code:200,packages[]}`; **404** when empty |
 | POST | `/packages` | multipart: `upload_token`,`package_name`,`package_version`,`package_license`,`tarball`[,`dry_run`] | token | `{code:200,message:"Package Uploaded Successfully."}` |
 | GET | `/packages/{ns}/{pkg}` | — | — | `{code:200,data{…}}` |
 | GET | `/packages/{ns}/{pkg}/{version}` | — | — | `{code:200,data{…,version_data}}` |
@@ -467,6 +467,22 @@ jq -e '.status=="error"' /tmp/cli.json
 `page` is **1-based** here and **0-based** on `/packages`. Getting this backwards
 silently duplicates or skips a page. Do not "fix" the inconsistency; the CLI
 depends on it.
+
+This route must honour the CLI's *own* parameter names, not just `/packages`':
+
+```bash
+# the CLI's sort field is `sort_by`; `sorted_by` is accepted as an alias.
+#   fpm search --sort-by downloads  =>  ?sort_by=downloads&sort=desc
+curl -sS "$API/packages_cli?sort_by=downloads&sort=desc&page=1" \
+  | jq -e '.code==200 and (.packages|type=="array")'
+# the CLI's version filter is `version`; `*` (its default) means "any".
+curl -sS "$API/packages_cli?version=1.0.0&page=1" \
+  | jq -e '.code==200 and (.packages|type=="array")'
+```
+
+Both were ignored on the legacy route (defect D200): `fpm search --sort-by` fell
+back to name order and `--package_version` matched every version. A regression
+here is silent — the route still answers `200`.
 
 #### 3.5.3 Upload
 
@@ -826,12 +842,14 @@ the usual cause of a confusing failure:
 
 | Action | Registry used | How to point it |
 |---|---|---|
-| **Dependency download** (`fpm build` fetches a registry dep) | the `[registry] url` in `~/.local/share/fpm/config.toml` | edit the config file (below) |
-| **Publish** (`fpm publish`) | the registry the `fpm` binary is built against (the official registry) | not selectable via config in all releases |
+| **Dependency download** (`fpm build` fetches a registry dep) | `[registry] url` in `~/.local/share/fpm/config.toml` | edit the config file (below) |
+| **Search** (`fpm search`) | `--registry URL`, else config `[registry] url`, else the official registry | `--registry` |
+| **Publish** (`fpm publish`) | `--registry URL`, else config `[registry] url`, else the official registry | `--registry` or the config file |
 
-So the config file below makes `fpm build` **download** from `$API`; `fpm publish`
-goes to whatever registry the CLI targets. To publish to a **staging** registry,
-use the raw-`curl` mirror in §4.3 — `fpm` cannot always be repointed for publish.
+The default (when nothing is set) is **`https://registry.fortran-lang.org`** —
+the same host the worker and the frontend serve. So the config file below makes
+`fpm build`, `fpm search` and `fpm publish` all talk to `$API`; for a one-off
+publish to staging, pass `--registry` (see §4.2).
 
 ```bash
 mkdir -p ~/.local/share/fpm
@@ -842,10 +860,10 @@ EOF
 cat ~/.local/share/fpm/config.toml
 ```
 
-`fpm --version` must be **0.8.2 or newer** (registry support landed there). Check
-the flags your build actually has with `fpm publish --help` — a `--registry` flag
-is **not** present in every release, and inventing it produces a usage error that
-looks like a registry fault.
+`fpm --version` must be **0.8.2 or newer** (registry support landed there).
+`fpm publish --registry` also needs a build that has the flag: this repository's
+`../fpm` (branch `fpm-search`) does; older releases accept `--registry` only for
+`fpm search`. Confirm with `fpm publish --help` before assuming a registry fault.
 
 ### 4.2 Publish a real package
 
@@ -895,37 +913,51 @@ builds the artifact from the project, so run it from inside `$FPMDIR`:
 
 ```bash
 cd "$FPMDIR"
-fpm publish --token "$UPTOKEN" --verbose
+fpm publish --token "$UPTOKEN" --registry "$API" --verbose
 ```
 
-Expected: a success message; the package appears at
-`GET /packages/$NS/$FPMPKG`. If it fails, `--verbose` prints the multipart fields
-and the registry's response.
+`--registry` is optional (the config file or the compiled-in default applies),
+but passing it explicitly is what makes the target unambiguous in a drill.
+
+Expected: exit `0`, a success message, and the package appears at
+`GET /packages/$NS/$FPMPKG`. A rejection (bad token, invalid license, oversized
+tarball) must exit **non-zero** and print the registry's JSON error alongside
+curl's HTTP status — e.g. `{"code":401,"message":"Invalid upload token",...}`.
+A publish that prints that body but exits `0` is the silent-success bug: curl
+without `--fail-with-body` treats HTTP 4xx/5xx as success.
 
 `fpm publish` flags worth exercising (from the fpm docs):
 
 ```bash
-# What version would be published? No network.
+# What version would be published? No network, no git.
 fpm publish --show-package-version
 
 # Exactly what WOULD be sent, including the token and a built tarball. No network.
 fpm publish --token "$UPTOKEN" --show-upload-data
 
-# Simulate the upload: builds the tarball, verifies package AND token against the
-# registry, then prints the local tarball path. Publishes nothing.
+# Build the tarball and print its path. LOCAL ONLY: it contacts nothing, so it
+# does NOT validate the token or the package name.
 fpm publish --token "$UPTOKEN" --dry-run --verbose
 ```
 
-> **`--dry-run` caveat.** It does contact the registry to verify the token in
-> current releases, but the exact behaviour has varied. The API-level dry run in
-> §3.5.3a is the authoritative "no side effects" check; treat `fpm publish
-> --dry-run` as corroborating evidence, not the gate.
+> **`--dry-run` caveat.** In this build `fpm publish --dry-run` is entirely
+> local: it builds the tarball, prints the path and returns without issuing an
+> HTTP request. The registry's own no-op is the `dry_run=true` **form field**
+> (§3.5.3a), which the CLI never sends. So §3.5.3a is the authoritative
+> "no side effects" check; `fpm publish --dry-run` proves only that the tarball
+> can be built (which, before the fix, it could not — see §4.3).
 
 ### 4.3 Byte-equivalent raw mirror of `fpm publish`
 
 If `fpm` is unavailable, or a publish fails and you need to isolate CLI vs API,
 this is exactly what the CLI sends. It builds a tarball the same way `fpm` does
 (`git archive` of the committed tree) and posts the identical fields:
+
+> The CLI's tarball also contains a generated `fpm_model.json` at the archive
+> root (`git archive --add-file`). The mirror below omits it; the registry does
+> not require it, so the two are equivalent for upload testing. (Ordering that
+> file into the archive before it was written was itself a publish-blocking bug
+> — see the note in §4.2.)
 
 ```bash
 # Mirror fpm's own tarball: `git archive HEAD` of the committed project.
@@ -1020,6 +1052,42 @@ curl -sS "$API/packages/$NS/$FPMPKG/1.0.0" \
 > registry base. A URL emitted as absolute (`https://…/tarballs/…`) or missing the
 > leading `/` will make `fpm` fetch the wrong host or 404. Assert
 > `startswith("/")` every time.
+
+### 4.5 Search (`fpm search`)
+
+`fpm search` queries `/packages_cli` (not `/packages`) and reads the package array
+back. Point it at `$API` explicitly:
+
+```bash
+# the metadata the CLI reads; §3.5.2 covers the parameter contract
+curl -sS "$API/packages_cli?query=json&page=1&limit=10&sort_by=name&sort=asc" \
+  | jq -e '.code==200 and (.packages|type=="array")'
+
+# 4.5.1 the CLI target and a normal query
+fpm search --registry "$API" --query json
+# 4.5.2 every filter the CLI exposes
+fpm search --registry "$API" --namespace "$NS" --package "$FPMPKG" \
+  --package_version '*' --license MIT --sort-by name --sort asc --page 1 --limit 10
+# 4.5.3 special characters must survive (they used to corrupt the URL)
+fpm search --registry "$API" --query 'a&b c'
+# 4.5.4 an empty result is NOT an error: the worker answers 404 and the CLI must
+#       still exit 0 with a "No packages found" message.
+fpm search --registry "$API" --query "zzz-nothing-${RUN}"; echo "exit=$?"   # 0
+```
+
+Assertions:
+
+- **4.5.1–4.5.2** print `Found N packages`, each with `Name/Namespace/Version/Description`.
+- **4.5.3** must not hit a malformed-URL error: the CLI percent-encodes `&`, space,
+  `#`, `+` and friends before building `/packages_cli?...`. A raw `&` would split
+  the query into extra parameters and silently change the search.
+- **4.5.4** exits `0` and prints `No packages found in the registry.` — the worker's
+  `404 {"code":404,...}` is "no matches", not a transport failure.
+- A trailing slash on `--registry` (`http://…/`) must not produce `//packages_cli`.
+
+`fpm search` also prints a **local registry** section first, read from
+`[registry] cache_path` (packages previously downloaded by `fpm build`). It is
+empty on a clean machine; that is not a failure.
 
 ---
 
