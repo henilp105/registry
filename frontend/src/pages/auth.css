@@ -1,4 +1,5 @@
-/* Authentication pages: login, register, forgot-password, verify-email.
+/* Authentication pages: login, register, forgot-password, reset-password,
+ * verify-email.
  *
  * Rewritten onto tokens. The file carried 49 literal hex values, including a
  * fifth gradient pair (#6366f1 -> #8b5cf6) on .auth-submit-btn - the same one
@@ -477,20 +478,6 @@
 .verify-retry-btn:active:not(:disabled) {
   background-color: var(--color-border);
   color: var(--color-text);
-}
-
-/* A single centred column for the short standalone auth pages (reset
- * password, and anything else that is one form with no header block). */
-.auth-narrow-page {
-  display: flex;
-  justify-content: center;
-  min-height: calc(100vh - var(--header-height));
-  padding: var(--space-10) var(--space-4);
-}
-
-.auth-narrow-page > * {
-  width: 100%;
-  max-width: 25rem;
 }
 
 /* --------------------------------------------------------------------------

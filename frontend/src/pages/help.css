@@ -70,7 +70,10 @@
   background-color: var(--color-surface-sunken);
   font-family: var(--font-mono);
   font-size: var(--font-size-base);
-  overflow-x: auto;
+  /* The command is longer than the column at narrow widths; wrap it rather
+     than clip it, so the reader never sees a truncated token. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   text-align: left;
 }
 

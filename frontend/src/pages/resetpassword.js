@@ -2,24 +2,25 @@ import React, { useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { reset } from "../store/actions/resetPasswordActions";
-import Container from "react-bootstrap/Container";
-import Form from "react-bootstrap/Form";
-import Button from "react-bootstrap/Button";
-import Alert from "react-bootstrap/Alert";
-import Spinner from "react-bootstrap/Spinner";
-import InputGroup from "react-bootstrap/InputGroup";
-import Icon from "../components/Icon";
+import {
+  CheckCircleFill,
+  CheckLg,
+  ExclamationCircleFill,
+  Eye,
+  EyeSlash,
+} from "react-bootstrap-icons";
+import "./auth.css";
 
 const ResetPassword = () => {
   const { uuid } = useParams();
   const dispatch = useDispatch();
-  
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [touched, setTouched] = useState({});
-  
+
   // Defect D98: read `error` as well as `message`. The failure branches of this
   // shared slice null `message` and write to `error`, so an expired or unknown
   // reset token -- or any server error -- showed a form that simply stopped
@@ -45,13 +46,13 @@ const ResetPassword = () => {
 
   const validateForm = useCallback(() => {
     const errors = {};
-    
+
     const passwordError = validateField("password", password);
     if (passwordError) errors.password = passwordError;
-    
+
     const confirmError = validateField("confirmPassword", confirmPassword);
     if (confirmError) errors.confirmPassword = confirmError;
-    
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   }, [password, confirmPassword, validateField]);
@@ -73,109 +74,143 @@ const ResetPassword = () => {
 
   const isSuccess = statuscode === 200;
 
+  // Each field is a plain <label htmlFor> paired with a matching input id, so
+  // the control is announced by name (the previous react-bootstrap version had
+  // no `for` until `controlId` was added). The reveal toggle is a focusable,
+  // labelled button that exposes its pressed state, rather than an icon-only
+  // control with tabIndex={-1} that a keyboard user could never reach.
+  const fieldClass = (field) =>
+    `auth-input${touched[field] && formErrors[field] ? " is-invalid" : ""}`;
+
   return (
-    <Container className="auth-narrow-page">
-      <div>
-        <h1 className="mb-2">Reset Password</h1>
-        <p className="text-muted mb-4">
-          Enter your new password below.
-        </p>
+    <div className="auth-container">
+      <div className="auth-card">
+        <div className="auth-header">
+          <img
+            src={`${process.env.PUBLIC_URL}/brand/fortran-logo-256.png`}
+            alt="FPM Registry"
+            className="auth-logo"
+            width={64}
+            height={64}
+          />
+          <h1 className="auth-title">
+            {isSuccess ? "Password Reset" : "Reset Password"}
+          </h1>
+          <p className="auth-subtitle">
+            {isSuccess
+              ? "You can now sign in with your new password."
+              : "Enter your new password below."}
+          </p>
+        </div>
 
         {(message || error) && (
-          <Alert variant={isSuccess ? "success" : "danger"} className="mb-3">
-            {isSuccess && <Icon name="check-circle" className="me-2" />}
-            {!isSuccess && <Icon name="exclamation-circle" className="me-2" />}
-            {isSuccess ? message : error}
-          </Alert>
+          <div
+            className={`auth-alert ${isSuccess ? "auth-alert-success" : "auth-alert-error"}`}
+            role={isSuccess ? "status" : "alert"}
+          >
+            {isSuccess ? (
+              <CheckCircleFill className="auth-alert-icon" />
+            ) : (
+              <ExclamationCircleFill className="auth-alert-icon" />
+            )}
+            <span>{isSuccess ? message : error}</span>
+          </div>
         )}
 
-        <Form onSubmit={handleSubmit}>
-          {/* `controlId` is what associates the label with the control.
-              react-bootstrap's Form.Label renders a bare <label>, and without a
-              controlId on the group it has no `for`, so a screen reader announces
-              an unlabelled password field. This is the only form in the app with
-              the omission, which is why it survived the earlier a11y pass. */}
-          <Form.Group className="mb-3" controlId="reset-password">
-            <Form.Label>New Password</Form.Label>
-            <InputGroup>
-              <Form.Control
+        <form onSubmit={handleSubmit} noValidate>
+          <div className="auth-form-group">
+            <label htmlFor="reset-password" className="auth-label">
+              New Password
+            </label>
+            <div className="auth-password-wrapper">
+              <input
+                id="reset-password"
                 type={showPassword ? "text" : "password"}
+                name="password"
+                className={fieldClass("password")}
                 placeholder="Enter new password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onBlur={() => handleBlur("password")}
-                isInvalid={touched.password && !!formErrors.password}
-                disabled={isLoading}
+                autoComplete="new-password"
+                disabled={isLoading || isSuccess}
+                aria-invalid={!!(touched.password && formErrors.password)}
               />
-              {/* An icon-only button announced simply as "button", and
-                  `tabIndex={-1}` put it beyond the reach of a keyboard user
-                  entirely. It is now labelled, exposes its pressed state, and is
-                  focusable: saving a keystroke in the tab order is not worth
-                  making a control unreachable. */}
-              <Button
-                variant="outline-secondary"
+              <button
+                type="button"
                 onClick={() => setShowPassword((shown) => !shown)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="auth-password-toggle"
                 aria-pressed={showPassword}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                <Icon name={showPassword ? "eye-slash" : "eye"} />
-              </Button>
-              <Form.Control.Feedback type="invalid">
+                {showPassword ? <EyeSlash size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {touched.password && formErrors.password && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
                 {formErrors.password}
-              </Form.Control.Feedback>
-            </InputGroup>
-          </Form.Group>
+              </div>
+            )}
+          </div>
 
-          <Form.Group className="mb-3" controlId="reset-password-confirm">
-            <Form.Label>Confirm Password</Form.Label>
-            <Form.Control
+          <div className="auth-form-group">
+            <label htmlFor="reset-password-confirm" className="auth-label">
+              Confirm Password
+            </label>
+            <input
+              id="reset-password-confirm"
               type={showPassword ? "text" : "password"}
+              name="confirmPassword"
+              className={fieldClass("confirmPassword")}
               placeholder="Confirm new password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               onBlur={() => handleBlur("confirmPassword")}
-              isInvalid={touched.confirmPassword && !!formErrors.confirmPassword}
-              disabled={isLoading}
+              autoComplete="new-password"
+              disabled={isLoading || isSuccess}
+              aria-invalid={!!(touched.confirmPassword && formErrors.confirmPassword)}
             />
-            <Form.Control.Feedback type="invalid">
-              {formErrors.confirmPassword}
-            </Form.Control.Feedback>
-          </Form.Group>
+            {touched.confirmPassword && formErrors.confirmPassword && (
+              <div className="auth-error">
+                <ExclamationCircleFill className="auth-error-icon" size={14} />
+                {formErrors.confirmPassword}
+              </div>
+            )}
+          </div>
 
-          <Button
+          <button
             type="submit"
-            variant="primary"
-            className="w-100 mb-3"
+            className="auth-submit-btn"
             disabled={isLoading || isSuccess}
           >
             {isLoading ? (
               <>
-                <Spinner
-                  as="span"
-                  animation="border"
-                  size="sm"
+                <span
+                  className="spinner-border spinner-border-sm"
                   role="status"
                   aria-hidden="true"
-                  className="me-2"
                 />
                 Resetting...
               </>
             ) : isSuccess ? (
               <>
-                <Icon name="check" className="me-2" />
+                <CheckLg size={18} />
                 Password Reset
               </>
             ) : (
               "Reset Password"
             )}
-          </Button>
-        </Form>
+          </button>
+        </form>
 
-        <p className="text-center text-muted">
-          Remember your password? <Link to="/account/login">Login</Link>
-        </p>
+        <div className="auth-links">
+          <p>
+            Remember your password? <Link to="/account/login">Login</Link>
+          </p>
+        </div>
       </div>
-    </Container>
+    </div>
   );
 };
 

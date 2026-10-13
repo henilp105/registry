@@ -20,7 +20,10 @@ const VerifyEmail = () => {
   }, [dispatch, uuid]);
 
   const isSuccess = statuscode === 200;
-  const hasError = Boolean(error) || (statuscode && statuscode !== 200);
+  // `statuscode` starts at 0, so the right-hand operand can be the number 0.
+  // Without the Boolean() the JSX below (`{hasError && ...}`) would render a
+  // stray literal "0" on the page.
+  const hasError = Boolean(error) || Boolean(statuscode && statuscode !== 200);
   const displayMessage = message || error;
 
   return (
